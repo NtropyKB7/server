@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.AllocationGoalMapper">
+
+    <resultMap id="allocationGoalResultMap" type="com.ntropy.work.domain.entity.AllocationGoal">
+        <id property="allocationGoalId" column="allocation_goal_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="targetMonth" column="target_month"/>
+        <result property="recommendHour" column="recommend_hour"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.AllocationGoal">
+        INSERT INTO ALLOCATION_GOAL (allocation_goal_id, job_id, target_month, recommend_hour)
+        VALUES (#{allocationGoalId}, #{jobId}, #{targetMonth}, #{recommendHour})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="allocationGoalResultMap">
+        SELECT allocation_goal_id, job_id, target_month, recommend_hour
+        FROM ALLOCATION_GOAL
+        WHERE allocation_goal_id = #{allocationGoalId}
+    </select>
+
+    <select id="findByJobId" parameterType="long" resultMap="allocationGoalResultMap">
+        SELECT allocation_goal_id, job_id, target_month, recommend_hour
+        FROM ALLOCATION_GOAL
+        WHERE job_id = #{jobId}
+    </select>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.AllocationGoal">
+        UPDATE ALLOCATION_GOAL
+        SET target_month = #{targetMonth},
+            recommend_hour = #{recommendHour}
+        WHERE allocation_goal_id = #{allocationGoalId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM ALLOCATION_GOAL
+        WHERE allocation_goal_id = #{allocationGoalId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.PlatformMapper">
+
+    <resultMap id="platformResultMap" type="com.ntropy.work.domain.entity.Platform">
+        <id property="platformId" column="platform_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="platformName" column="platform_name"/>
+        <result property="depositName" column="deposit_name"/>
+        <result property="settlementCycle" column="settlement_cycle"/>
+        <result property="isActive" column="is_active"/>
+        <result property="settlementDay" column="settlement_day"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Platform">
+        INSERT INTO PLATFORM (platform_id, job_id, platform_name, deposit_name, settlement_cycle, is_active, settlement_day)
+        VALUES (#{platformId}, #{jobId}, #{platformName}, #{depositName}, #{settlementCycle}, #{isActive}, #{settlementDay})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="platformResultMap">
+        SELECT platform_id, job_id, platform_name, deposit_name, settlement_cycle, is_active, settlement_day
+        FROM PLATFORM
+        WHERE platform_id = #{platformId}
+    </select>
+
+    <select id="findByJobId" parameterType="long" resultMap="platformResultMap">
+        SELECT platform_id, job_id, platform_name, deposit_name, settlement_cycle, is_active, settlement_day
+        FROM PLATFORM
+        WHERE job_id = #{jobId}
+    </select>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.Platform">
+        UPDATE PLATFORM
+        SET platform_name = #{platformName},
+            deposit_name = #{depositName},
+            settlement_cycle = #{settlementCycle},
+            is_active = #{isActive},
+            settlement_day = #{settlementDay}
+        WHERE platform_id = #{platformId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM PLATFORM
+        WHERE platform_id = #{platformId}
+    </delete>
+
+</mapper>

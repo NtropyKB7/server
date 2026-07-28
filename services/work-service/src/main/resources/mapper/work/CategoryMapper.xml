@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.CategoryMapper">
+
+    <resultMap id="categoryResultMap" type="com.ntropy.work.domain.entity.Category">
+        <id property="categoryId" column="category_id"/>
+        <result property="name" column="name"/>
+        <result property="taskPerHour" column="task_per_hour"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Category">
+        INSERT INTO Category (category_id, name, task_per_hour)
+        VALUES (#{categoryId}, #{name}, #{taskPerHour})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="categoryResultMap">
+        SELECT category_id, name, task_per_hour
+        FROM Category
+        WHERE category_id = #{categoryId}
+    </select>
+
+    <select id="findAll" resultMap="categoryResultMap">
+        SELECT category_id, name, task_per_hour
+        FROM Category
+    </select>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.Category">
+        UPDATE Category
+        SET name = #{name},
+            task_per_hour = #{taskPerHour}
+        WHERE category_id = #{categoryId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM Category
+        WHERE category_id = #{categoryId}
+    </delete>
+
+</mapper>

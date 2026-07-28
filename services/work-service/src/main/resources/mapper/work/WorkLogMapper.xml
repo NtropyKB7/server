@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.WorkLogMapper">
+
+    <resultMap id="workLogResultMap" type="com.ntropy.work.domain.entity.WorkLog">
+        <id property="logId" column="log_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="workDate" column="work_date"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="fatigue" column="fatigue"/>
+        <result property="estimatedIncome" column="estimated_income"/>
+        <result property="status" column="status"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.WorkLog">
+        INSERT INTO WORK_LOG (log_id, user_id, job_id, work_date, start_time, end_time,
+                               fatigue, estimated_income, status)
+        VALUES (#{logId}, #{userId}, #{jobId}, #{workDate}, #{startTime}, #{endTime},
+                #{fatigue}, #{estimatedIncome}, #{status})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="workLogResultMap">
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, fatigue, estimated_income, status
+        FROM WORK_LOG
+        WHERE log_id = #{logId}
+    </select>
+
+    <select id="findByJobId" parameterType="long" resultMap="workLogResultMap">
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, fatigue, estimated_income, status
+        FROM WORK_LOG
+        WHERE job_id = #{jobId}
+    </select>
+
+    <select id="findByUserIdAndWorkDate" resultMap="workLogResultMap">
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, fatigue, estimated_income, status
+        FROM WORK_LOG
+        WHERE user_id = #{userId}
+          AND work_date = #{workDate}
+    </select>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.WorkLog">
+        UPDATE WORK_LOG
+        SET work_date = #{workDate},
+            start_time = #{startTime},
+            end_time = #{endTime},
+            fatigue = #{fatigue},
+            estimated_income = #{estimatedIncome},
+            status = #{status}
+        WHERE log_id = #{logId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM WORK_LOG
+        WHERE log_id = #{logId}
+    </delete>
+
+</mapper>
