@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.CodefConnectionMapper">
+
+    <insert id="insert" parameterType="com.ntropy.account.CodefConnection"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO CODEF_CONNECTION (user_id, connected_id)
+        VALUES (#{userId}, #{connectedId})
+    </insert>
+
+    <select id="findByUserId" parameterType="long" resultType="com.ntropy.account.CodefConnection">
+        SELECT id,
+               user_id      AS userId,
+               connected_id AS connectedId,
+               created_at   AS createdAt,
+               updated_at   AS updatedAt
+        FROM CODEF_CONNECTION
+        WHERE user_id = #{userId}
+    </select>
+
+</mapper>
