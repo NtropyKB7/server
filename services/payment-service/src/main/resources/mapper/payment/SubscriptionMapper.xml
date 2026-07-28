@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.payment.mapper.SubscriptionMapper">
+
+    <resultMap id="subscriptionResultMap" type="com.ntropy.payment.domain.Subscription">
+        <id property="subscriptionId" column="subscription_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="planCode" column="plan_code" javaType="com.ntropy.payment.domain.PlanCode"/>
+        <result property="startDate" column="start_date"/>
+        <result property="endDate" column="end_date"/>
+        <result property="cancelRequestedAt" column="cancel_requested_at"/>
+        <result property="autoRenewYn" column="auto_renew_yn"/>
+        <result property="customerUid" column="customer_uid"/>
+        <result property="cardName" column="card_name"/>
+        <result property="cardNumberMasked" column="card_number_masked"/>
+        <result property="status" column="status" javaType="com.ntropy.payment.domain.SubscriptionStatus"/>
+    </resultMap>
+
+    <sql id="subscriptionColumns">
+        subscription_id, user_id, plan_code, start_date, end_date,
+        cancel_requested_at, auto_renew_yn, customer_uid, card_name,
+        card_number_masked, status
+    </sql>
+
+    <select id="findById" resultMap="subscriptionResultMap">
+        SELECT <include refid="subscriptionColumns"/>
+        FROM SUBSCRIPTION
+        WHERE subscription_id = #{subscriptionId}
+    </select>
+
+    <select id="findLatestByUserId" resultMap="subscriptionResultMap">
+        SELECT <include refid="subscriptionColumns"/>
+        FROM SUBSCRIPTION
+        WHERE user_id = #{userId}
+        ORDER BY start_date DESC
+        LIMIT 1
+    </select>
+
+    <select id="findByCustomerUid" resultMap="subscriptionResultMap">
+        SELECT <include refid="subscriptionColumns"/>
+        FROM SUBSCRIPTION
+        WHERE customer_uid = #{customerUid}
+    </select>
+
+    <select id="findAllByUserId" resultMap="subscriptionResultMap">
+        SELECT <include refid="subscriptionColumns"/>
+        FROM SUBSCRIPTION
+        WHERE user_id = #{userId}
+        ORDER BY start_date DESC
+    </select>
+
+    <insert id="insert" parameterType="com.ntropy.payment.domain.Subscription"
+            useGeneratedKeys="true" keyProperty="subscriptionId" keyColumn="subscription_id">
+        INSERT INTO SUBSCRIPTION (
+            user_id, plan_code, start_date, end_date, cancel_requested_at,
+            auto_renew_yn, customer_uid, card_name, card_number_masked, status
+        ) VALUES (
+                     #{userId}, #{planCode}, #{startDate}, #{endDate}, #{cancelRequestedAt},
+                     #{autoRenewYn}, #{customerUid}, #{cardName}, #{cardNumberMasked}, #{status}
+                 )
+    </insert>
+
+    <update id="update" parameterType="com.ntropy.payment.domain.Subscription">
+        UPDATE SUBSCRIPTION
+        SET plan_code = #{planCode},
+            end_date = #{endDate},
+            cancel_requested_at = #{cancelRequestedAt},
+            auto_renew_yn = #{autoRenewYn},
+            customer_uid = #{customerUid},
+            card_name = #{cardName},
+            card_number_masked = #{cardNumberMasked},
+            status = #{status}
+        WHERE subscription_id = #{subscriptionId}
+    </update>
+
+</mapper>
