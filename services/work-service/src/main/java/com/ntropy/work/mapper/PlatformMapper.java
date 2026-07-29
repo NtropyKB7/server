@@ -2,8 +2,11 @@ package com.ntropy.work.mapper;
 
 import java.util.List;
 
+import org.apache.ibatis.annotations.Mapper;
+
 import com.ntropy.work.domain.entity.Platform;
 
+@Mapper
 public interface PlatformMapper {
 
     void insert(Platform platform);

@@ -3,10 +3,12 @@ package com.ntropy.work.mapper;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.ntropy.work.domain.entity.WorkLog;
 
+@Mapper
 public interface WorkLogMapper {
 
     void insert(WorkLog workLog);
