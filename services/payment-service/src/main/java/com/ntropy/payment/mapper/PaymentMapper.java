@@ -2,10 +2,12 @@ package com.ntropy.payment.mapper;
 
 import com.ntropy.payment.domain.Payment;
 import com.ntropy.payment.domain.PaymentStatus;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
+@Mapper
 public interface PaymentMapper {
 
     Payment findById(Long paymentId);
