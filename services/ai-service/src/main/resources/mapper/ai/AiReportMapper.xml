@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- AiReportMapper 자바 인터페이스와 연결되는 XML 매퍼 설정 -->
+<mapper namespace="com.ntropy.ai.mapper.AiReportMapper">
+
+    <!-- DB 컬럼명과 Java AiReport 객체의 필드명을 1:1 매핑하는 ResultMap -->
+    <resultMap id="aiReportResultMap" type="com.ntropy.ai.domain.AiReport">
+        <id property="reportId" column="report_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="yearMonth" column="year_month"/>
+        <result property="financialSummaryJson" column="financial_summary_json"/>
+        <result property="recommendationJson" column="recommendation_json"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 공통으로 사용할 SELECT 컬럼 리스트 조각 -->
+    <sql id="aiReportColumns">
+        report_id, user_id, year_month, financial_summary_json, recommendation_json, created_at
+    </sql>
+
+    <!-- 1. AI 리포트 데이터 신규 저장 (insert) -->
+    <!-- useGeneratedKeys="true"로 지정하여 DB에서 AUTO_INCREMENT 된 report_id를 객체에 자동 채움 -->
+    <insert id="insert" parameterType="com.ntropy.ai.domain.AiReport"
+            useGeneratedKeys="true" keyProperty="reportId" keyColumn="report_id">
+        INSERT INTO AI_REPORT (
+            user_id, year_month, financial_summary_json, recommendation_json
+        ) VALUES (
+                     #{userId}, #{yearMonth}, #{financialSummaryJson}, #{recommendationJson}
+                 )
+    </insert>
+
+    <!-- 2. PK(report_id) 기준 단건 조회 (findById) -->
+    <select id="findById" resultMap="aiReportResultMap">
+        SELECT <include refid="aiReportColumns"/>
+        FROM AI_REPORT
+        WHERE report_id = #{reportId}
+    </select>
+
+    <!-- 3. 특정 유저의 해당 연월(user_id, year_month) 리포트 조회 (findByUserIdAndYearMonth) -->
+    <!-- IDX_AI_REPORT_USER_YM 복합 인덱스를 타고 빠르게 조회됨 -->
+    <select id="findByUserIdAndYearMonth" resultMap="aiReportResultMap">
+        SELECT <include refid="aiReportColumns"/>
+        FROM AI_REPORT
+        WHERE user_id = #{userId} AND year_month = #{yearMonth}
+        LIMIT 1
+    </select>
+
+    <!-- 4. 특정 유저의 전체 리포트 히스토리 최신순 조회 (findAllByUserId) -->
+    <select id="findAllByUserId" resultMap="aiReportResultMap">
+        SELECT <include refid="aiReportColumns"/>
+        FROM AI_REPORT
+        WHERE user_id = #{userId}
+        ORDER BY year_month DESC
+    </select>
+
+</mapper>

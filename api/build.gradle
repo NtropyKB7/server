@@ -12,6 +12,7 @@ dependencies {
     implementation project(':services:payment-service')
     implementation project(':services:notification-service')
     implementation project(':services:bff-service')
+    implementation project(':services:ai-service')
 
     // 스프링
     implementation ("org.springframework:spring-context:${springVersion}")
