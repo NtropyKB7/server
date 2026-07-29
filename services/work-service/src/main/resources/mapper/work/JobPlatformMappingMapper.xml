@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.JobPlatformMappingMapper">
+
+    <resultMap id="jobPlatformMappingResultMap" type="com.ntropy.work.domain.entity.JobPlatformMapping">
+        <id property="mappingId" column="mapping_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="platformId" column="platform_id"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.JobPlatformMapping">
+        INSERT INTO JOBPLATFORMMAPPING (mapping_id, job_id, platform_id)
+        VALUES (#{mappingId}, #{jobId}, #{platformId})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="jobPlatformMappingResultMap">
+        SELECT mapping_id, job_id, platform_id
+        FROM JOBPLATFORMMAPPING
+        WHERE mapping_id = #{mappingId}
+    </select>
+
+    <select id="findByJobId" parameterType="long" resultMap="jobPlatformMappingResultMap">
+        SELECT mapping_id, job_id, platform_id
+        FROM JOBPLATFORMMAPPING
+        WHERE job_id = #{jobId}
+    </select>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.JobPlatformMapping">
+        UPDATE JOBPLATFORMMAPPING
+        SET platform_id = #{platformId}
+        WHERE mapping_id = #{mappingId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM JOBPLATFORMMAPPING
+        WHERE mapping_id = #{mappingId}
+    </delete>
+
+</mapper>

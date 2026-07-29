@@ -5,16 +5,22 @@ build/
 !**/src/test/**/build/
 .kotlin
 
-### 개인 문서 (커밋 금지) ###
-CLAUDE.local.md
-DEVLOG.md
-codef-local.properties
+### 로컬 설정/비밀정보 ###
+application.properties
+application-local.properties
+application-*.properties
+!application.properties.example
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
 .idea/libraries/
+.idea/dataSources.xml
+.idea/.name
+.idea/gradle.xml
+.idea/vcs.xml
+.idea/misc.xml
 *.iws
 *.iml
 *.ipr

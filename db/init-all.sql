@@ -12,7 +12,8 @@
 -- SOURCE services/account-service/src/main/resources/db/account-service-schema.sql;
 
 -- work-service
--- SOURCE services/work-service/src/main/resources/db/work-service-schema.sql;
+SOURCE services/work-service/src/main/resources/db/work-service-schema.sql;
+SOURCE services/work-service/src/main/resources/db/work-service-seed.sql;
 
 -- diagnosis-service
 -- SOURCE services/diagnosis-service/src/main/resources/db/diagnosis-service-schema.sql;

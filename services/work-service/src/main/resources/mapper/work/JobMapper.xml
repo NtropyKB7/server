@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.JobMapper">
+
+    <resultMap id="jobResultMap" type="com.ntropy.work.domain.entity.Job">
+        <id property="jobId" column="job_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="jobName" column="job_name"/>
+        <result property="settlementType" column="settlement_type"/>
+        <result property="hourlyWage" column="hourly_wage"/>
+        <result property="monthlyWage" column="monthly_wage"/>
+        <result property="perTaskWage" column="per_task_wage"/>
+        <result property="taskPerHour" column="task_per_hour"/>
+        <result property="isRegular" column="is_regular"/>
+        <result property="baseFatigue" column="base_fatigue"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="isActive" column="is_active"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Job">
+        INSERT INTO JOB (job_id, user_id, category_id, job_name, settlement_type, hourly_wage,
+                          monthly_wage, per_task_wage, task_per_hour, is_regular, base_fatigue,
+                          created_at, updated_at, is_active)
+        VALUES (#{jobId}, #{userId}, #{categoryId}, #{jobName}, #{settlementType}, #{hourlyWage},
+                #{monthlyWage}, #{perTaskWage}, #{taskPerHour}, #{isRegular}, #{baseFatigue},
+                #{createdAt}, #{updatedAt}, #{isActive})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="jobResultMap">
+        SELECT job_id, user_id, category_id, job_name, settlement_type, hourly_wage,
+               monthly_wage, per_task_wage, task_per_hour, is_regular, base_fatigue,
+               created_at, updated_at, is_active
+        FROM JOB
+        WHERE job_id = #{jobId}
+    </select>
+
+    <select id="findByUserId" parameterType="long" resultMap="jobResultMap">
+        SELECT job_id, user_id, category_id, job_name, settlement_type, hourly_wage,
+               monthly_wage, per_task_wage, task_per_hour, is_regular, base_fatigue,
+               created_at, updated_at, is_active
+        FROM JOB
+        WHERE user_id = #{userId}
+    </select>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.Job">
+        UPDATE JOB
+        SET category_id = #{categoryId},
+            job_name = #{jobName},
+            settlement_type = #{settlementType},
+            hourly_wage = #{hourlyWage},
+            monthly_wage = #{monthlyWage},
+            per_task_wage = #{perTaskWage},
+            task_per_hour = #{taskPerHour},
+            is_regular = #{isRegular},
+            base_fatigue = #{baseFatigue},
+            updated_at = #{updatedAt},
+            is_active = #{isActive}
+        WHERE job_id = #{jobId}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM JOB
+        WHERE job_id = #{jobId}
+    </delete>
+
+</mapper>
