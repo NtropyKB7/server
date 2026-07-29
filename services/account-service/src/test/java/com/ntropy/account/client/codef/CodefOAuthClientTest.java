@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -22,9 +22,10 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ntropy.account.CodefToken;
 import com.ntropy.account.config.CodefProperties;
 import com.ntropy.account.config.CodefServiceType;
+import com.ntropy.account.domain.entity.CodefToken;
+import com.ntropy.account.repository.CodefTokenStore;
 
 class CodefOAuthClientTest {
 

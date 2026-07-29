@@ -2,7 +2,8 @@ package com.ntropy.account.service;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.account.CodefConnection;
+import com.ntropy.account.client.codef.CodefConnectionClient;
+import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -14,13 +15,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CodefConnectionService {
 
-    private final CodefAccountClient codefAccountClient;
+    private final CodefConnectionClient codefConnectionClient;
     private final CodefConnectionMapper codefConnectionMapper;
 
     public CodefConnection registerAndSave(Long userId, String organizationCode,
                                            String businessType, String clientType,
                                            String loginId, String rawPassword, String birthDate) {
-        String connectedId = codefAccountClient.createConnection(
+        String connectedId = codefConnectionClient.createConnection(
                 organizationCode,
                 businessType,
                 clientType,

@@ -1,4 +1,4 @@
 /**
- * account-service가 구현하는 LocalXXXClient 계층 (common의 인터페이스 구현).
+ * account-service 외부 시스템 연동 클라이언트 계층.
  */
 package com.ntropy.account.client;

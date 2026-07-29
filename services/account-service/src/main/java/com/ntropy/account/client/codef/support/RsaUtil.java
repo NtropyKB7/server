@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef.support;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;

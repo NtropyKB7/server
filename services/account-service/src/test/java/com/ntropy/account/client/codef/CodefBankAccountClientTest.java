@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

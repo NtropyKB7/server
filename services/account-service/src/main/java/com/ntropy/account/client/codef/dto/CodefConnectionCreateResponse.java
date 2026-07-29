@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef.dto;
 
 import java.util.List;
 
@@ -13,7 +13,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class CodefAccountCreateResponse {
+public class CodefConnectionCreateResponse {
 
     private Result result;
     private Data data;

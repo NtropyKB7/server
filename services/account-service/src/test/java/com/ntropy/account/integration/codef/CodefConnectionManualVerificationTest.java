@@ -1,4 +1,4 @@
-package com.ntropy.account;
+package com.ntropy.account.integration.codef;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -21,7 +21,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ntropy.account.service.CodefBankAccountClient;
+import com.ntropy.account.client.codef.CodefBankAccountClient;
+import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.service.CodefConnectionService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;

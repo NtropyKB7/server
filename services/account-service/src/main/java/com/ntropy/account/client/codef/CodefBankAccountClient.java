@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

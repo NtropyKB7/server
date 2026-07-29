@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import java.net.URLDecoder;
 import java.net.URLEncoder;

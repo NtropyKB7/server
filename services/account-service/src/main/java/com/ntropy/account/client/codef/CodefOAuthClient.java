@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -16,8 +16,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ntropy.account.CodefToken;
+import com.ntropy.account.client.codef.dto.CodefTokenResponse;
 import com.ntropy.account.config.CodefProperties;
+import com.ntropy.account.domain.entity.CodefToken;
+import com.ntropy.account.repository.CodefTokenStore;
 
 /**
  * CODEF OAuth2 accessToken을 발급/캐싱해서 돌려준다.

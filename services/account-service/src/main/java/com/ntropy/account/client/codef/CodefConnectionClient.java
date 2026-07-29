@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -7,6 +7,8 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.account.config.CodefProperties;
+import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse;
+import com.ntropy.account.client.codef.support.RsaUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -16,7 +18,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Component
 @RequiredArgsConstructor
-public class CodefAccountClient {
+public class CodefConnectionClient {
 
     private static final String ACCOUNT_CREATE_PATH = "/v1/account/create";
 
@@ -52,10 +54,10 @@ public class CodefAccountClient {
             Map<String, Object> requestBody = new LinkedHashMap<>();
             requestBody.put("accountList", List.of(account));
 
-            CodefAccountCreateResponse response = codefApiClient.post(
+            CodefConnectionCreateResponse response = codefApiClient.post(
                     ACCOUNT_CREATE_PATH,
                     requestBody,
-                    CodefAccountCreateResponse.class
+                    CodefConnectionCreateResponse.class
             );
 
             if (response.getResult() == null || !"CF-00000".equals(response.getResult().getCode())
