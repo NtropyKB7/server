@@ -26,14 +26,14 @@ CREATE TABLE `PLATFORM` (
 
 -- 3. JOBPLATFORMMAPPING (사용자별 잡-플랫폼 연결 인스턴스)
 CREATE TABLE `JOBPLATFORMMAPPING` (
-	`mapping_id`	BIGINT	NOT NULL,
+	`mapping_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
 	`job_id`	BIGINT	NOT NULL,
 	`platform_id`	BIGINT	NOT NULL
 );
 
 -- 4. JOB (잡 등록)
 CREATE TABLE `JOB` (
-	`job_id`	BIGINT	NOT NULL,
+	`job_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
 	`user_id`	BIGINT	NOT NULL,
 	`category_id`	BIGINT	NOT NULL,
 	`job_name`	VARCHAR(50)	NOT NULL	COMMENT '사용자가 직접 입력하는 잡 라벨 (카테고리만으로 구분 안 되는 실제 근무지명)',
@@ -51,7 +51,7 @@ CREATE TABLE `JOB` (
 
 -- 5. JOB_SCHEDULE (정기 근무 스케줄)
 CREATE TABLE `JOB_SCHEDULE` (
-	`schedule_id`	BIGINT	NOT NULL,
+	`schedule_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
 	`job_id`	BIGINT	NOT NULL,
 	`day_of_week`	VARCHAR(10)	NULL,
 	`start_time`	TIME	NULL,
