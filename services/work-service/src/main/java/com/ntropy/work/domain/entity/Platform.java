@@ -14,10 +14,11 @@ import lombok.Setter;
 public class Platform {
 
     private Long platformId;
-    private Long jobId;
+    private Long categoryId;
     private String platformName;
     private String depositName;
     private String settlementCycle;
-    private Boolean isActive;
-    private String settlementDay;
+    private Integer settlementOffsetDay;
+    private String settlementDayOfWeek;
+    private Integer settlementDayOfMonth;
 }

@@ -11,8 +11,9 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Category {
+public class JobPlatformMapping {
 
-    private Long categoryId;
-    private String name;
+    private Long mappingId;
+    private Long jobId;
+    private Long platformId;
 }

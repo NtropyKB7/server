@@ -10,7 +10,7 @@ public interface PlatformMapper {
 
     Platform findById(Long platformId);
 
-    List<Platform> findByJobId(Long jobId);
+    List<Platform> findAll();
 
     void update(Platform platform);
 

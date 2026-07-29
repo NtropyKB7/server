@@ -18,10 +18,13 @@ public class Job {
     private Long jobId;
     private Long userId;
     private Long categoryId;
-    private String rewardType;
+    private String jobName;
+    private String settlementType;
     private Integer hourlyWage;
-    private Integer perTaskAmount;
-    private String scheduleType;
+    private Integer monthlyWage;
+    private Integer perTaskWage;
+    private Float taskPerHour;
+    private Boolean isRegular;
     private Integer baseFatigue;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -4,38 +4,44 @@
 
     <resultMap id="platformResultMap" type="com.ntropy.work.domain.entity.Platform">
         <id property="platformId" column="platform_id"/>
-        <result property="jobId" column="job_id"/>
+        <result property="categoryId" column="category_id"/>
         <result property="platformName" column="platform_name"/>
         <result property="depositName" column="deposit_name"/>
         <result property="settlementCycle" column="settlement_cycle"/>
-        <result property="isActive" column="is_active"/>
-        <result property="settlementDay" column="settlement_day"/>
+        <result property="settlementOffsetDay" column="settlement_offset_day"/>
+        <result property="settlementDayOfWeek" column="settlement_day_of_week"/>
+        <result property="settlementDayOfMonth" column="settlement_day_of_month"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.ntropy.work.domain.entity.Platform">
-        INSERT INTO PLATFORM (platform_id, job_id, platform_name, deposit_name, settlement_cycle, is_active, settlement_day)
-        VALUES (#{platformId}, #{jobId}, #{platformName}, #{depositName}, #{settlementCycle}, #{isActive}, #{settlementDay})
+        INSERT INTO PLATFORM (platform_id, category_id, platform_name, deposit_name, settlement_cycle,
+                               settlement_offset_day, settlement_day_of_week, settlement_day_of_month)
+        VALUES (#{platformId}, #{categoryId}, #{platformName}, #{depositName}, #{settlementCycle},
+                #{settlementOffsetDay}, #{settlementDayOfWeek}, #{settlementDayOfMonth})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="platformResultMap">
-        SELECT platform_id, job_id, platform_name, deposit_name, settlement_cycle, is_active, settlement_day
+        SELECT platform_id, category_id, platform_name, deposit_name, settlement_cycle,
+               settlement_offset_day, settlement_day_of_week, settlement_day_of_month
         FROM PLATFORM
         WHERE platform_id = #{platformId}
     </select>
 
-    <select id="findByJobId" parameterType="long" resultMap="platformResultMap">
-        SELECT platform_id, job_id, platform_name, deposit_name, settlement_cycle, is_active, settlement_day
+    <select id="findAll" resultMap="platformResultMap">
+        SELECT platform_id, category_id, platform_name, deposit_name, settlement_cycle,
+               settlement_offset_day, settlement_day_of_week, settlement_day_of_month
         FROM PLATFORM
-        WHERE job_id = #{jobId}
     </select>
 
     <update id="update" parameterType="com.ntropy.work.domain.entity.Platform">
         UPDATE PLATFORM
-        SET platform_name = #{platformName},
+        SET category_id = #{categoryId},
+            platform_name = #{platformName},
             deposit_name = #{depositName},
             settlement_cycle = #{settlementCycle},
-            is_active = #{isActive},
-            settlement_day = #{settlementDay}
+            settlement_offset_day = #{settlementOffsetDay},
+            settlement_day_of_week = #{settlementDayOfWeek},
+            settlement_day_of_month = #{settlementDayOfMonth}
         WHERE platform_id = #{platformId}
     </update>
 

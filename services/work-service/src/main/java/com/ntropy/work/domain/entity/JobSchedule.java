@@ -1,5 +1,7 @@
 package com.ntropy.work.domain.entity;
 
+import java.time.LocalTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,6 +18,6 @@ public class JobSchedule {
     private Long scheduleId;
     private Long jobId;
     private String dayOfWeek;
-    private String startTime;
-    private String endTime;
+    private LocalTime startTime;
+    private LocalTime endTime;
 }
