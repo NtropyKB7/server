@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.payment.mapper.PaymentMapper">
+
+    <resultMap id="paymentResultMap" type="com.ntropy.payment.domain.Payment">
+        <id property="paymentId" column="payment_id"/>
+        <result property="subscriptionId" column="subscription_id"/>
+        <result property="planCode" column="plan_code" javaType="com.ntropy.payment.domain.PlanCode"/>
+        <result property="impUid" column="imp_uid"/>
+        <result property="amount" column="amount"/>
+        <result property="paymentMethod" column="payment_method"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="merchantUid" column="merchant_uid"/>
+        <result property="paymentStatus" column="payment_status" javaType="com.ntropy.payment.domain.PaymentStatus"/>
+        <result property="receiptUrl" column="receipt_url"/>
+    </resultMap>
+
+    <sql id="paymentColumns">
+        payment_id, subscription_id, plan_code, imp_uid, amount,
+        payment_method, created_at, merchant_uid, payment_status, receipt_url
+    </sql>
+
+    <select id="findById" resultMap="paymentResultMap">
+        SELECT <include refid="paymentColumns"/>
+        FROM PAYMENT
+        WHERE payment_id = #{paymentId}
+    </select>
+
+    <select id="findByMerchantUid" resultMap="paymentResultMap">
+        SELECT <include refid="paymentColumns"/>
+        FROM PAYMENT
+        WHERE merchant_uid = #{merchantUid}
+    </select>
+
+    <select id="findAllBySubscriptionId" resultMap="paymentResultMap">
+        SELECT <include refid="paymentColumns"/>
+        FROM PAYMENT
+        WHERE subscription_id = #{subscriptionId}
+        ORDER BY created_at DESC
+    </select>
+
+    <insert id="insert" parameterType="com.ntropy.payment.domain.Payment"
+            useGeneratedKeys="true" keyProperty="paymentId" keyColumn="payment_id">
+        INSERT INTO PAYMENT (
+            subscription_id, plan_code, imp_uid, amount,
+            payment_method, created_at, merchant_uid, payment_status, receipt_url
+        ) VALUES (
+                     #{subscriptionId}, #{planCode}, #{impUid}, #{amount},
+                     #{paymentMethod}, #{createdAt}, #{merchantUid}, #{paymentStatus}, #{receiptUrl}
+                 )
+    </insert>
+
+    <update id="updateStatus">
+        UPDATE PAYMENT
+        SET payment_status = #{paymentStatus},
+            receipt_url = #{receiptUrl}
+        WHERE payment_id = #{paymentId}
+    </update>
+
+</mapper>
