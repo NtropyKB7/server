@@ -1,0 +1,43 @@
+package com.ntropy.account.service;
+
+import org.springframework.stereotype.Service;
+
+import com.ntropy.account.CodefConnection;
+import com.ntropy.account.mapper.CodefConnectionMapper;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * CODEF 계정을 등록하고 발급된 connectedId를 사용자와 연결한다.
+ */
+@Service
+@RequiredArgsConstructor
+public class CodefConnectionService {
+
+    private final CodefAccountClient codefAccountClient;
+    private final CodefConnectionMapper codefConnectionMapper;
+
+    public CodefConnection registerAndSave(Long userId, String organizationCode,
+                                           String businessType, String clientType,
+                                           String loginId, String rawPassword, String birthDate) {
+        String connectedId = codefAccountClient.createConnection(
+                organizationCode,
+                businessType,
+                clientType,
+                loginId,
+                rawPassword,
+                birthDate
+        );
+
+        CodefConnection connection = new CodefConnection();
+        connection.setUserId(userId);
+        connection.setConnectedId(connectedId);
+        codefConnectionMapper.upsert(connection);
+
+        CodefConnection saved = codefConnectionMapper.findByUserId(userId);
+        if (saved == null || !connectedId.equals(saved.getConnectedId())) {
+            throw new IllegalStateException("CODEF connectedId 저장 확인 실패");
+        }
+        return saved;
+    }
+}
