@@ -5,6 +5,11 @@ build/
 !**/src/test/**/build/
 .kotlin
 
+### 개인 문서 (커밋 금지) ###
+CLAUDE.local.md
+DEVLOG.md
+codef-local.properties
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml

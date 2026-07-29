@@ -1,4 +1,11 @@
 # codef-local.properties로 복사해서 실제 값을 채우세요. codef-local.properties는 git에 커밋되지 않습니다.
-# CODEF 개발자센터 > 내 서비스 > 샌드박스 탭에서 확인 가능
-codef.sandbox.client-id=
-codef.sandbox.client-secret=
+# SANDBOX, DEMO, API 중 하나. 각 환경은 sandbox/development/api.codef.io에 대응합니다.
+codef.service-type=SANDBOX
+# CODEF 개발자센터에서 선택한 환경에 해당하는 클라이언트 정보
+codef.client-id=
+codef.client-secret=
+# CODEF 마이페이지 > 키 관리 탭의 public_key (RSA 암호화용, 비밀값 아님 - 공개키)
+codef.public-key=
+# 외부 CODEF 호출 타임아웃 (밀리초)
+codef.connect-timeout-ms=5000
+codef.read-timeout-ms=10000
