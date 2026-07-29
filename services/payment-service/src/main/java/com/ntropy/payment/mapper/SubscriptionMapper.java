@@ -1,9 +1,11 @@
 package com.ntropy.payment.mapper;
 
 import com.ntropy.payment.domain.Subscription;
+import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
+@Mapper
 public interface SubscriptionMapper {
 
     Subscription findById(Long subscriptionId);

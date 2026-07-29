@@ -5,4 +5,11 @@ dependencies {
 
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    //날짜 json 포맷
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.4'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.9.4'
+
+    //auth를 위해 임시로..
+    implementation 'org.springframework.security:spring-security-core:5.8.11'
 }
