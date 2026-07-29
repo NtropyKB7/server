@@ -2,6 +2,7 @@ package com.ntropy.config;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +24,7 @@ import javax.sql.DataSource;
                 @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = SwaggerConfig.class)
         }
 )
-@MapperScan("com.ntropy")
+@MapperScan(basePackages = "com.ntropy", annotationClass = Mapper.class)
 @EnableTransactionManagement
 public class RootConfig {
 

@@ -1,0 +1,39 @@
+package com.ntropy.account.service;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * {@code POST /v1/account/create} 응답 바디. CODEF 모든 API 공통 result/data 포맷을 따른다.
+ */
+@Getter
+@Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class CodefAccountCreateResponse {
+
+    private Result result;
+    private Data data;
+
+    @Getter
+    @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Result {
+        private String code;
+        private String message;
+        private String extraMessage;
+        private String transactionId;
+    }
+
+    @Getter
+    @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Data {
+        private String connectedId;
+        private List<Object> successList;
+        private List<Object> errorList;
+    }
+}
