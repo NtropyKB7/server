@@ -11,8 +11,9 @@ CREATE TABLE `SUBSCRIPTION` (
                                 `cancel_requested_at`	DATETIME	NULL,
                                 `auto_renew_yn`	BOOLEAN	NULL,
                                 `customer_uid`	VARCHAR(50)	NULL,
-                                `card_name`	VARCHAR(50)	NULL,
-                                `card_number_masked`	VARCHAR(30)	NULL,
+                                `payment_method`	VARCHAR(20)	NULL	COMMENT 'CARD | KAKAOPAY | TOSSPAY',
+                                `payment_label`	VARCHAR(50)	NULL	COMMENT '화면 표시용 (카드=카드사명, 간편결제=카카오페이/토스페이)',
+                                `payment_masked`	VARCHAR(30)	NULL	COMMENT 'CARD만 값 있음. 간편결제는 카드정보가 안 넘어와서 항상 NULL',
                                 `status`	VARCHAR(20)	NULL,
                                 PRIMARY KEY (`subscription_id`)
 );
@@ -59,17 +60,11 @@ CREATE INDEX `IDX_PAYMENT_SUBSCRIPTION_ID` ON `PAYMENT` (`subscription_id`);
 
 CREATE INDEX `IDX_SUBSCRIPTION_USER_ID` ON `SUBSCRIPTION` (`user_id`);
 
-
--- 케이스 1: PRO, 정상 이용중 (userId = 101)
-INSERT INTO SUBSCRIPTION (user_id, plan_code, status, start_date, end_date, auto_renew_yn, card_name, card_number_masked)
-VALUES (101, 'PRO', 'ACTIVE', '2026-07-16 00:00:00', '2026-08-16 00:00:00', 1, '신한카드', '**** 1111');
-
--- 케이스 2: PRO, 해지예정 (userId = 102)
-INSERT INTO SUBSCRIPTION (user_id, plan_code, status, start_date, end_date, auto_renew_yn, cancel_requested_at, card_name, card_number_masked)
-VALUES (102, 'PRO', 'CANCEL_SCHEDULED', '2026-06-16 00:00:00', '2026-08-16 00:00:00', 0, '2026-07-20 12:00:00', '신한카드', '**** 1111');
-
--- 케이스 3: Basic을 DB에 명시적으로 저장해둔 경우 (userId = 103)
-INSERT INTO SUBSCRIPTION (user_id, plan_code, status, auto_renew_yn)
-VALUES (103, 'BASIC', 'ACTIVE', 0);
-
--- 케이스 4(구독없음)는 INSERT 필요없음 - 그냥 위에 없는 숫자(예: 999)로 조회하면 됨
+-- ============================================================
+-- 참고: 아래 컬럼은 문자열(VARCHAR)로 저장되지만 애플리케이션에서는 enum으로 강제한다.
+--   SUBSCRIPTION.plan_code       : BASIC | PRO
+--   SUBSCRIPTION.status          : ACTIVE | CANCEL_SCHEDULED | EXPIRED | PAYMENT_FAILED
+--   SUBSCRIPTION.payment_method  : CARD | KAKAOPAY | TOSSPAY (결제수단별 포트원 채널 분리 확정)
+--   PAYMENT.payment_method       : CARD | KAKAOPAY | TOSSPAY (위와 동일 값 범위)
+--   PAYMENT.payment_status       : SUCCESS | FAILED | RETRY | CANCELLED
+-- ============================================================

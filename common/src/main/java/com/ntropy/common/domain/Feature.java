@@ -1,4 +1,4 @@
-package com.ntropy.payment.domain;
+package com.ntropy.common.domain;
 
 public enum Feature {
     DASHBOARD,

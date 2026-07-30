@@ -8,7 +8,7 @@
         <result property="planCode" column="plan_code" javaType="com.ntropy.payment.domain.PlanCode"/>
         <result property="impUid" column="imp_uid"/>
         <result property="amount" column="amount"/>
-        <result property="paymentMethod" column="payment_method"/>
+        <result property="paymentMethod" column="payment_method" javaType="com.ntropy.payment.domain.PaymentMethod"/>
         <result property="createdAt" column="created_at"/>
         <result property="merchantUid" column="merchant_uid"/>
         <result property="paymentStatus" column="payment_status" javaType="com.ntropy.payment.domain.PaymentStatus"/>
