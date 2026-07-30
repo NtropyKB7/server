@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.AccountTransactionMapper">
+
+    <insert id="insertAll">
+        INSERT INTO ACCOUNT_TRANSACTION (
+            account_id, tran_date, tran_time, out_amount, in_amount, after_balance, desc1, desc2, desc3, desc4
+        ) VALUES
+        <foreach collection="list" item="tx" separator=",">
+            (#{tx.accountId}, #{tx.tranDate}, #{tx.tranTime}, #{tx.outAmount}, #{tx.inAmount},
+             #{tx.afterBalance}, #{tx.desc1}, #{tx.desc2}, #{tx.desc3}, #{tx.desc4})
+        </foreach>
+    </insert>
+
+</mapper>

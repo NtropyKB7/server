@@ -9,7 +9,7 @@
 -- SOURCE services/user-service/src/main/resources/db/user-service-schema.sql;
 
 -- account-service
--- SOURCE services/account-service/src/main/resources/db/account-service-schema.sql;
+SOURCE services/account-service/src/main/resources/db/account-service-schema.sql;
 
 -- work-service
 SOURCE services/work-service/src/main/resources/db/work-service-schema.sql;

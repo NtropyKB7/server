@@ -13,13 +13,14 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse;
+import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse.AccountResult;
 import com.ntropy.account.config.CodefProperties;
 
 class CodefConnectionClientTest {
 
     @Test
     void addsAccountToExistingConnectedId() throws Exception {
-        StubCodefApiClient apiClient = new StubCodefApiClient(successResponse());
+        StubCodefApiClient apiClient = new StubCodefApiClient(successResponse("0004"));
         CodefConnectionClient client = new CodefConnectionClient(properties(), apiClient);
 
         client.addConnection(
@@ -57,6 +58,27 @@ class CodefConnectionClientTest {
         );
     }
 
+    @Test
+    void rejectsInstitutionFailureEvenWhenTopLevelResultSucceeds() throws Exception {
+        CodefConnectionCreateResponse response = successResponseWithoutAccountResult();
+        AccountResult failure = new AccountResult();
+        failure.setCode("CF-01001");
+        failure.setMessage("아이디 또는 비밀번호 오류");
+        failure.setOrganization("0088");
+        response.getData().setErrorList(List.of(failure));
+
+        CodefConnectionClient client = new CodefConnectionClient(
+                properties(), new StubCodefApiClient(response)
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> client.addConnection(
+                        "connected-id", "0088", "BK", "P", "id", "password", null
+                )
+        );
+    }
+
     private static CodefProperties properties() throws Exception {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
         generator.initialize(2048);
@@ -65,12 +87,26 @@ class CodefConnectionClientTest {
         return new CodefProperties("DEMO", "client-id", "client-secret", publicKey, 1000, 1000);
     }
 
-    private static CodefConnectionCreateResponse successResponse() {
+    private static CodefConnectionCreateResponse successResponse(String organizationCode) {
+        CodefConnectionCreateResponse response = successResponseWithoutAccountResult();
+        AccountResult success = new AccountResult();
+        success.setCode("CF-00000");
+        success.setMessage("정상");
+        success.setOrganization(organizationCode);
+        response.getData().setSuccessList(List.of(success));
+        return response;
+    }
+
+    private static CodefConnectionCreateResponse successResponseWithoutAccountResult() {
         CodefConnectionCreateResponse response = new CodefConnectionCreateResponse();
         CodefConnectionCreateResponse.Result result = new CodefConnectionCreateResponse.Result();
         result.setCode("CF-00000");
         result.setMessage("정상");
         response.setResult(result);
+        CodefConnectionCreateResponse.Data data = new CodefConnectionCreateResponse.Data();
+        data.setSuccessList(List.of());
+        data.setErrorList(List.of());
+        response.setData(data);
         return response;
     }
 

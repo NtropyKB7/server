@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.ntropy.account.config.CodefProperties;
 import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse;
+import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse.AccountResult;
 import com.ntropy.account.client.codef.support.RsaUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,7 @@ public class CodefConnectionClient {
                 String message = response.getResult() != null ? response.getResult().getMessage() : "알 수 없는 오류";
                 throw new IllegalStateException("CODEF 계정 등록 실패: " + message);
             }
+            validateInstitutionSuccess(response, organizationCode, "등록");
             return response.getData().getConnectedId();
         } catch (IllegalStateException e) {
             throw e;
@@ -85,6 +87,7 @@ public class CodefConnectionClient {
                 String message = response.getResult() != null ? response.getResult().getMessage() : "알 수 없는 오류";
                 throw new IllegalStateException("CODEF 계정 추가 실패: " + message);
             }
+            validateInstitutionSuccess(response, organizationCode, "추가");
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
@@ -109,6 +112,37 @@ public class CodefConnectionClient {
             account.put("birthDate", birthDate);
         }
         return account;
+    }
+
+    private static void validateInstitutionSuccess(CodefConnectionCreateResponse response,
+                                                    String organizationCode, String action) {
+        if (response.getData() != null && response.getData().getSuccessList() != null) {
+            boolean succeeded = response.getData().getSuccessList().stream()
+                    .anyMatch(item -> organizationCode.equals(item.getOrganization())
+                            && "CF-00000".equals(item.getCode()));
+            if (succeeded) {
+                return;
+            }
+        }
+
+        AccountResult failure = findInstitutionResult(
+                response.getData() != null ? response.getData().getErrorList() : null,
+                organizationCode
+        );
+        String detail = failure == null
+                ? "기관별 성공 결과가 없습니다"
+                : failure.getCode() + " " + failure.getMessage();
+        throw new IllegalStateException("CODEF 계정 " + action + " 실패: " + detail.trim());
+    }
+
+    private static AccountResult findInstitutionResult(List<AccountResult> results, String organizationCode) {
+        if (results == null) {
+            return null;
+        }
+        return results.stream()
+                .filter(item -> organizationCode.equals(item.getOrganization()))
+                .findFirst()
+                .orElse(null);
     }
 
 }

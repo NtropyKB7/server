@@ -18,6 +18,14 @@ public class CodefConnection {
     private Long id;
     private Long userId;
     private String connectedId;
+
+    /**
+     * 등록 완료된 기관코드 JSON 배열 원문(예: {@code ["0004","0088"]}).
+     * 동일 기관에 대한 CODEF {@code /account/add} 중복 요청을 막는 데 쓰인다.
+     * 파싱/직렬화는 {@link com.ntropy.account.domain.InstitutionKeys}를 사용한다.
+     */
+    private String registeredInstitutionKeys;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
