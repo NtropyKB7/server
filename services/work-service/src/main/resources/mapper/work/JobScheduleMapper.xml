@@ -10,9 +10,10 @@
         <result property="endTime" column="end_time"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.ntropy.work.domain.entity.JobSchedule">
-        INSERT INTO JOB_SCHEDULE (schedule_id, job_id, day_of_week, start_time, end_time)
-        VALUES (#{scheduleId}, #{jobId}, #{dayOfWeek}, #{startTime}, #{endTime})
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.JobSchedule"
+            useGeneratedKeys="true" keyProperty="scheduleId">
+        INSERT INTO JOB_SCHEDULE (job_id, day_of_week, start_time, end_time)
+        VALUES (#{jobId}, #{dayOfWeek}, #{startTime}, #{endTime})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="jobScheduleResultMap">

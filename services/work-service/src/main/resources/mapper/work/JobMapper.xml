@@ -19,11 +19,12 @@
         <result property="isActive" column="is_active"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Job">
-        INSERT INTO JOB (job_id, user_id, category_id, job_name, settlement_type, hourly_wage,
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Job"
+            useGeneratedKeys="true" keyProperty="jobId">
+        INSERT INTO JOB (user_id, category_id, job_name, settlement_type, hourly_wage,
                           monthly_wage, per_task_wage, task_per_hour, is_regular, base_fatigue,
                           created_at, updated_at, is_active)
-        VALUES (#{jobId}, #{userId}, #{categoryId}, #{jobName}, #{settlementType}, #{hourlyWage},
+        VALUES (#{userId}, #{categoryId}, #{jobName}, #{settlementType}, #{hourlyWage},
                 #{monthlyWage}, #{perTaskWage}, #{taskPerHour}, #{isRegular}, #{baseFatigue},
                 #{createdAt}, #{updatedAt}, #{isActive})
     </insert>

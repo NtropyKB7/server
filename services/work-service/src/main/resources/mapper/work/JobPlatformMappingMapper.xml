@@ -8,9 +8,10 @@
         <result property="platformId" column="platform_id"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.ntropy.work.domain.entity.JobPlatformMapping">
-        INSERT INTO JOBPLATFORMMAPPING (mapping_id, job_id, platform_id)
-        VALUES (#{mappingId}, #{jobId}, #{platformId})
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.JobPlatformMapping"
+            useGeneratedKeys="true" keyProperty="mappingId">
+        INSERT INTO JOBPLATFORMMAPPING (job_id, platform_id)
+        VALUES (#{jobId}, #{platformId})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="jobPlatformMappingResultMap">
