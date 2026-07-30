@@ -13,13 +13,7 @@ class CodefConnectionServiceTest {
 
     @Test
     void registersAccountAndReadsSavedConnectionBack() {
-        CodefConnectionClient connectionClient = new CodefConnectionClient(null, null) {
-            @Override
-            public String createConnection(String organizationCode, String businessType, String clientType,
-                                           String loginId, String rawPassword, String birthDate) {
-                return "connected-id";
-            }
-        };
+        StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
 
@@ -36,6 +30,58 @@ class CodefConnectionServiceTest {
         assertNotNull(saved);
         assertEquals(1L, saved.getUserId());
         assertEquals("connected-id", saved.getConnectedId());
+        assertEquals(1, connectionClient.createCalls);
+        assertEquals(0, connectionClient.addCalls);
+    }
+
+    @Test
+    void addsAccountToExistingConnectedIdWithoutReplacingIt() {
+        StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
+        InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
+        CodefConnection existing = new CodefConnection();
+        existing.setUserId(1L);
+        existing.setConnectedId("existing-connected-id");
+        mapper.upsert(existing);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+
+        CodefConnection saved = service.registerAndSave(
+                1L, "0088", "BK", "P", "login-id", "password", null
+        );
+
+        assertEquals("existing-connected-id", saved.getConnectedId());
+        assertEquals("existing-connected-id", connectionClient.connectedId);
+        assertEquals("0088", connectionClient.organizationCode);
+        assertEquals(0, connectionClient.createCalls);
+        assertEquals(1, connectionClient.addCalls);
+    }
+
+    private static class StubCodefConnectionClient extends CodefConnectionClient {
+
+        private int createCalls;
+        private int addCalls;
+        private String connectedId;
+        private String organizationCode;
+
+        StubCodefConnectionClient() {
+            super(null, null);
+        }
+
+        @Override
+        public String createConnection(String organizationCode, String businessType, String clientType,
+                                       String loginId, String rawPassword, String birthDate) {
+            createCalls++;
+            this.organizationCode = organizationCode;
+            return "connected-id";
+        }
+
+        @Override
+        public void addConnection(String connectedId, String organizationCode,
+                                  String businessType, String clientType,
+                                  String loginId, String rawPassword, String birthDate) {
+            addCalls++;
+            this.connectedId = connectedId;
+            this.organizationCode = organizationCode;
+        }
     }
 
     private static class InMemoryCodefConnectionMapper implements CodefConnectionMapper {

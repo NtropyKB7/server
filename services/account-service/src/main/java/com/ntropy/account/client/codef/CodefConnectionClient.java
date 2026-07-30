@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class CodefConnectionClient {
 
     private static final String ACCOUNT_CREATE_PATH = "/v1/account/create";
+    private static final String ACCOUNT_ADD_PATH = "/v1/account/add";
 
     private final CodefProperties codefProperties;
     private final CodefApiClient codefApiClient;
@@ -37,22 +38,10 @@ public class CodefConnectionClient {
     public String createConnection(String organizationCode, String businessType, String clientType,
                                     String loginId, String rawPassword, String birthDate) {
         try {
-            String encryptedPassword = RsaUtil.encryptWithPublicKey(rawPassword, codefProperties.getPublicKey());
-
-            Map<String, Object> account = new LinkedHashMap<>();
-            account.put("countryCode", "KR");
-            account.put("businessType", businessType);
-            account.put("clientType", clientType);
-            account.put("organization", organizationCode);
-            account.put("loginType", "1");
-            account.put("id", loginId);
-            account.put("password", encryptedPassword);
-            if (birthDate != null) {
-                account.put("birthDate", birthDate);
-            }
-
             Map<String, Object> requestBody = new LinkedHashMap<>();
-            requestBody.put("accountList", List.of(account));
+            requestBody.put("accountList", List.of(createAccount(
+                    organizationCode, businessType, clientType, loginId, rawPassword, birthDate
+            )));
 
             CodefConnectionCreateResponse response = codefApiClient.post(
                     ACCOUNT_CREATE_PATH,
@@ -72,6 +61,54 @@ public class CodefConnectionClient {
         } catch (Exception e) {
             throw new IllegalStateException("CODEF 계정 등록 요청 실패", e);
         }
+    }
+
+    /**
+     * 이미 발급된 connectedId에 다른 기관의 개인 계정을 추가한다.
+     */
+    public void addConnection(String connectedId, String organizationCode,
+                              String businessType, String clientType,
+                              String loginId, String rawPassword, String birthDate) {
+        try {
+            Map<String, Object> requestBody = new LinkedHashMap<>();
+            requestBody.put("accountList", List.of(createAccount(
+                    organizationCode, businessType, clientType, loginId, rawPassword, birthDate
+            )));
+            requestBody.put("connectedId", connectedId);
+
+            CodefConnectionCreateResponse response = codefApiClient.post(
+                    ACCOUNT_ADD_PATH,
+                    requestBody,
+                    CodefConnectionCreateResponse.class
+            );
+            if (response.getResult() == null || !"CF-00000".equals(response.getResult().getCode())) {
+                String message = response.getResult() != null ? response.getResult().getMessage() : "알 수 없는 오류";
+                throw new IllegalStateException("CODEF 계정 추가 실패: " + message);
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("CODEF 계정 추가 요청 실패", e);
+        }
+    }
+
+    private Map<String, Object> createAccount(String organizationCode, String businessType,
+                                              String clientType, String loginId,
+                                              String rawPassword, String birthDate) throws Exception {
+        String encryptedPassword = RsaUtil.encryptWithPublicKey(rawPassword, codefProperties.getPublicKey());
+
+        Map<String, Object> account = new LinkedHashMap<>();
+        account.put("countryCode", "KR");
+        account.put("businessType", businessType);
+        account.put("clientType", clientType);
+        account.put("organization", organizationCode);
+        account.put("loginType", "1");
+        account.put("id", loginId);
+        account.put("password", encryptedPassword);
+        if (birthDate != null) {
+            account.put("birthDate", birthDate);
+        }
+        return account;
     }
 
 }

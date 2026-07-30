@@ -21,13 +21,23 @@ public class CodefConnectionService {
     public CodefConnection registerAndSave(Long userId, String organizationCode,
                                            String businessType, String clientType,
                                            String loginId, String rawPassword, String birthDate) {
+        CodefConnection existing = codefConnectionMapper.findByUserId(userId);
+        if (existing != null && existing.getConnectedId() != null
+                && !existing.getConnectedId().isBlank()) {
+            codefConnectionClient.addConnection(
+                    existing.getConnectedId(),
+                    organizationCode,
+                    businessType,
+                    clientType,
+                    loginId,
+                    rawPassword,
+                    birthDate
+            );
+            return existing;
+        }
+
         String connectedId = codefConnectionClient.createConnection(
-                organizationCode,
-                businessType,
-                clientType,
-                loginId,
-                rawPassword,
-                birthDate
+                organizationCode, businessType, clientType, loginId, rawPassword, birthDate
         );
 
         CodefConnection connection = new CodefConnection();
