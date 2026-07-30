@@ -1,8 +1,8 @@
-package com.ntropy.bff.controller;
+package com.ntropy.bff.controller.subscription;
 
 import com.ntropy.bff.dto.subscription.PlansResponse;
 import com.ntropy.bff.dto.subscription.SubscriptionResponse;
-import com.ntropy.bff.response.ApiResponse;
+import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;

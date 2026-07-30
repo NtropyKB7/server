@@ -1,4 +1,4 @@
-package com.ntropy.bff.controller;
+package com.ntropy.bff.controller.work;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +17,7 @@ import com.ntropy.bff.dto.work.response.JobCreateResponse;
 import com.ntropy.bff.dto.work.response.JobResponse;
 import com.ntropy.bff.dto.work.request.JobUpdateRequest;
 import com.ntropy.bff.dto.work.response.JobsResponse;
-import com.ntropy.bff.response.ApiResponse;
+import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.common.client.JobCommandClient;
 import com.ntropy.common.client.JobQueryClient;
 

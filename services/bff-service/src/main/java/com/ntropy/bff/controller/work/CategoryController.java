@@ -1,11 +1,11 @@
-package com.ntropy.bff.controller;
+package com.ntropy.bff.controller.work;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ntropy.bff.dto.work.response.CategoriesResponse;
-import com.ntropy.bff.response.ApiResponse;
+import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.common.client.CategoryQueryClient;
 
 import lombok.RequiredArgsConstructor;
