@@ -43,8 +43,8 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, Su
     }
 
     @Override
-    public SubscriptionSummary initSubscription(Long userId, String paymentId, String customerUid, Long amount) {
-        Subscription subscription = subscriptionService.initSubscription(userId, paymentId, customerUid, amount);
+    public SubscriptionSummary initSubscription(Long userId, String billingKey) {
+        Subscription subscription = subscriptionService.initSubscription(userId, billingKey);
         return toSubscriptionSummary(subscription);
     }
 
@@ -70,5 +70,11 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, Su
                 s.getPaymentLabel(),
                 s.getPaymentMasked()
         );
+    }
+
+    @Override
+    public SubscriptionSummary updatePaymentMethod(Long userId, String billingKey) {
+        Subscription subscription = subscriptionService.updatePaymentMethod(userId, billingKey);
+        return toSubscriptionSummary(subscription);
     }
 }

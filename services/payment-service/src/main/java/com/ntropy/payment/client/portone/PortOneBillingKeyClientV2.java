@@ -6,17 +6,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-
+/**
+ * 포트원 V2 REST API(GET https://api.portone.io/billing-keys/{id})로 실제 검증하는 구현체.
+ */
 @Component
-public class PortOnePaymentClientV2 implements PortOnePaymentClient {
+public class PortOneBillingKeyClientV2 implements PortOneBillingKeyClient {
 
     private static final String BASE_URL = "https://api.portone.io";
 
@@ -24,20 +25,20 @@ public class PortOnePaymentClientV2 implements PortOnePaymentClient {
     private final RestTemplate restTemplate;
 
     @Autowired
-    public PortOnePaymentClientV2(PortOneProperties portOneProperties) {
+    public PortOneBillingKeyClientV2(PortOneProperties portOneProperties) {
         this.portOneProperties = portOneProperties;
         this.restTemplate = new RestTemplate();
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public PortOnePaymentVerification verifyPayment(String paymentId) {
+    public PortOneBillingKeyVerification verifyBillingKey(String billingKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "PortOne " + portOneProperties.getApiSecret());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         ResponseEntity<Map> response = restTemplate.exchange(
-                BASE_URL + "/payments/" + paymentId,
+                BASE_URL + "/billing-keys/" + billingKey,
                 HttpMethod.GET,
                 entity,
                 Map.class
@@ -45,48 +46,14 @@ public class PortOnePaymentClientV2 implements PortOnePaymentClient {
 
         Map<String, Object> body = response.getBody();
         if (body == null) {
-            throw new IllegalStateException("포트원 응답이 비어있습니다. paymentId=" + paymentId);
+            throw new IllegalStateException("포트원 응답이 비어있습니다. billingKey=" + billingKey);
         }
-        return parsePaymentResponse(body);
-    }
 
-    @Override
-    public PortOnePaymentVerification payWithBillingKey(String paymentId, String billingKey, long amount, String orderName) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "PortOne " + portOneProperties.getApiSecret());
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        String status = String.valueOf(body.get("status"));
+        boolean valid = "ISSUED".equalsIgnoreCase(status);
 
-        Map<String, Object> amountMap = new HashMap<>();
-        amountMap.put("total", amount);
-
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("billingKey", billingKey);
-        requestBody.put("orderName", orderName);
-        requestBody.put("amount", amountMap);
-        requestBody.put("currency", "KRW");
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        restTemplate.exchange(
-                BASE_URL + "/payments/" + paymentId + "/billing-key",
-                HttpMethod.POST,
-                entity,
-                Map.class
-        );
-
-        return verifyPayment(paymentId);
-    }
-
-    @SuppressWarnings("unchecked")
-    private PortOnePaymentVerification parsePaymentResponse(Map<String, Object> body) {
-        boolean paid = "PAID".equals(body.get("status"));
-
-        Object amountObj = body.get("amount");
-        long amount = (amountObj instanceof Map)
-                ? ((Number) ((Map<String, Object>) amountObj).get("total")).longValue()
-                : ((Number) amountObj).longValue();
-
-        Map<String, Object> methodMap = (Map<String, Object>) body.get("method");
+        List<Map<String, Object>> methods = (List<Map<String, Object>>) body.get("methods");
+        Map<String, Object> methodMap = (methods != null && !methods.isEmpty()) ? methods.get(0) : null;
         PaymentMethod paymentMethod = null;
         String paymentLabel = null;
         String paymentMasked = null;
@@ -109,11 +76,10 @@ public class PortOnePaymentClientV2 implements PortOnePaymentClient {
                     paymentMethod = PaymentMethod.TOSSPAY;
                     paymentLabel = "토스페이";
                 }
+                // 간편결제는 카드정보 자체가 안 넘어오므로 paymentMasked는 항상 null로 둔다
             }
         }
 
-        String receiptUrl = (String) body.get("receiptUrl");
-
-        return new PortOnePaymentVerification(paid, amount, paymentMethod, paymentLabel, paymentMasked, receiptUrl);
+        return new PortOneBillingKeyVerification(valid, paymentMethod, paymentLabel, paymentMasked);
     }
 }

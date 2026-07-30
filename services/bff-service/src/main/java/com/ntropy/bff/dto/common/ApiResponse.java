@@ -6,14 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * 모든 bff 응답을 감싸는 공통 envelope.
- * {success, status_code, message, data} 형태를 API 명세 그대로 따른다.
- *
- * 필드명을 아예 status_code로 둬서 Lombok이 getStatus_code()/setStatus_code()를
- * 그대로 생성하게 했다 (JSON 키를 "status_code"로 맞추기 위해 @JsonProperty 없이
- * 필드명 자체로 해결).
- */
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -43,10 +36,6 @@ public class ApiResponse<T> {
         return new ApiResponse<>(false, errorCode.getStatusCode(), errorCode.getMessage() + " " + detail, null);
     }
 
-    /** ErrorCode에 없는 임의의 상태코드/메시지가 필요할 때만 예외적으로 사용. */
-    public static <T> ApiResponse<T> fail(int statusCode, String message) {
-        return new ApiResponse<>(false, statusCode, message, null);
-    }
 
     /** 도메인 서비스가 던진 ServiceException을 그대로 실패 응답으로 변환할 때 사용. */
     public static <T> ApiResponse<T> fail(ServiceException e) {

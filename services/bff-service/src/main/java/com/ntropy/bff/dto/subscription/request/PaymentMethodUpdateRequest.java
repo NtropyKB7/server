@@ -7,6 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class SubscriptionInitRequest {
+public class PaymentMethodUpdateRequest {
     private String billingKey;
 }

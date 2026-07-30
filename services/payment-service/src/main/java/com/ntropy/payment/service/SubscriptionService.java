@@ -1,6 +1,8 @@
 package com.ntropy.payment.service;
 
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.payment.client.portone.PortOneBillingKeyClient;
+import com.ntropy.payment.client.portone.PortOneBillingKeyVerification;
 import com.ntropy.payment.client.portone.PortOnePaymentClient;
 import com.ntropy.payment.client.portone.PortOnePaymentVerification;
 import com.ntropy.payment.domain.Payment;
@@ -18,68 +20,60 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
-/**
- * 구독/결제 비즈니스 로직.
- * Issue #5(정기결제)부터 순차적으로 더 채워진다.
- */
+// 구독/결제 비즈니스 로직.
+
 @Service
 public class SubscriptionService {
 
     private final SubscriptionMapper subscriptionMapper;
     private final PaymentMapper paymentMapper;
     private final PortOnePaymentClient portOnePaymentClient;
-
+    private final PortOneBillingKeyClient portOneBillingKeyClient;
     @Autowired
     public SubscriptionService(SubscriptionMapper subscriptionMapper,
                                PaymentMapper paymentMapper,
-                               PortOnePaymentClient portOnePaymentClient) {
+                               PortOnePaymentClient portOnePaymentClient,
+                               PortOneBillingKeyClient portOneBillingKeyClient) {  // ← 생성자 파라미터에도 있나요?
         this.subscriptionMapper = subscriptionMapper;
         this.paymentMapper = paymentMapper;
         this.portOnePaymentClient = portOnePaymentClient;
+        this.portOneBillingKeyClient = portOneBillingKeyClient;   // ← 이 대입문 있나요?
     }
-
     /** 서비스가 제공하는 전체 플랜 목록. 유저와 무관하게 고정된 값이라 DB 조회가 필요 없다. */
     public List<PlanCode> getAllPlans() {
         return Arrays.asList(PlanCode.values());
     }
 
-    /**
-     * 유저의 현재 구독 상태를 조회한다.
-     * SUBSCRIPTION 테이블에 한 번도 구독한 적 없는 유저는 행 자체가 없을 수 있는데,
-     * 이 경우는 에러가 아니라 "무료 Basic을 쓰고 있는 상태"로 간주해 기본값을 만들어 돌려준다.
-     */
+    // 유저의 현재 구독 상태를 조회한다.
+
     public Subscription getMySubscription(Long userId) {
         Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
         return subscription != null ? subscription : defaultBasicSubscription();
     }
 
-    /**
-     * 최초결제 + 빌링키 발급을 검증하고 PRO 구독을 생성한다.
-     *
-     * 순서가 중요하다:
-     * 1) paymentId 중복 체크 (SUBSCRIPTION02_F05) - DB UNIQUE 제약(merchant_uid 컬럼)이
-     *    최후 방어선이지만, 그 전에 명확한 에러 메시지로 먼저 걸러낸다.
-     * 2) 포트원 서버에 실제로 검증 요청 - 클라이언트가 보낸 값은 여기서부터 신뢰하지 않는다.
-     * 3) 검증된 실제 결제금액과 클라이언트 요청값을 대조 - 다르면 위변조 의심.
-     * 4) SUBSCRIPTION + PAYMENT 저장 - 전부 검증된 값 기준으로만 채운다.
-     *
-     * ⚠️ paymentId는 PAYMENT.merchant_uid 컬럼에 저장한다 (컬럼명은 V1 시절 이름 그대로
-     * 유지 - PAYMENT.payment_id는 이미 우리 자체 PK로 쓰고 있어서 이름 충돌 방지 목적도 있음).
-     */
+
+    // 최초결제 + 빌링키 발급을 검증하고 PRO 구독을 생성한다.
+
     @Transactional
-    public Subscription initSubscription(Long userId, String paymentId, String customerUid, Long claimedAmount) {
-        if (paymentMapper.findByMerchantUid(paymentId) != null) {
-            throw new ServiceException(PaymentErrorCode.DUPLICATE_PAYMENT);
+    public Subscription initSubscription(Long userId, String billingKey) {
+        Subscription existing = subscriptionMapper.findLatestByUserId(userId);
+        if (existing != null && existing.isUsable()) {
+            throw new ServiceException(PaymentErrorCode.ALREADY_SUBSCRIBED);
         }
 
-        PortOnePaymentVerification verification = portOnePaymentClient.verifyPayment(paymentId);
+        PortOneBillingKeyVerification billingKeyVerification = portOneBillingKeyClient.verifyBillingKey(billingKey);
+        if (!billingKeyVerification.isValid()) {
+            throw new ServiceException(PaymentErrorCode.INVALID_BILLING_KEY);
+        }
 
-        if (!verification.isPaid()) {
+        String paymentId = "sub-init-" + UUID.randomUUID();
+        PortOnePaymentVerification paymentResult = portOnePaymentClient.payWithBillingKey(
+                paymentId, billingKey, PlanCode.PRO.getMonthlyPrice(), "Ntropy Pro 구독 최초결제");
+
+        if (!paymentResult.isPaid()) {
             throw new ServiceException(PaymentErrorCode.PAYMENT_NOT_COMPLETED);
-        }
-        if (verification.getAmount() != PlanCode.PRO.getMonthlyPrice()) {
-            throw new ServiceException(PaymentErrorCode.AMOUNT_MISMATCH);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -91,21 +85,21 @@ public class SubscriptionService {
         subscription.setStartDate(now);
         subscription.setEndDate(now.plusMonths(1));
         subscription.setAutoRenewYn(true);
-        subscription.setCustomerUid(customerUid);
-        subscription.setPaymentMethod(verification.getPaymentMethod());
-        subscription.setPaymentLabel(verification.getPaymentLabel());
-        subscription.setPaymentMasked(verification.getPaymentMasked());
+        subscription.setCustomerUid(billingKey);
+        subscription.setPaymentMethod(paymentResult.getPaymentMethod());
+        subscription.setPaymentLabel(paymentResult.getPaymentLabel());
+        subscription.setPaymentMasked(paymentResult.getPaymentMasked());
         subscriptionMapper.insert(subscription);
 
         Payment payment = new Payment();
         payment.setSubscriptionId(subscription.getSubscriptionId());
         payment.setPlanCode(PlanCode.PRO);
-        payment.setAmount(verification.getAmount());
-        payment.setPaymentMethod(verification.getPaymentMethod());
+        payment.setAmount(paymentResult.getAmount());
+        payment.setPaymentMethod(paymentResult.getPaymentMethod());
         payment.setCreatedAt(now);
         payment.setMerchantUid(paymentId);
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
-        payment.setReceiptUrl(verification.getReceiptUrl());
+        payment.setReceiptUrl(paymentResult.getReceiptUrl());
         paymentMapper.insert(payment);
 
         return subscription;
@@ -117,5 +111,26 @@ public class SubscriptionService {
         basic.setStatus(SubscriptionStatus.ACTIVE);
         basic.setAutoRenewYn(false);
         return basic;
+    }
+
+    @Transactional
+    public Subscription updatePaymentMethod(Long userId, String billingKey) {
+        Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
+        if (subscription == null) {
+            throw new ServiceException(PaymentErrorCode.SUBSCRIPTION_NOT_FOUND);
+        }
+
+        PortOneBillingKeyVerification verification = portOneBillingKeyClient.verifyBillingKey(billingKey);
+        if (!verification.isValid()) {
+            throw new ServiceException(PaymentErrorCode.INVALID_BILLING_KEY);
+        }
+
+        subscription.setCustomerUid(billingKey);
+        subscription.setPaymentMethod(verification.getPaymentMethod());
+        subscription.setPaymentLabel(verification.getPaymentLabel());
+        subscription.setPaymentMasked(verification.getPaymentMasked());
+        subscriptionMapper.update(subscription);
+
+        return subscription;
     }
 }

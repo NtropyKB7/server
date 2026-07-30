@@ -12,7 +12,6 @@ public interface PaymentMapper {
 
     Payment findById(Long paymentId);
 
-    Payment findByMerchantUid(String merchantUid);
 
     List<Payment> findAllBySubscriptionId(Long subscriptionId);
 
