@@ -1,4 +1,4 @@
-package com.ntropy.bff.dto.work;
+package com.ntropy.bff.dto.work.response;
 
 import java.util.List;
 import java.util.stream.Collectors;

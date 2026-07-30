@@ -4,7 +4,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ntropy.bff.dto.work.CategoriesResponse;
+import com.ntropy.bff.dto.work.response.CategoriesResponse;
+import com.ntropy.bff.response.ApiResponse;
 import com.ntropy.common.client.CategoryQueryClient;
 
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ public class CategoryController {
     private final CategoryQueryClient categoryQueryClient;
 
     @GetMapping
-    public CategoriesResponse getCategories() {
-        return new CategoriesResponse(categoryQueryClient.getCategories());
+    public ApiResponse<CategoriesResponse> getCategories() {
+        return ApiResponse.success(new CategoriesResponse(categoryQueryClient.getCategories()));
     }
 }
