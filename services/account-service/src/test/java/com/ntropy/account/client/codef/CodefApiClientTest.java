@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +21,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse;
 import com.ntropy.account.config.CodefProperties;
 import com.ntropy.account.config.CodefServiceType;
 
@@ -67,8 +68,8 @@ class CodefApiClientTest {
                 properties, tokenProvider, restTemplate, objectMapper
         );
 
-        CodefAccountCreateResponse response = client.post(
-                "/v1/account/create", requestBody, CodefAccountCreateResponse.class
+        CodefConnectionCreateResponse response = client.post(
+                "/v1/account/create", requestBody, CodefConnectionCreateResponse.class
         );
 
         assertEquals("connected-id", response.getData().getConnectedId());
@@ -87,7 +88,7 @@ class CodefApiClientTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> client.post("https://example.com", Map.of(), CodefAccountCreateResponse.class)
+                () -> client.post("https://example.com", Map.of(), CodefConnectionCreateResponse.class)
         );
     }
 

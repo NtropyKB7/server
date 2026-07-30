@@ -1,4 +1,4 @@
-package com.ntropy.account.service;
+package com.ntropy.account.client.codef.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

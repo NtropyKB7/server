@@ -1,6 +1,6 @@
 package com.ntropy.account.mapper;
 
-import com.ntropy.account.CodefToken;
+import com.ntropy.account.domain.entity.CodefToken;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

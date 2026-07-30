@@ -1,4 +1,4 @@
-package com.ntropy.account;
+package com.ntropy.account.domain.entity;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

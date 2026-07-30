@@ -1,7 +1,5 @@
-package com.ntropy.account;
+package com.ntropy.account.integration.codef;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -21,69 +19,83 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ntropy.account.service.CodefBankAccountClient;
-import com.ntropy.account.service.CodefConnectionService;
+import com.ntropy.account.config.CodefProperties;
+import com.ntropy.account.config.CodefServiceType;
+import com.ntropy.account.domain.PersonalBank;
+import com.ntropy.account.service.PersonalBankAccountService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * 국민은행 개인 샌드박스 계정 등록 -> connectedId 발급 -> MySQL 저장/재조회
+ * 선택한 은행의 개인 데모 계정 등록/추가 -> connectedId MySQL 저장/재조회
  * -> 개인 보유계좌 조회 수동 검증.
- * 샌드박스는 고정 응답을 사용하므로 실제 국민은행 로그인 정보는 사용하지 않는다.
+ * 실제 로그인 ID, 비밀번호, 생년월일은 환경변수로만 받아 요청 시점에 사용하며 소스·DB·로그에 저장하지 않는다.
+ * 은행별 비밀번호 오류 제한이 있으므로 자격증명을 확인한 뒤 기관당 한 번만 실행한다.
  */
 class CodefConnectionManualVerificationTest {
 
-    private static final Long SANDBOX_USER_ID = 9_000_000_004L;
+    private static final Long DEMO_USER_ID = 9_000_000_088L;
 
     @Test
-    void registersKbPersonalSandboxAccountAndPersistsConnectedId() {
+    void registersSelectedPersonalDemoAccountAndPersistsConnectedId() {
         assumeTrue(
                 "true".equalsIgnoreCase(System.getenv("RUN_CODEF_ACCOUNT_TEST")),
-                "외부 CODEF 샌드박스와 로컬 MySQL이 필요한 수동 검증용 테스트"
+                "외부 CODEF 데모와 로컬 MySQL이 필요한 수동 검증용 테스트"
         );
 
-        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
-            CodefConnectionService service = ctx.getBean(CodefConnectionService.class);
+        PersonalBank bank = PersonalBank.fromOrganizationCode(
+                requiredEnvironmentVariable("CODEF_DEMO_BANK_ORGANIZATION")
+        );
+        String loginId = requiredEnvironmentVariable("CODEF_DEMO_BANK_LOGIN_ID");
+        String loginPassword = requiredEnvironmentVariable("CODEF_DEMO_BANK_LOGIN_PASSWORD");
+        String birthDate = bank.isBirthDateRequired()
+                ? requiredEnvironmentVariable("CODEF_DEMO_BANK_BIRTH_DATE")
+                : null;
 
-            CodefConnection saved = service.registerAndSave(
-                    SANDBOX_USER_ID,
-                    "0004",
-                    "BK",
-                    "P",
-                    "sandbox-user",
-                    "sandbox-password",
-                    "19900101"
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
+            CodefProperties properties = ctx.getBean(CodefProperties.class);
+            assertTrue(
+                    CodefServiceType.DEMO == properties.getServiceType(),
+                    "CODEF 서비스 타입이 DEMO여야 함"
             );
 
-            assertNotNull(saved);
-            assertEquals(SANDBOX_USER_ID, saved.getUserId());
-            assertNotNull(saved.getConnectedId());
-            assertTrue(!saved.getConnectedId().isBlank());
-
-            CodefBankAccountClient bankAccountClient = ctx.getBean(CodefBankAccountClient.class);
-            JsonNode accountListResponse = bankAccountClient.getPersonalAccountList(
-                    "0004",
-                    saved.getConnectedId()
+            PersonalBankAccountService service = ctx.getBean(PersonalBankAccountService.class);
+            JsonNode accountListResponse = service.registerAndGetPersonalAccountList(
+                    DEMO_USER_ID,
+                    bank,
+                    loginId,
+                    loginPassword,
+                    birthDate
             );
 
             JsonNode accountGroups = accountListResponse.path("data");
             assertTrue(accountGroups.isObject());
-            assertTrue(accountGroups.size() > 0, "샌드박스 개인 보유계좌 고정 응답이 비어 있음");
+            assertTrue(accountGroups.size() > 0, "데모 개인 보유계좌 응답이 비어 있음");
 
             List<String> groupFields = new ArrayList<>();
             accountGroups.fieldNames().forEachRemaining(groupFields::add);
             Collections.sort(groupFields);
+            System.out.println("CODEF_BANK=" + bank.getDisplayName()
+                    + "(" + bank.getOrganizationCode() + ")");
             System.out.println("CODEF_ACCOUNT_LIST_GROUPS=" + String.join(",", groupFields));
 
             JsonNode depositAccounts = accountGroups.path("resDepositTrust");
             assertTrue(depositAccounts.isArray());
-            assertTrue(depositAccounts.size() > 0, "샌드박스 예금/신탁 계좌 고정 응답이 비어 있음");
+            assertTrue(depositAccounts.size() > 0, "데모 예금/신탁 계좌 응답이 비어 있음");
 
             List<String> accountFields = new ArrayList<>();
             depositAccounts.get(0).fieldNames().forEachRemaining(accountFields::add);
             Collections.sort(accountFields);
             System.out.println("CODEF_DEPOSIT_ACCOUNT_FIELDS=" + String.join(",", accountFields));
         }
+    }
+
+    private static String requiredEnvironmentVariable(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(name + " 환경변수가 필요합니다");
+        }
+        return value;
     }
 
     @Configuration

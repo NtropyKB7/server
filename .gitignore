@@ -10,6 +10,12 @@ application.properties
 application-local.properties
 application-*.properties
 !application.properties.example
+codef-local.properties
+
+### 개인 문서/도구 ###
+CLAUDE.local.md
+DEVLOG.md
+.ai/
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

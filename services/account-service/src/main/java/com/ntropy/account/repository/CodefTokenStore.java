@@ -1,9 +1,9 @@
-package com.ntropy.account.service;
+package com.ntropy.account.repository;
 
 import java.util.Optional;
 
-import com.ntropy.account.CodefToken;
 import com.ntropy.account.config.CodefServiceType;
+import com.ntropy.account.domain.entity.CodefToken;
 
 /**
  * CODEF OAuth2 accessToken 저장/조회 인터페이스.
