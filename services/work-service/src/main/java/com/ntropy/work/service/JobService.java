@@ -92,7 +92,7 @@ public class JobService {
         if (job.getCategoryId() == null) {
             throw new IllegalArgumentException("category_id는 필수입니다.");
         }
-        if (!StringUtils.hasText(job.getSettlementType())) {
+        if (job.getSettlementType() == null) {
             throw new IllegalArgumentException("settlement_type은 필수입니다.");
         }
         if (job.getIsRegular() == null) {

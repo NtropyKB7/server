@@ -1,29 +1,23 @@
-package com.ntropy.work.domain.entity;
+package com.ntropy.common.dto.work.command;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
+/**
+ * 근무일지 수정(edit)/확정(confirm) 공용 요청. 모든 필드가 선택이며,
+ * 값이 있는 필드만 work-service에서 덮어쓴다.
+ */
 @Getter
-@Setter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class WorkLog {
+public class WorkLogPatchCommand {
 
-    private Long logId;
-    private Long userId;
     private Long jobId;
-    private LocalDate workDate;
     private LocalTime startTime;
     private LocalTime endTime;
     private Long taskCount;
     private Long fatigue;
-    private Long estimatedIncome;
-    private String status;
 }

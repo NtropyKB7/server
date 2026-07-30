@@ -7,11 +7,12 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.JobCommandClient;
-import com.ntropy.common.dto.JobRegisterCommand;
-import com.ntropy.common.dto.JobScheduleCommand;
-import com.ntropy.common.dto.JobUpdateCommand;
+import com.ntropy.common.dto.work.command.JobRegisterCommand;
+import com.ntropy.common.dto.work.command.JobScheduleCommand;
+import com.ntropy.common.dto.work.command.JobUpdateCommand;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
+import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.service.JobPlatformMappingService;
 import com.ntropy.work.service.JobService;
 
@@ -30,7 +31,7 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .userId(command.getUserId())
                 .categoryId(command.getCategoryId())
                 .jobName(command.getJobName())
-                .settlementType(command.getSettlementType())
+                .settlementType(SettlementType.valueOf(command.getSettlementType()))
                 .hourlyWage(command.getHourlyWage())
                 .monthlyWage(command.getMonthlyWage())
                 .perTaskWage(command.getPerTaskWage())
@@ -56,7 +57,7 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .jobId(jobId)
                 .categoryId(command.getCategoryId())
                 .jobName(command.getJobName())
-                .settlementType(command.getSettlementType())
+                .settlementType(SettlementType.valueOf(command.getSettlementType()))
                 .hourlyWage(command.getHourlyWage())
                 .monthlyWage(command.getMonthlyWage())
                 .perTaskWage(command.getPerTaskWage())
