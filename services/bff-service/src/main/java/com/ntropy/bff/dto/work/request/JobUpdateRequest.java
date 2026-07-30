@@ -1,6 +1,6 @@
 package com.ntropy.bff.dto.work.request;
 
-import com.ntropy.common.dto.JobUpdateCommand;
+import com.ntropy.common.dto.work.JobUpdateCommand;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

@@ -1,4 +1,4 @@
-package com.ntropy.common.dto;
+package com.ntropy.common.dto.work;
 
 import java.util.List;
 

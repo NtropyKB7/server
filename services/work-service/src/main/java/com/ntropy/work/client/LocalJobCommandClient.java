@@ -7,9 +7,9 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.JobCommandClient;
-import com.ntropy.common.dto.JobRegisterCommand;
-import com.ntropy.common.dto.JobScheduleCommand;
-import com.ntropy.common.dto.JobUpdateCommand;
+import com.ntropy.common.dto.work.JobRegisterCommand;
+import com.ntropy.common.dto.work.JobScheduleCommand;
+import com.ntropy.common.dto.work.JobUpdateCommand;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
 import com.ntropy.work.domain.enums.SettlementType;
