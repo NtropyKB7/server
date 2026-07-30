@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id                     BIGINT       NOT NULL COMMENT 'user-service USER.id 참조 (크로스 도메인 FK 없음)',
     connected_id                VARCHAR(100) NOT NULL COMMENT 'CODEF 커넥티드 아이디 (계정 등록 API 응답값)',
-    registered_institution_keys TEXT         NULL COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용',
+    registered_institution_keys JSON         NULL COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용',
     created_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_codef_connection_user (user_id)
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 -- 이미 CODEF_CONNECTION이 생성되어 있는 기존 로컬 DB라면 위 컬럼이 반영되지 않으므로 아래 ALTER를 한 번 수동 실행한다.
 -- (이 스키마 파일은 마이그레이션 도구 없이 수동 적용하는 방식이라 IF NOT EXISTS ADD COLUMN 같은 자동 가드는 넣지 않는다)
 -- ALTER TABLE CODEF_CONNECTION
---     ADD COLUMN registered_institution_keys TEXT NULL
+--     ADD COLUMN registered_institution_keys JSON NULL
 --         COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용'
 --         AFTER connected_id;
 
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     organization_code   VARCHAR(10)   NOT NULL COMMENT 'CODEF 기관코드',
     account_group       VARCHAR(20)   NOT NULL COMMENT 'DEPOSIT_TRUST, FOREIGN_CURRENCY, FUND, LOAN, INSURANCE',
     deposit_type_code   VARCHAR(2)    NOT NULL COMMENT 'resAccountDeposit 분류값 (10~99)',
-    account_no_masked   VARCHAR(64)   NOT NULL COMMENT 'resAccountDisplay 표시용 마스킹 계좌번호',
+    account_no_masked   VARCHAR(64)   NOT NULL COMMENT '서버 생성 표시용 마스킹 계좌번호 (끝 4자리만 노출)',
     account_no_hash     CHAR(64)      NOT NULL COMMENT 'SHA-256(기관코드+실제계좌번호) 중복 판별용 해시. 원문 계좌번호는 저장하지 않음',
     account_name        VARCHAR(100)  NULL COMMENT 'resAccountNickName 우선, 없으면 resAccountName',
     balance             DECIMAL(18,2) NULL COMMENT 'resAccountBalance',

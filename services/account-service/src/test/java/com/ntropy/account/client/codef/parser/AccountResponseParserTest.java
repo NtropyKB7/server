@@ -68,7 +68,7 @@ class AccountResponseParserTest {
         Account deposit = depositTrust.account();
         assertEquals(AccountGroup.DEPOSIT_TRUST, deposit.getAccountGroup());
         assertEquals("11", deposit.getDepositTypeCode());
-        assertEquals("110-***-456789", deposit.getAccountNoMasked());
+        assertEquals("****6789", deposit.getAccountNoMasked());
         assertEquals(AccountNoHash.hash("0004", "110123456789"), deposit.getAccountNoHash());
         assertEquals("생활비통장", deposit.getAccountName());
         assertEquals(new BigDecimal("1234567"), deposit.getBalance());

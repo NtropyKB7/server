@@ -6,6 +6,7 @@ import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ntropy.account.domain.AccountGroup;
 import com.ntropy.account.domain.AccountNoHash;
+import com.ntropy.account.domain.AccountNoMask;
 import com.ntropy.account.domain.entity.Account;
 
 /**
@@ -50,7 +51,7 @@ public final class AccountResponseParser {
         account.setOrganizationCode(organizationCode);
         account.setAccountGroup(group);
         account.setDepositTypeCode(CodefJsonSupport.text(node, "resAccountDeposit"));
-        account.setAccountNoMasked(CodefJsonSupport.text(node, "resAccountDisplay"));
+        account.setAccountNoMasked(AccountNoMask.mask(rawAccountNo));
         account.setAccountNoHash(AccountNoHash.hash(organizationCode, rawAccountNo));
 
         String nickName = CodefJsonSupport.text(node, "resAccountNickName");
