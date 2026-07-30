@@ -66,10 +66,12 @@ public class JobService {
 
     @Transactional
     public Job updateJob(Job job) {
-        findById(job.getJobId());
+        Job existing = findById(job.getJobId());
         validate(job);
         categoryService.findById(job.getCategoryId());
 
+        job.setIsActive(existing.getIsActive());
+        job.setCreatedAt(existing.getCreatedAt());
         job.setUpdatedAt(LocalDateTime.now());
         jobMapper.update(job);
         return job;

@@ -1,4 +1,4 @@
-package com.ntropy.bff.dto.work;
+package com.ntropy.bff.dto.work.response;
 
 import com.ntropy.common.dto.JobSummary;
 

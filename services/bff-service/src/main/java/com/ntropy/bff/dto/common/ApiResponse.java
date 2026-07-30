@@ -1,4 +1,4 @@
-package com.ntropy.bff.response;
+package com.ntropy.bff.dto.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
