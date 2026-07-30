@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.work;
+package com.ntropy.common.dto.work.summary;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.work;
+package com.ntropy.common.dto.work.command;
 
 import java.time.LocalTime;
 

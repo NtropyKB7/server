@@ -1,17 +1,22 @@
-package com.ntropy.common.dto.work;
+package com.ntropy.common.dto.work.summary;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 잡 수정 요청. userId(소유자 변경 불가)와 스케줄(#3에서 별도 처리 예정)은 포함하지 않음.
+ * work-service의 JOB을 다른 서비스/bff-service에 노출하기 위한 공유 DTO.
+ * 서버 간 계약이라 work-service 내부 사정(created_at 등 감사 컬럼)은 담지 않는다.
  */
 @Getter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class JobUpdateCommand {
+public class JobSummary {
 
+    private Long jobId;
+    private Long userId;
     private Long categoryId;
     private String jobName;
     private String settlementType;
@@ -21,4 +26,5 @@ public class JobUpdateCommand {
     private Float taskPerHour;
     private Boolean isRegular;
     private Integer baseFatigue;
+    private Boolean isActive;
 }

@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.PlatformQueryClient;
-import com.ntropy.common.dto.work.PlatformSummary;
+import com.ntropy.common.dto.work.summary.PlatformSummary;
 import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.service.PlatformService;
 

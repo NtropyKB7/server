@@ -2,7 +2,7 @@ package com.ntropy.common.client;
 
 import java.util.List;
 
-import com.ntropy.common.dto.work.JobSummary;
+import com.ntropy.common.dto.work.summary.JobSummary;
 
 /**
  * work-service의 JOB 조회 계약. work-service가 LocalJobQueryClient로 구현하고,

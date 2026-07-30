@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.JobQueryClient;
-import com.ntropy.common.dto.work.JobSummary;
+import com.ntropy.common.dto.work.summary.JobSummary;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.service.JobService;
 
