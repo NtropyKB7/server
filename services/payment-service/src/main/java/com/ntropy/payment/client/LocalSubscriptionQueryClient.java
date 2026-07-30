@@ -1,5 +1,6 @@
 package com.ntropy.payment.client;
 
+import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.domain.Feature;
 import com.ntropy.common.dto.PlanSummary;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
-public class LocalSubscriptionQueryClient implements SubscriptionQueryClient {
+public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, SubscriptionCommandClient {
 
     private final SubscriptionService subscriptionService;
 
@@ -39,6 +40,12 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient {
     public boolean supportsFeature(Long userId, Feature feature) {
         Subscription subscription = subscriptionService.getMySubscription(userId);
         return subscription.supports(feature);
+    }
+
+    @Override
+    public SubscriptionSummary initSubscription(Long userId, String paymentId, String customerUid, Long amount) {
+        Subscription subscription = subscriptionService.initSubscription(userId, paymentId, customerUid, amount);
+        return toSubscriptionSummary(subscription);
     }
 
     private PlanSummary toPlanSummary(PlanCode planCode) {

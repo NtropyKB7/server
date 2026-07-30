@@ -1,4 +1,4 @@
-package com.ntropy.bff.dto.subscription;
+package com.ntropy.bff.dto.subscription.response;
 
 import com.ntropy.common.dto.PlanSummary;
 import lombok.AllArgsConstructor;

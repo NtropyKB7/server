@@ -1,4 +1,4 @@
-package com.ntropy.bff.dto.subscription;
+package com.ntropy.bff.dto.subscription.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ntropy.common.dto.SubscriptionSummary;
