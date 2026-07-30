@@ -60,15 +60,16 @@ CREATE TABLE `JOB_SCHEDULE` (
 
 -- 6. WORK_LOG (근무 계획/실적 기록)
 CREATE TABLE `WORK_LOG` (
-	`log_id`	BIGINT	NOT NULL,
+	`log_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
 	`user_id`	BIGINT	NOT NULL,
 	`job_id`	BIGINT	NOT NULL,
 	`work_date`	DATE	NULL,
 	`start_time`	TIME	NULL,
 	`end_time`	TIME	NULL,
+	`task_count`	BIGINT	NULL	COMMENT 'PER_TASK 잡 확정 시 사용자가 입력하는 실제 건수',
 	`fatigue`	BIGINT	NULL,
 	`estimated_income`	BIGINT	NULL,
-	`status`	VARCHAR(20)	NULL
+	`status`	VARCHAR(20)	NULL	COMMENT 'PLANNED/CONFIRMED'
 );
 
 -- 7. ALLOCATION_GOAL (잡별 근무시간 배분 추천)

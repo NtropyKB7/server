@@ -12,6 +12,7 @@ import com.ntropy.common.dto.JobScheduleCommand;
 import com.ntropy.common.dto.JobUpdateCommand;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
+import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.service.JobPlatformMappingService;
 import com.ntropy.work.service.JobService;
 
@@ -30,7 +31,7 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .userId(command.getUserId())
                 .categoryId(command.getCategoryId())
                 .jobName(command.getJobName())
-                .settlementType(command.getSettlementType())
+                .settlementType(SettlementType.valueOf(command.getSettlementType()))
                 .hourlyWage(command.getHourlyWage())
                 .monthlyWage(command.getMonthlyWage())
                 .perTaskWage(command.getPerTaskWage())
@@ -56,7 +57,7 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .jobId(jobId)
                 .categoryId(command.getCategoryId())
                 .jobName(command.getJobName())
-                .settlementType(command.getSettlementType())
+                .settlementType(SettlementType.valueOf(command.getSettlementType()))
                 .hourlyWage(command.getHourlyWage())
                 .monthlyWage(command.getMonthlyWage())
                 .perTaskWage(command.getPerTaskWage())

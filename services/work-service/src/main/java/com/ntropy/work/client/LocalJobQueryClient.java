@@ -36,7 +36,7 @@ public class LocalJobQueryClient implements JobQueryClient {
                 .userId(job.getUserId())
                 .categoryId(job.getCategoryId())
                 .jobName(job.getJobName())
-                .settlementType(job.getSettlementType())
+                .settlementType(job.getSettlementType().name())
                 .hourlyWage(job.getHourlyWage())
                 .monthlyWage(job.getMonthlyWage())
                 .perTaskWage(job.getPerTaskWage())
