@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.AccountMapper">
+
+    <insert id="upsert" parameterType="com.ntropy.account.domain.entity.Account">
+        INSERT INTO ACCOUNT (
+            codef_connection_id, user_id, organization_code, account_group, deposit_type_code,
+            account_no_masked, account_no_hash, account_name, balance, currency_code,
+            account_start_date, account_end_date, last_tran_date, account_lifetime, overdraft_yn,
+            loan_kind, loan_balance, loan_start_date, loan_end_date, invested_cost, earnings_rate, loan_exec_no
+        ) VALUES (
+            #{codefConnectionId}, #{userId}, #{organizationCode}, #{accountGroup}, #{depositTypeCode},
+            #{accountNoMasked}, #{accountNoHash}, #{accountName}, #{balance}, #{currencyCode},
+            #{accountStartDate}, #{accountEndDate}, #{lastTranDate}, #{accountLifetime}, #{overdraftYn},
+            #{loanKind}, #{loanBalance}, #{loanStartDate}, #{loanEndDate}, #{investedCost}, #{earningsRate}, #{loanExecNo}
+        )
+        ON DUPLICATE KEY UPDATE
+            account_no_masked = VALUES(account_no_masked),
+            account_name = VALUES(account_name),
+            balance = VALUES(balance),
+            currency_code = VALUES(currency_code),
+            account_start_date = VALUES(account_start_date),
+            account_end_date = VALUES(account_end_date),
+            last_tran_date = VALUES(last_tran_date),
+            account_lifetime = VALUES(account_lifetime),
+            overdraft_yn = VALUES(overdraft_yn),
+            loan_kind = VALUES(loan_kind),
+            loan_balance = VALUES(loan_balance),
+            loan_start_date = VALUES(loan_start_date),
+            loan_end_date = VALUES(loan_end_date),
+            invested_cost = VALUES(invested_cost),
+            earnings_rate = VALUES(earnings_rate),
+            loan_exec_no = VALUES(loan_exec_no)
+    </insert>
+
+    <select id="findByConnectionIdAndAccountNoHash" resultType="com.ntropy.account.domain.entity.Account">
+        SELECT id,
+               codef_connection_id AS codefConnectionId,
+               user_id             AS userId,
+               organization_code   AS organizationCode,
+               account_group       AS accountGroup,
+               deposit_type_code   AS depositTypeCode,
+               account_no_masked   AS accountNoMasked,
+               account_no_hash     AS accountNoHash,
+               account_name        AS accountName,
+               balance,
+               currency_code       AS currencyCode,
+               account_start_date  AS accountStartDate,
+               account_end_date    AS accountEndDate,
+               last_tran_date      AS lastTranDate,
+               account_lifetime    AS accountLifetime,
+               overdraft_yn        AS overdraftYn,
+               loan_kind           AS loanKind,
+               loan_balance        AS loanBalance,
+               loan_start_date     AS loanStartDate,
+               loan_end_date       AS loanEndDate,
+               invested_cost       AS investedCost,
+               earnings_rate       AS earningsRate,
+               loan_exec_no        AS loanExecNo,
+               created_at          AS createdAt,
+               updated_at          AS updatedAt
+        FROM ACCOUNT
+        WHERE codef_connection_id = #{codefConnectionId}
+          AND account_no_hash = #{accountNoHash}
+    </select>
+
+</mapper>

@@ -1,9 +1,5 @@
 package com.ntropy.account.service;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,7 +33,7 @@ public class PersonalBankAccountService {
         requireNonBlank(loginId, bank.getDisplayName() + " 로그인 ID");
         requireNonBlank(rawPassword, bank.getDisplayName() + " 로그인 비밀번호");
 
-        String normalizedBirthDate = normalizeBirthDate(bank, birthDate);
+        String normalizedBirthDate = bank.normalizeBirthDate(birthDate);
         return codefConnectionService.registerAndSave(
                 userId,
                 bank.getOrganizationCode(),
@@ -70,22 +66,6 @@ public class PersonalBankAccountService {
                                                      String birthDate) {
         registerPersonalAccount(userId, bank, loginId, rawPassword, birthDate);
         return getPersonalAccountList(userId, bank);
-    }
-
-    private static String normalizeBirthDate(PersonalBank bank, String birthDate) {
-        if (!bank.isBirthDateRequired()) {
-            return null;
-        }
-        requireNonBlank(birthDate, bank.getDisplayName() + " 생년월일(YYYYMMDD)");
-        if (!birthDate.matches("\\d{8}")) {
-            throw new IllegalArgumentException("생년월일은 YYYYMMDD 형식이어야 합니다");
-        }
-        try {
-            LocalDate.parse(birthDate, DateTimeFormatter.BASIC_ISO_DATE);
-        } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("유효한 생년월일을 입력해야 합니다", e);
-        }
-        return birthDate;
     }
 
     private static void validateUserId(Long userId) {

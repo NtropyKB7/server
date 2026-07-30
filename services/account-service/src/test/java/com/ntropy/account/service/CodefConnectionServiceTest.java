@@ -53,6 +53,47 @@ class CodefConnectionServiceTest {
         assertEquals("0088", connectionClient.organizationCode);
         assertEquals(0, connectionClient.createCalls);
         assertEquals(1, connectionClient.addCalls);
+        assertEquals("[\"0088\"]", saved.getRegisteredInstitutionKeys());
+    }
+
+    @Test
+    void skipsAddConnectionWhenInstitutionAlreadyRegistered() {
+        StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
+        InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
+        CodefConnection existing = new CodefConnection();
+        existing.setUserId(1L);
+        existing.setConnectedId("existing-connected-id");
+        existing.setRegisteredInstitutionKeys("[\"0088\"]");
+        mapper.upsert(existing);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+
+        CodefConnection saved = service.registerAndSave(
+                1L, "0088", "BK", "P", "login-id", "password", null
+        );
+
+        assertEquals("existing-connected-id", saved.getConnectedId());
+        assertEquals(0, connectionClient.createCalls);
+        assertEquals(0, connectionClient.addCalls);
+        assertEquals("[\"0088\"]", saved.getRegisteredInstitutionKeys());
+    }
+
+    @Test
+    void accumulatesInstitutionKeysAcrossMultipleBanks() {
+        StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
+        InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
+        CodefConnection existing = new CodefConnection();
+        existing.setUserId(1L);
+        existing.setConnectedId("existing-connected-id");
+        existing.setRegisteredInstitutionKeys("[\"0004\"]");
+        mapper.upsert(existing);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+
+        CodefConnection saved = service.registerAndSave(
+                1L, "0088", "BK", "P", "login-id", "password", null
+        );
+
+        assertEquals(1, connectionClient.addCalls);
+        assertEquals("[\"0004\",\"0088\"]", saved.getRegisteredInstitutionKeys());
     }
 
     private static class StubCodefConnectionClient extends CodefConnectionClient {
