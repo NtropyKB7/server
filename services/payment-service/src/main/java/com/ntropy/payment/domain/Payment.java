@@ -20,5 +20,6 @@ public class Payment {
     private LocalDateTime createdAt;
     private String merchantUid;
     private PaymentStatus paymentStatus;
+    private String failureReason;
     private String receiptUrl;
 }

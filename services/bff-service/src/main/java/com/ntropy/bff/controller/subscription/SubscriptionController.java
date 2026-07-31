@@ -9,13 +9,10 @@ import com.ntropy.bff.dto.subscription.response.SubscriptionResponse;
 import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/subscriptions")
@@ -95,5 +92,16 @@ public class SubscriptionController {
                 subscriptionCommandClient.updatePaymentMethod(resolvedUserId, request.getBillingKey())
         );
         return ApiResponse.success(response);
+    }
+
+    @PostMapping("/webhook")
+    public ResponseEntity<Void> receiveWebhook(
+            @RequestHeader("webhook-id") String webhookId,
+            @RequestHeader("webhook-timestamp") String webhookTimestamp,
+            @RequestHeader("webhook-signature") String webhookSignature,
+            @RequestBody String rawBody
+    ) {
+        boolean verified = subscriptionCommandClient.receiveWebhook(webhookId, webhookTimestamp, webhookSignature, rawBody);
+        return verified ? ResponseEntity.ok().build() : ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 }

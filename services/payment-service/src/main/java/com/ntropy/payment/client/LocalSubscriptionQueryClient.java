@@ -77,4 +77,15 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, Su
         Subscription subscription = subscriptionService.updatePaymentMethod(userId, billingKey);
         return toSubscriptionSummary(subscription);
     }
+
+    @Override
+    public void handleScheduledPaymentResult(String paymentId) {
+        subscriptionService.handleScheduledPaymentResult(paymentId);
+    }
+
+
+    @Override
+    public boolean receiveWebhook(String webhookId, String webhookTimestamp, String webhookSignature, String rawBody) {
+        return subscriptionService.receiveWebhook(webhookId, webhookTimestamp, webhookSignature, rawBody);
+    }
 }

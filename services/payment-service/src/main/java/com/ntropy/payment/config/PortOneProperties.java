@@ -22,6 +22,10 @@ public class PortOneProperties {
     @Value("${portone.channel-key.tosspay:}")
     private String tosspayChannelKey;
 
+    @Value("${portone.webhook-secret:}")
+    private String webhookSecret;
+
+
     public String getStoreId() {
         return storeId;
     }
@@ -41,5 +45,9 @@ public class PortOneProperties {
             default:
                 throw new IllegalArgumentException("지원하지 않는 결제수단: " + method);
         }
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
     }
 }

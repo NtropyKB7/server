@@ -10,7 +10,7 @@ CREATE TABLE `SUBSCRIPTION` (
                                 `end_date`	DATETIME	NULL,
                                 `cancel_requested_at`	DATETIME	NULL,
                                 `auto_renew_yn`	BOOLEAN	NULL,
-                                `customer_uid`	VARCHAR(50)	NULL,
+                                `customer_uid`	VARCHAR(100)	NULL,
                                 `payment_method`	VARCHAR(20)	NULL	COMMENT 'CARD | KAKAOPAY | TOSSPAY',
                                 `payment_label`	VARCHAR(50)	NULL	COMMENT '화면 표시용 (카드=카드사명, 간편결제=카카오페이/토스페이)',
                                 `payment_masked`	VARCHAR(30)	NULL	COMMENT 'CARD만 값 있음. 간편결제는 카드정보가 안 넘어와서 항상 NULL',
@@ -27,9 +27,10 @@ CREATE TABLE `PAYMENT` (
                            `amount`	BIGINT	NULL,
                            `payment_method`	VARCHAR(20)	NULL,
                            `created_at`	DATETIME	NULL,
-                           `merchant_uid`	VARCHAR(50)	NULL	COMMENT 'UNIQUE',
+                           `merchant_uid`	VARCHAR(100)	NULL	COMMENT 'UNIQUE',
                            `payment_status`	VARCHAR(20)	NULL,
                            `receipt_url`	VARCHAR(500)	NULL,
+                           `failure_reason`	VARCHAR(255)	NULL,
                            PRIMARY KEY (`payment_id`)
 );
 

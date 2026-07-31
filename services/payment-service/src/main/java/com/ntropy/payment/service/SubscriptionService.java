@@ -1,10 +1,13 @@
 package com.ntropy.payment.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.payment.client.portone.PortOneBillingKeyClient;
 import com.ntropy.payment.client.portone.PortOneBillingKeyVerification;
 import com.ntropy.payment.client.portone.PortOnePaymentClient;
 import com.ntropy.payment.client.portone.PortOnePaymentVerification;
+import com.ntropy.payment.client.portone.PortOneWebhookVerifier;
 import com.ntropy.payment.domain.Payment;
 import com.ntropy.payment.domain.PaymentStatus;
 import com.ntropy.payment.domain.PlanCode;
@@ -22,39 +25,40 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-// 구독/결제 비즈니스 로직.
-
 @Service
 public class SubscriptionService {
+
+    private static final int MAX_RETRY_COUNT = 3;
+    private static final long RETRY_INTERVAL_DAYS = 1;
 
     private final SubscriptionMapper subscriptionMapper;
     private final PaymentMapper paymentMapper;
     private final PortOnePaymentClient portOnePaymentClient;
     private final PortOneBillingKeyClient portOneBillingKeyClient;
+    private final PortOneWebhookVerifier portOneWebhookVerifier;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Autowired
     public SubscriptionService(SubscriptionMapper subscriptionMapper,
                                PaymentMapper paymentMapper,
                                PortOnePaymentClient portOnePaymentClient,
-                               PortOneBillingKeyClient portOneBillingKeyClient) {  // ← 생성자 파라미터에도 있나요?
+                               PortOneBillingKeyClient portOneBillingKeyClient,
+                               PortOneWebhookVerifier portOneWebhookVerifier) {
         this.subscriptionMapper = subscriptionMapper;
         this.paymentMapper = paymentMapper;
         this.portOnePaymentClient = portOnePaymentClient;
-        this.portOneBillingKeyClient = portOneBillingKeyClient;   // ← 이 대입문 있나요?
+        this.portOneBillingKeyClient = portOneBillingKeyClient;
+        this.portOneWebhookVerifier = portOneWebhookVerifier;
     }
-    /** 서비스가 제공하는 전체 플랜 목록. 유저와 무관하게 고정된 값이라 DB 조회가 필요 없다. */
+
     public List<PlanCode> getAllPlans() {
         return Arrays.asList(PlanCode.values());
     }
-
-    // 유저의 현재 구독 상태를 조회한다.
 
     public Subscription getMySubscription(Long userId) {
         Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
         return subscription != null ? subscription : defaultBasicSubscription();
     }
-
-
-    // 최초결제 + 빌링키 발급을 검증하고 PRO 구독을 생성한다.
 
     @Transactional
     public Subscription initSubscription(Long userId, String billingKey) {
@@ -102,15 +106,9 @@ public class SubscriptionService {
         payment.setReceiptUrl(paymentResult.getReceiptUrl());
         paymentMapper.insert(payment);
 
-        return subscription;
-    }
+        scheduleUpcomingPayment(subscription, subscription.getEndDate());
 
-    private Subscription defaultBasicSubscription() {
-        Subscription basic = new Subscription();
-        basic.setPlanCode(PlanCode.BASIC);
-        basic.setStatus(SubscriptionStatus.ACTIVE);
-        basic.setAutoRenewYn(false);
-        return basic;
+        return subscription;
     }
 
     @Transactional
@@ -132,5 +130,124 @@ public class SubscriptionService {
         subscriptionMapper.update(subscription);
 
         return subscription;
+    }
+
+    @Transactional
+    public void handleScheduledPaymentResult(String paymentId) {
+        Payment pendingPayment = paymentMapper.findByMerchantUid(paymentId);
+        if (pendingPayment == null) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_NOT_FOUND);
+        }
+
+        if (pendingPayment.getPaymentStatus() != PaymentStatus.PENDING) {
+            // 이미 SUCCESS/FAILED로 처리된 건 - 웹훅 중복수신. 재처리하지 않고 그대로 종료.
+            return;
+        }
+
+        PortOnePaymentVerification result = portOnePaymentClient.verifyPayment(paymentId);
+
+        if (result.isPaid()) {
+            handleScheduledPaymentSuccess(pendingPayment, result);
+        } else {
+            handleScheduledPaymentFailure(pendingPayment);
+        }
+    }
+
+    @Transactional
+    public boolean receiveWebhook(String webhookId, String webhookTimestamp, String webhookSignature, String rawBody) {
+        if (!portOneWebhookVerifier.verify(webhookId, webhookTimestamp, webhookSignature, rawBody)) {
+            return false;
+        }
+
+        String paymentId = extractPaymentId(rawBody);
+        if (paymentId != null && paymentMapper.findByMerchantUid(paymentId) != null) {
+            handleScheduledPaymentResult(paymentId);
+        }
+
+        return true;
+    }
+
+    private String extractPaymentId(String rawBody) {
+        try {
+            JsonNode root = objectMapper.readTree(rawBody);
+            JsonNode paymentIdNode = root.path("data").path("paymentId");
+            return paymentIdNode.isMissingNode() ? null : paymentIdNode.asText(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void handleScheduledPaymentSuccess(Payment pendingPayment, PortOnePaymentVerification result) {
+        pendingPayment.setAmount(result.getAmount());
+        pendingPayment.setPaymentMethod(result.getPaymentMethod());
+        pendingPayment.setPaymentStatus(PaymentStatus.SUCCESS);
+        pendingPayment.setFailureReason(null);
+        pendingPayment.setReceiptUrl(result.getReceiptUrl());
+        paymentMapper.update(pendingPayment);
+
+        Subscription subscription = subscriptionMapper.findById(pendingPayment.getSubscriptionId());
+        subscription.setEndDate(subscription.getEndDate().plusMonths(1));
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setPaymentMethod(result.getPaymentMethod());
+        subscription.setPaymentLabel(result.getPaymentLabel());
+        subscription.setPaymentMasked(result.getPaymentMasked());
+        subscriptionMapper.update(subscription);
+
+        scheduleUpcomingPayment(subscription, subscription.getEndDate());
+    }
+
+    private void handleScheduledPaymentFailure(Payment pendingPayment) {
+        pendingPayment.setPaymentStatus(PaymentStatus.FAILED);
+        pendingPayment.setFailureReason("포트원 결제 실패");
+        paymentMapper.update(pendingPayment);
+
+        Subscription subscription = subscriptionMapper.findById(pendingPayment.getSubscriptionId());
+        int consecutiveFailures = countConsecutiveFailures(subscription.getSubscriptionId());
+
+        if (consecutiveFailures < MAX_RETRY_COUNT) {
+            scheduleUpcomingPayment(subscription, LocalDateTime.now().plusDays(RETRY_INTERVAL_DAYS));
+        } else {
+            subscription.setStatus(SubscriptionStatus.EXPIRED);
+            subscriptionMapper.update(subscription);
+            // TODO(notification-service 연계 지점): 정기결제 최종 실패로 구독이 만료됐다는 알림 발송
+        }
+    }
+
+    private int countConsecutiveFailures(Long subscriptionId) {
+        List<Payment> history = paymentMapper.findAllBySubscriptionId(subscriptionId);
+        int count = 0;
+        for (Payment payment : history) {
+            if (payment.getPaymentStatus() == PaymentStatus.FAILED) {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
+
+    private void scheduleUpcomingPayment(Subscription subscription, LocalDateTime timeToPay) {
+        String paymentId = "sub-recurring-" + subscription.getSubscriptionId() + "-" + UUID.randomUUID();
+
+        Payment pendingPayment = new Payment();
+        pendingPayment.setSubscriptionId(subscription.getSubscriptionId());
+        pendingPayment.setPlanCode(PlanCode.PRO);
+        pendingPayment.setAmount((long) PlanCode.PRO.getMonthlyPrice());
+        pendingPayment.setCreatedAt(LocalDateTime.now());
+        pendingPayment.setMerchantUid(paymentId);
+        pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
+        paymentMapper.insert(pendingPayment);
+
+        portOnePaymentClient.schedulePayment(
+                paymentId, subscription.getCustomerUid(), PlanCode.PRO.getMonthlyPrice(),
+                "Ntropy Pro 정기결제", timeToPay);
+    }
+
+    private Subscription defaultBasicSubscription() {
+        Subscription basic = new Subscription();
+        basic.setPlanCode(PlanCode.BASIC);
+        basic.setStatus(SubscriptionStatus.ACTIVE);
+        basic.setAutoRenewYn(false);
+        return basic;
     }
 }
