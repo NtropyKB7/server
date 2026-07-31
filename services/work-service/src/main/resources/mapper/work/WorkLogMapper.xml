@@ -9,32 +9,34 @@
         <result property="workDate" column="work_date"/>
         <result property="startTime" column="start_time"/>
         <result property="endTime" column="end_time"/>
+        <result property="taskCount" column="task_count"/>
         <result property="fatigue" column="fatigue"/>
         <result property="estimatedIncome" column="estimated_income"/>
         <result property="status" column="status"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.ntropy.work.domain.entity.WorkLog">
-        INSERT INTO WORK_LOG (log_id, user_id, job_id, work_date, start_time, end_time,
-                               fatigue, estimated_income, status)
-        VALUES (#{logId}, #{userId}, #{jobId}, #{workDate}, #{startTime}, #{endTime},
-                #{fatigue}, #{estimatedIncome}, #{status})
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.WorkLog"
+            useGeneratedKeys="true" keyProperty="logId">
+        INSERT INTO WORK_LOG (user_id, job_id, work_date, start_time, end_time,
+                               task_count, fatigue, estimated_income, status)
+        VALUES (#{userId}, #{jobId}, #{workDate}, #{startTime}, #{endTime},
+                #{taskCount}, #{fatigue}, #{estimatedIncome}, #{status})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="workLogResultMap">
-        SELECT log_id, user_id, job_id, work_date, start_time, end_time, fatigue, estimated_income, status
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status
         FROM WORK_LOG
         WHERE log_id = #{logId}
     </select>
 
     <select id="findByJobId" parameterType="long" resultMap="workLogResultMap">
-        SELECT log_id, user_id, job_id, work_date, start_time, end_time, fatigue, estimated_income, status
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status
         FROM WORK_LOG
         WHERE job_id = #{jobId}
     </select>
 
     <select id="findByUserIdAndWorkDate" resultMap="workLogResultMap">
-        SELECT log_id, user_id, job_id, work_date, start_time, end_time, fatigue, estimated_income, status
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status
         FROM WORK_LOG
         WHERE user_id = #{userId}
           AND work_date = #{workDate}
@@ -45,6 +47,7 @@
         SET work_date = #{workDate},
             start_time = #{startTime},
             end_time = #{endTime},
+            task_count = #{taskCount},
             fatigue = #{fatigue},
             estimated_income = #{estimatedIncome},
             status = #{status}

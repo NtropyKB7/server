@@ -41,4 +41,27 @@ class PersonalBankTest {
         assertEquals(PersonalBank.SHINHAN_BANK, PersonalBank.fromOrganizationCode("0088"));
         assertThrows(IllegalArgumentException.class, () -> PersonalBank.fromOrganizationCode("0031"));
     }
+
+    @Test
+    void normalizesBirthDateOnlyForBanksThatRequireIt() {
+        assertEquals("19900101", PersonalBank.KB_KOOKMIN_BANK.normalizeBirthDate("19900101"));
+        assertEquals(null, PersonalBank.SHINHAN_BANK.normalizeBirthDate(null));
+        assertEquals(null, PersonalBank.SHINHAN_BANK.normalizeBirthDate("19900101"));
+    }
+
+    @Test
+    void rejectsMissingOrInvalidBirthDateForRequiredBanks() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> PersonalBank.IBK_INDUSTRIAL_BANK.normalizeBirthDate(null)
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> PersonalBank.KB_KOOKMIN_BANK.normalizeBirthDate("19900231")
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> PersonalBank.KB_KOOKMIN_BANK.normalizeBirthDate("not-a-date")
+        );
+    }
 }

@@ -1,4 +1,4 @@
-package com.ntropy.common.dto;
+package com.ntropy.common.dto.payment;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

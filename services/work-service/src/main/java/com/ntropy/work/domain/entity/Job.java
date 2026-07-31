@@ -2,6 +2,8 @@ package com.ntropy.work.domain.entity;
 
 import java.time.LocalDateTime;
 
+import com.ntropy.work.domain.enums.SettlementType;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +21,7 @@ public class Job {
     private Long userId;
     private Long categoryId;
     private String jobName;
-    private String settlementType;
+    private SettlementType settlementType;
     private Integer hourlyWage;
     private Integer monthlyWage;
     private Integer perTaskWage;

@@ -1,8 +1,8 @@
 package com.ntropy.common.client;
 
 import com.ntropy.common.domain.Feature;
-import com.ntropy.common.dto.PlanSummary;
-import com.ntropy.common.dto.SubscriptionSummary;
+import com.ntropy.common.dto.payment.PlanSummary;
+import com.ntropy.common.dto.payment.SubscriptionSummary;
 
 import java.util.List;
 

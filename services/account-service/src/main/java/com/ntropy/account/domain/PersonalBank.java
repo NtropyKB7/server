@@ -1,5 +1,8 @@
 package com.ntropy.account.domain;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -49,6 +52,28 @@ public enum PersonalBank {
      */
     public Optional<Integer> getPasswordErrorLimit() {
         return Optional.ofNullable(passwordErrorLimit);
+    }
+
+    /**
+     * 생년월일이 필요 없는 은행이면 {@code null}을 반환하고, 필요한 은행이면 YYYYMMDD 형식을
+     * 검증한 뒤 그대로 반환한다. 보유계좌 등록과 거래내역 조회 양쪽에서 공용으로 쓴다.
+     */
+    public String normalizeBirthDate(String birthDate) {
+        if (!birthDateRequired) {
+            return null;
+        }
+        if (birthDate == null || birthDate.isBlank()) {
+            throw new IllegalArgumentException(displayName + " 생년월일(YYYYMMDD)가 필요합니다");
+        }
+        if (!birthDate.matches("\\d{8}")) {
+            throw new IllegalArgumentException("생년월일은 YYYYMMDD 형식이어야 합니다");
+        }
+        try {
+            LocalDate.parse(birthDate, DateTimeFormatter.BASIC_ISO_DATE);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("유효한 생년월일을 입력해야 합니다", e);
+        }
+        return birthDate;
     }
 
     public static PersonalBank fromOrganizationCode(String organizationCode) {

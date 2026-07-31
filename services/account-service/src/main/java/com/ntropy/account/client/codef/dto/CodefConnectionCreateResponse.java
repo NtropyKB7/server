@@ -33,7 +33,21 @@ public class CodefConnectionCreateResponse {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Data {
         private String connectedId;
-        private List<Object> successList;
-        private List<Object> errorList;
+        private List<AccountResult> successList;
+        private List<AccountResult> errorList;
+    }
+
+    @Getter
+    @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AccountResult {
+        private String code;
+        private String message;
+        private String extraMessage;
+        private String countryCode;
+        private String businessType;
+        private String clientType;
+        private String loginType;
+        private String organization;
     }
 }

@@ -22,6 +22,7 @@ public class WorkLog {
     private LocalDate workDate;
     private LocalTime startTime;
     private LocalTime endTime;
+    private Long taskCount;
     private Long fatigue;
     private Long estimatedIncome;
     private String status;

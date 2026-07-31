@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.JobQueryClient;
-import com.ntropy.common.dto.JobSummary;
+import com.ntropy.common.dto.work.summary.JobSummary;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.service.JobService;
 
@@ -36,7 +36,7 @@ public class LocalJobQueryClient implements JobQueryClient {
                 .userId(job.getUserId())
                 .categoryId(job.getCategoryId())
                 .jobName(job.getJobName())
-                .settlementType(job.getSettlementType())
+                .settlementType(job.getSettlementType().name())
                 .hourlyWage(job.getHourlyWage())
                 .monthlyWage(job.getMonthlyWage())
                 .perTaskWage(job.getPerTaskWage())

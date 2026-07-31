@@ -2,7 +2,7 @@ package com.ntropy.common.client;
 
 import java.util.List;
 
-import com.ntropy.common.dto.PlatformSummary;
+import com.ntropy.common.dto.work.summary.PlatformSummary;
 
 public interface PlatformQueryClient {
 

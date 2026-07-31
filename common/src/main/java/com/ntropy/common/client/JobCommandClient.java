@@ -1,7 +1,7 @@
 package com.ntropy.common.client;
 
-import com.ntropy.common.dto.JobRegisterCommand;
-import com.ntropy.common.dto.JobUpdateCommand;
+import com.ntropy.common.dto.work.command.JobRegisterCommand;
+import com.ntropy.common.dto.work.command.JobUpdateCommand;
 
 /**
  * work-service의 JOB 쓰기 계약. work-service가 LocalJobCommandClient로 구현하고,
