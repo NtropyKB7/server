@@ -26,6 +26,16 @@
         WHERE job_id = #{jobId}
     </select>
 
+    <select id="findByJobIdsAndTargetMonth" resultMap="allocationGoalResultMap">
+        SELECT allocation_goal_id, job_id, target_month, recommend_hour
+        FROM ALLOCATION_GOAL
+        WHERE target_month = #{targetMonth}
+          AND job_id IN
+        <foreach collection="jobIds" item="jobId" open="(" separator="," close=")">
+            #{jobId}
+        </foreach>
+    </select>
+
     <update id="update" parameterType="com.ntropy.work.domain.entity.AllocationGoal">
         UPDATE ALLOCATION_GOAL
         SET target_month = #{targetMonth},
