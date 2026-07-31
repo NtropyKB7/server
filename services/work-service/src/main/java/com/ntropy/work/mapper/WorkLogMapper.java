@@ -19,6 +19,10 @@ public interface WorkLogMapper {
 
     List<WorkLog> findByUserIdAndWorkDate(@Param("userId") Long userId, @Param("workDate") LocalDate workDate);
 
+    List<WorkLog> findByUserIdAndDateRange(@Param("userId") Long userId,
+                                            @Param("startDate") LocalDate startDate,
+                                            @Param("endDate") LocalDate endDate);
+
     void update(WorkLog workLog);
 
     void deleteById(Long logId);

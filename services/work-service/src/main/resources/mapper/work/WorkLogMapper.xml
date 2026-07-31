@@ -13,33 +13,41 @@
         <result property="fatigue" column="fatigue"/>
         <result property="estimatedIncome" column="estimated_income"/>
         <result property="status" column="status"/>
+        <result property="settlementStatus" column="settlement_status"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.ntropy.work.domain.entity.WorkLog"
             useGeneratedKeys="true" keyProperty="logId">
         INSERT INTO WORK_LOG (user_id, job_id, work_date, start_time, end_time,
-                               task_count, fatigue, estimated_income, status)
+                               task_count, fatigue, estimated_income, status, settlement_status)
         VALUES (#{userId}, #{jobId}, #{workDate}, #{startTime}, #{endTime},
-                #{taskCount}, #{fatigue}, #{estimatedIncome}, #{status})
+                #{taskCount}, #{fatigue}, #{estimatedIncome}, #{status}, #{settlementStatus})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="workLogResultMap">
-        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status, settlement_status
         FROM WORK_LOG
         WHERE log_id = #{logId}
     </select>
 
     <select id="findByJobId" parameterType="long" resultMap="workLogResultMap">
-        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status, settlement_status
         FROM WORK_LOG
         WHERE job_id = #{jobId}
     </select>
 
     <select id="findByUserIdAndWorkDate" resultMap="workLogResultMap">
-        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status, settlement_status
         FROM WORK_LOG
         WHERE user_id = #{userId}
           AND work_date = #{workDate}
+    </select>
+
+    <select id="findByUserIdAndDateRange" resultMap="workLogResultMap">
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status, settlement_status
+        FROM WORK_LOG
+        WHERE user_id = #{userId}
+          AND work_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
     <update id="update" parameterType="com.ntropy.work.domain.entity.WorkLog">
@@ -50,7 +58,8 @@
             task_count = #{taskCount},
             fatigue = #{fatigue},
             estimated_income = #{estimatedIncome},
-            status = #{status}
+            status = #{status},
+            settlement_status = #{settlementStatus}
         WHERE log_id = #{logId}
     </update>
 

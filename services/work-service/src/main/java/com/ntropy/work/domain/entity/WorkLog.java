@@ -3,6 +3,8 @@ package com.ntropy.work.domain.entity;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import com.ntropy.work.domain.enums.SettlementStatus;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,4 +28,5 @@ public class WorkLog {
     private Long fatigue;
     private Long estimatedIncome;
     private String status;
+    private SettlementStatus settlementStatus;
 }
