@@ -1,6 +1,5 @@
 package com.ntropy.work.service;
 
-import java.time.Duration;
 import java.time.LocalTime;
 
 import org.springframework.stereotype.Service;
@@ -11,6 +10,7 @@ import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.WorkLogMapper;
+import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
 
@@ -137,14 +137,17 @@ public class WorkLogService {
         }
     }
 
+    /**
+     * 자정을 넘기는 근무(예: 23:30~02:00)는 24시간을 더해 정상 계산한다.
+     */
     private Long calculateEstimatedIncome(Job job, LocalTime startTime, LocalTime endTime, Long taskCount) {
         if (startTime == null || endTime == null) {
             return null;
         }
-        if (!endTime.isAfter(startTime)) {
-            throw new IllegalArgumentException("종료 시간은 시작 시간보다 이후여야 합니다.");
+        if (startTime.equals(endTime)) {
+            throw new IllegalArgumentException("시작 시간과 종료 시간이 같을 수 없습니다.");
         }
-        double hours = Duration.between(startTime, endTime).toMinutes() / 60.0;
+        double hours = WorkTimeUtils.durationMinutes(startTime, endTime) / 60.0;
 
         switch (job.getSettlementType()) {
             case HOURLY:

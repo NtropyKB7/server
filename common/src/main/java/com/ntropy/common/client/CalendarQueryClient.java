@@ -1,5 +1,8 @@
 package com.ntropy.common.client;
 
+import java.time.LocalDate;
+
+import com.ntropy.common.dto.work.summary.CalendarDailySummary;
 import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
 
 /**
@@ -9,4 +12,6 @@ import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
 public interface CalendarQueryClient {
 
     CalendarMonthlySummary getMonthlySummary(Long userId, int year, int month);
+
+    CalendarDailySummary getDailySummary(Long userId, LocalDate date);
 }
