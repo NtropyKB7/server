@@ -3,8 +3,10 @@ package com.ntropy.payment.client;
 import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.domain.Feature;
+import com.ntropy.common.dto.payment.PaymentSummary;
 import com.ntropy.common.dto.payment.PlanSummary;
 import com.ntropy.common.dto.payment.SubscriptionSummary;
+import com.ntropy.payment.domain.Payment;
 import com.ntropy.payment.domain.PlanCode;
 import com.ntropy.payment.domain.Subscription;
 import com.ntropy.payment.service.SubscriptionService;
@@ -87,5 +89,37 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, Su
     @Override
     public boolean receiveWebhook(String webhookId, String webhookTimestamp, String webhookSignature, String rawBody) {
         return subscriptionService.receiveWebhook(webhookId, webhookTimestamp, webhookSignature, rawBody);
+    }
+
+    @Override
+    public List<PaymentSummary> getPaymentHistory(Long userId) {
+        return subscriptionService.getPaymentHistory(userId).stream()
+                .map(this::toPaymentSummary)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public SubscriptionSummary cancelSubscription(Long userId) {
+        Subscription subscription = subscriptionService.cancelSubscription(userId);
+        return toSubscriptionSummary(subscription);
+    }
+
+    @Override
+    public SubscriptionSummary revokeCancel(Long userId) {
+        Subscription subscription = subscriptionService.revokeCancel(userId);
+        return toSubscriptionSummary(subscription);
+    }
+
+    private PaymentSummary toPaymentSummary(Payment p) {
+        return new PaymentSummary(
+                p.getPaymentId(),
+                p.getPlanCode() != null ? p.getPlanCode().name() : null,
+                p.getAmount(),
+                p.getPaymentMethod() != null ? p.getPaymentMethod().name() : null,
+                p.getCreatedAt(),
+                p.getPaymentStatus() != null ? p.getPaymentStatus().name() : null,
+                p.getFailureReason(),
+                p.getReceiptUrl()
+        );
     }
 }

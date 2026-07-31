@@ -8,4 +8,6 @@ public interface SubscriptionCommandClient {
     SubscriptionSummary updatePaymentMethod(Long userId, String billingKey);
     void handleScheduledPaymentResult(String paymentId);
     boolean receiveWebhook(String webhookId, String webhookTimestamp, String webhookSignature, String rawBody);
+    SubscriptionSummary cancelSubscription(Long userId);
+    SubscriptionSummary revokeCancel(Long userId);
 }

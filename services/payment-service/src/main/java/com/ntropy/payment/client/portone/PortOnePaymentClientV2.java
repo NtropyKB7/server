@@ -159,4 +159,25 @@ public class PortOnePaymentClientV2 implements PortOnePaymentClient {
 
         return new PortOnePaymentVerification(paid, amount, paymentMethod, paymentLabel, paymentMasked, receiptUrl);
     }
+
+    @Override
+    public boolean cancelScheduledPayments(String billingKey) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "PortOne " + portOneProperties.getApiSecret());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("billingKey", billingKey);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                BASE_URL + "/payment-schedules",
+                HttpMethod.DELETE,
+                entity,
+                Map.class
+        );
+
+        return response.getStatusCode().is2xxSuccessful();
+    }
 }

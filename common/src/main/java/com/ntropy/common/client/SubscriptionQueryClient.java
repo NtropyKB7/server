@@ -1,6 +1,7 @@
 package com.ntropy.common.client;
 
 import com.ntropy.common.domain.Feature;
+import com.ntropy.common.dto.payment.PaymentSummary;
 import com.ntropy.common.dto.payment.PlanSummary;
 import com.ntropy.common.dto.payment.SubscriptionSummary;
 
@@ -13,4 +14,6 @@ public interface SubscriptionQueryClient {
     SubscriptionSummary getMySubscription(Long userId);
 
     boolean supportsFeature(Long userId, Feature feature);
+
+    List<PaymentSummary> getPaymentHistory(Long userId);
 }

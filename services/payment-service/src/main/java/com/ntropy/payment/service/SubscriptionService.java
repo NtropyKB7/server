@@ -22,8 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class SubscriptionService {
@@ -55,10 +57,6 @@ public class SubscriptionService {
         return Arrays.asList(PlanCode.values());
     }
 
-    public Subscription getMySubscription(Long userId) {
-        Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
-        return subscription != null ? subscription : defaultBasicSubscription();
-    }
 
     @Transactional
     public Subscription initSubscription(Long userId, String billingKey) {
@@ -249,5 +247,101 @@ public class SubscriptionService {
         basic.setStatus(SubscriptionStatus.ACTIVE);
         basic.setAutoRenewYn(false);
         return basic;
+    }
+
+    /**
+     * 유저의 현재 구독 상태를 조회한다.
+     * ⚠️ SUBSCRIPTION02_F03(만료 시 최종 해지 처리) 구현 방식: 배치/스케줄러 대신
+     * "조회 시점 지연갱신"으로 결정했다. CANCEL_SCHEDULED(해지예약) 상태인 구독은
+     * 다음 회차 예약 자체를 취소해뒀기 때문에, 웹훅이 다시 올 일이 없어 상태가
+     * 영원히 CANCEL_SCHEDULED로 남아있을 수 있다. 그래서 조회할 때마다 만료일이
+     * 지났는지 확인해서, 지났으면 이 자리에서 EXPIRED로 갱신한다.
+     */
+    public Subscription getMySubscription(Long userId) {
+        Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
+        if (subscription == null) {
+            return defaultBasicSubscription();
+        }
+
+        if (subscription.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED
+                && subscription.getEndDate() != null
+                && subscription.getEndDate().isBefore(LocalDateTime.now())) {
+            subscription.setStatus(SubscriptionStatus.EXPIRED);
+            subscriptionMapper.update(subscription);
+        }
+
+        return subscription;
+    }
+
+    /**
+     * 해지예약(SUBSCRIPTION02_F01 관련) - POST /api/subscriptions/cancel.
+     *
+     * 순서:
+     * 1) 활성 구독이 있어야 한다 (없거나 이미 만료됐으면 SUBSCRIPTION_NOT_FOUND).
+     * 2) 이미 해지예약 상태면 중복 요청으로 보고 거절한다 (ALREADY_CANCELLED).
+     * 3) 포트원에 걸려있는 다음 회차 예약을 먼저 취소한다 - 이 호출이 실패하면
+     *    (예외가 던져지면) @Transactional에 의해 아래 DB 변경도 전부 롤백된다.
+     *    순서를 "포트원 취소 → DB 반영"으로 둔 이유: DB만 먼저 바꿔놓고 포트원 취소에
+     *    실패하면, 사용자는 해지된 줄 알지만 실제로는 다음 달에 또 결제되는 사고로
+     *    이어질 수 있기 때문이다.
+     * 4) status를 CANCEL_SCHEDULED로, cancel_requested_at을 지금 시각으로,
+     *    auto_renew_yn을 false로 바꾼다. end_date는 그대로 둔다 - 만료일까지는
+     *    계속 이용 가능해야 하기 때문(isUsable()이 CANCEL_SCHEDULED를 true로 취급).
+     */
+    @Transactional
+    public Subscription cancelSubscription(Long userId) {
+        Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
+        if (subscription == null || !subscription.isUsable()) {
+            throw new ServiceException(PaymentErrorCode.SUBSCRIPTION_NOT_FOUND);
+        }
+        if (subscription.getStatus() == SubscriptionStatus.CANCEL_SCHEDULED) {
+            throw new ServiceException(PaymentErrorCode.ALREADY_CANCELLED);
+        }
+
+        portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid());
+
+        subscription.setStatus(SubscriptionStatus.CANCEL_SCHEDULED);
+        subscription.setCancelRequestedAt(LocalDateTime.now());
+        subscription.setAutoRenewYn(false);
+        subscriptionMapper.update(subscription);
+
+        return subscription;
+    }
+
+    /**
+     * 해지예약 취소 - DELETE /api/subscriptions/cancel.
+     * status를 ACTIVE로 되돌리고, cancelSubscription 때 취소했던 다음 회차 결제를
+     * 다시 예약한다 (기존 end_date 기준 그대로 - 해지예약 중엔 end_date를 안 건드렸으므로).
+     */
+    @Transactional
+    public Subscription revokeCancel(Long userId) {
+        Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
+        if (subscription == null || subscription.getStatus() != SubscriptionStatus.CANCEL_SCHEDULED) {
+            throw new ServiceException(PaymentErrorCode.NOT_CANCEL_SCHEDULED);
+        }
+
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setCancelRequestedAt(null);
+        subscription.setAutoRenewYn(true);
+        subscriptionMapper.update(subscription);
+
+        scheduleUpcomingPayment(subscription, subscription.getEndDate());
+
+        return subscription;
+    }
+
+    /**
+     * GET /api/subscriptions/payments - 이 유저의 전체 결제 이력(최신순).
+     * 과거에 해지 후 재구독해서 SUBSCRIPTION 행이 여러 개 쌓여있어도 전부 합쳐서 보여준다.
+     * PENDING(아직 결과 안 나온 정기결제 예약)은 사용자에게 보여줄 이유가 없어 제외한다.
+     */
+    public List<Payment> getPaymentHistory(Long userId) {
+        List<Subscription> subscriptions = subscriptionMapper.findAllByUserId(userId);
+
+        return subscriptions.stream()
+                .flatMap(subscription -> paymentMapper.findAllBySubscriptionId(subscription.getSubscriptionId()).stream())
+                .filter(payment -> payment.getPaymentStatus() != PaymentStatus.PENDING)
+                .sorted(Comparator.comparing(Payment::getCreatedAt).reversed())
+                .collect(Collectors.toList());
     }
 }
