@@ -2,6 +2,7 @@ package com.ntropy.config;
 
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -16,7 +17,8 @@ import org.springframework.web.servlet.view.JstlView;
         useDefaultFilters = false,
         includeFilters = {
                 @ComponentScan.Filter(Controller.class),
-                @ComponentScan.Filter(RestController.class)
+                @ComponentScan.Filter(RestController.class),
+                @ComponentScan.Filter(ControllerAdvice.class)
         }
 )
 public class ServletConfig implements WebMvcConfigurer {

@@ -11,15 +11,16 @@
         <result property="cancelRequestedAt" column="cancel_requested_at"/>
         <result property="autoRenewYn" column="auto_renew_yn"/>
         <result property="customerUid" column="customer_uid"/>
-        <result property="cardName" column="card_name"/>
-        <result property="cardNumberMasked" column="card_number_masked"/>
+        <result property="paymentMethod" column="payment_method" javaType="com.ntropy.payment.domain.PaymentMethod"/>
+        <result property="paymentLabel" column="payment_label"/>
+        <result property="paymentMasked" column="payment_masked"/>
         <result property="status" column="status" javaType="com.ntropy.payment.domain.SubscriptionStatus"/>
     </resultMap>
 
     <sql id="subscriptionColumns">
         subscription_id, user_id, plan_code, start_date, end_date,
-        cancel_requested_at, auto_renew_yn, customer_uid, card_name,
-        card_number_masked, status
+        cancel_requested_at, auto_renew_yn, customer_uid, payment_method,
+        payment_label, payment_masked, status
     </sql>
 
     <select id="findById" resultMap="subscriptionResultMap">
@@ -53,10 +54,10 @@
             useGeneratedKeys="true" keyProperty="subscriptionId" keyColumn="subscription_id">
         INSERT INTO SUBSCRIPTION (
             user_id, plan_code, start_date, end_date, cancel_requested_at,
-            auto_renew_yn, customer_uid, card_name, card_number_masked, status
+            auto_renew_yn, customer_uid, payment_method, payment_label, payment_masked, status
         ) VALUES (
                      #{userId}, #{planCode}, #{startDate}, #{endDate}, #{cancelRequestedAt},
-                     #{autoRenewYn}, #{customerUid}, #{cardName}, #{cardNumberMasked}, #{status}
+                     #{autoRenewYn}, #{customerUid}, #{paymentMethod}, #{paymentLabel}, #{paymentMasked}, #{status}
                  )
     </insert>
 
@@ -67,8 +68,9 @@
             cancel_requested_at = #{cancelRequestedAt},
             auto_renew_yn = #{autoRenewYn},
             customer_uid = #{customerUid},
-            card_name = #{cardName},
-            card_number_masked = #{cardNumberMasked},
+            payment_method = #{paymentMethod},
+            payment_label = #{paymentLabel},
+            payment_masked = #{paymentMasked},
             status = #{status}
         WHERE subscription_id = #{subscriptionId}
     </update>

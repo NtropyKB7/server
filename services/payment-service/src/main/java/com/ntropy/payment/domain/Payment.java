@@ -16,9 +16,10 @@ public class Payment {
     private PlanCode planCode;
     private String impUid;
     private Long amount;
-    private String paymentMethod;
+    private PaymentMethod paymentMethod;
     private LocalDateTime createdAt;
     private String merchantUid;
     private PaymentStatus paymentStatus;
+    private String failureReason;
     private String receiptUrl;
 }

@@ -1,4 +1,4 @@
-package com.ntropy.bff.dto.subscription;
+package com.ntropy.bff.dto.subscription.response;
 
 import com.ntropy.common.dto.payment.PlanSummary;
 import lombok.AllArgsConstructor;
@@ -8,10 +8,6 @@ import lombok.Setter;
 
 import java.util.List;
 
-/**
- * GET /api/subscriptions/plans 의 data 필드 모양.
- * { "plans": [ ... ] } 형태로 감싸기 위한 wrapper.
- */
 @Getter
 @Setter
 @NoArgsConstructor

@@ -8,16 +8,17 @@
         <result property="planCode" column="plan_code" javaType="com.ntropy.payment.domain.PlanCode"/>
         <result property="impUid" column="imp_uid"/>
         <result property="amount" column="amount"/>
-        <result property="paymentMethod" column="payment_method"/>
+        <result property="paymentMethod" column="payment_method" javaType="com.ntropy.payment.domain.PaymentMethod"/>
         <result property="createdAt" column="created_at"/>
         <result property="merchantUid" column="merchant_uid"/>
         <result property="paymentStatus" column="payment_status" javaType="com.ntropy.payment.domain.PaymentStatus"/>
+        <result property="failureReason" column="failure_reason"/>
         <result property="receiptUrl" column="receipt_url"/>
     </resultMap>
 
     <sql id="paymentColumns">
         payment_id, subscription_id, plan_code, imp_uid, amount,
-        payment_method, created_at, merchant_uid, payment_status, receipt_url
+        payment_method, created_at, merchant_uid, payment_status, failure_reason, receipt_url
     </sql>
 
     <select id="findById" resultMap="paymentResultMap">
@@ -43,16 +44,19 @@
             useGeneratedKeys="true" keyProperty="paymentId" keyColumn="payment_id">
         INSERT INTO PAYMENT (
             subscription_id, plan_code, imp_uid, amount,
-            payment_method, created_at, merchant_uid, payment_status, receipt_url
+            payment_method, created_at, merchant_uid, payment_status, failure_reason, receipt_url
         ) VALUES (
                      #{subscriptionId}, #{planCode}, #{impUid}, #{amount},
-                     #{paymentMethod}, #{createdAt}, #{merchantUid}, #{paymentStatus}, #{receiptUrl}
+                     #{paymentMethod}, #{createdAt}, #{merchantUid}, #{paymentStatus}, #{failureReason}, #{receiptUrl}
                  )
     </insert>
 
-    <update id="updateStatus">
+    <update id="update" parameterType="com.ntropy.payment.domain.Payment">
         UPDATE PAYMENT
-        SET payment_status = #{paymentStatus},
+        SET amount = #{amount},
+            payment_method = #{paymentMethod},
+            payment_status = #{paymentStatus},
+            failure_reason = #{failureReason},
             receipt_url = #{receiptUrl}
         WHERE payment_id = #{paymentId}
     </update>

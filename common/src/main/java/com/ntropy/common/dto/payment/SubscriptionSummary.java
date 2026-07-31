@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class SubscriptionSummary {
 
+
     private Long subscriptionId;
     private String planCode;
     private String status;
@@ -20,6 +21,7 @@ public class SubscriptionSummary {
     private LocalDateTime endDate;
     private Boolean autoRenewYn;
     private LocalDateTime cancelRequestedAt;
-    private String cardName;
-    private String cardNumberMasked;
+    private String paymentMethod;
+    private String paymentLabel;
+    private String paymentMasked;
 }

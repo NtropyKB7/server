@@ -1,4 +1,4 @@
-package com.ntropy.bff.dto.subscription;
+package com.ntropy.bff.dto.subscription.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ntropy.common.dto.payment.SubscriptionSummary;
@@ -39,8 +39,9 @@ public class SubscriptionResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime cancelRequestedAt;
 
-    private String cardName;
-    private String cardNumberMasked;
+    private String paymentMethod;
+    private String paymentLabel;
+    private String paymentMasked;
 
     public static SubscriptionResponse from(SubscriptionSummary summary) {
         SubscriptionResponse response = new SubscriptionResponse();
@@ -51,8 +52,9 @@ public class SubscriptionResponse {
         response.endDate = summary.getEndDate();
         response.autoRenewYn = summary.getAutoRenewYn();
         response.cancelRequestedAt = summary.getCancelRequestedAt();
-        response.cardName = summary.getCardName();
-        response.cardNumberMasked = summary.getCardNumberMasked();
+        response.paymentMethod = summary.getPaymentMethod();
+        response.paymentLabel = summary.getPaymentLabel();
+        response.paymentMasked = summary.getPaymentMasked();
         return response;
     }
 }
