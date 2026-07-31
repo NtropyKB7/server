@@ -69,7 +69,8 @@ CREATE TABLE `WORK_LOG` (
 	`task_count`	BIGINT	NULL	COMMENT 'PER_TASK 잡 확정 시 사용자가 입력하는 실제 건수',
 	`fatigue`	BIGINT	NULL,
 	`estimated_income`	BIGINT	NULL,
-	`status`	VARCHAR(20)	NULL	COMMENT 'PLANNED/CONFIRMED'
+	`status`	VARCHAR(20)	NULL	COMMENT 'PLANNED/CONFIRMED',
+	`settlement_status`	VARCHAR(20)	NULL	COMMENT 'NONE/PENDING/COMPLETED'
 );
 
 -- 7. ALLOCATION_GOAL (잡별 근무시간 배분 추천)

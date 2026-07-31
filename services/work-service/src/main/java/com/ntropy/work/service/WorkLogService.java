@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.WorkLogMapper;
 
@@ -39,6 +40,7 @@ public class WorkLogService {
         workLog.setEstimatedIncome(
                 calculateEstimatedIncome(job, workLog.getStartTime(), workLog.getEndTime(), null));
         workLog.setStatus(STATUS_PLANNED);
+        workLog.setSettlementStatus(SettlementStatus.NONE);
 
         workLogMapper.insert(workLog);
         return workLog;
@@ -56,6 +58,7 @@ public class WorkLogService {
         workLog.setEstimatedIncome(
                 calculateEstimatedIncome(job, workLog.getStartTime(), workLog.getEndTime(), workLog.getTaskCount()));
         workLog.setStatus(STATUS_CONFIRMED);
+        workLog.setSettlementStatus(SettlementStatus.PENDING);
 
         workLogMapper.insert(workLog);
         return workLog;
@@ -96,6 +99,7 @@ public class WorkLogService {
         existing.setEstimatedIncome(
                 calculateEstimatedIncome(job, existing.getStartTime(), existing.getEndTime(), existing.getTaskCount()));
         existing.setStatus(STATUS_CONFIRMED);
+        existing.setSettlementStatus(SettlementStatus.PENDING);
 
         workLogMapper.update(existing);
         return existing;
