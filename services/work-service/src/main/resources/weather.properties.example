@@ -1,0 +1,9 @@
+# weather-local.properties로 복사해서 실제 값을 채우세요. weather-local.properties는 git에 커밋되지 않습니다.
+# 공공데이터포털(data.go.kr) 기상청_단기예보 조회서비스 신청 후 발급받은 인증키 (Decoding 키)
+weather.service-key=
+# 위치 미동의/좌표 없음 시 사용할 기본 좌표 (서울시청)
+weather.default-latitude=37.5665
+weather.default-longitude=126.9780
+# 외부 기상청 API 호출 타임아웃 (밀리초)
+weather.connect-timeout-ms=5000
+weather.read-timeout-ms=10000
