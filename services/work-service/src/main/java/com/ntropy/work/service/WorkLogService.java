@@ -1,5 +1,6 @@
 package com.ntropy.work.service;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class WorkLogService {
     @Transactional
     public WorkLog registerPlan(WorkLog workLog) {
         validatePlan(workLog);
+        validateNoOverlap(workLog.getUserId(), workLog.getWorkDate(), workLog.getStartTime(), workLog.getEndTime(), null);
         Job job = jobService.findById(workLog.getJobId());
 
         if (workLog.getFatigue() == null) {
@@ -52,6 +54,7 @@ public class WorkLogService {
     @Transactional
     public WorkLog registerActual(WorkLog workLog) {
         validateActual(workLog);
+        validateNoOverlap(workLog.getUserId(), workLog.getWorkDate(), workLog.getStartTime(), workLog.getEndTime(), null);
         Job job = jobService.findById(workLog.getJobId());
         validateTaskCountIfPerTask(job, workLog.getTaskCount());
 
@@ -72,6 +75,8 @@ public class WorkLogService {
     public WorkLog editWorkLog(Long logId, WorkLog patch) {
         WorkLog existing = findById(logId);
         applyPatch(existing, patch);
+        validateNoOverlap(existing.getUserId(), existing.getWorkDate(), existing.getStartTime(), existing.getEndTime(),
+                existing.getLogId());
 
         Job job = jobService.findById(existing.getJobId());
         existing.setEstimatedIncome(
@@ -92,6 +97,8 @@ public class WorkLogService {
             throw new IllegalStateException("이미 확정된 근무일지입니다. logId=" + logId);
         }
         applyPatch(existing, patch);
+        validateNoOverlap(existing.getUserId(), existing.getWorkDate(), existing.getStartTime(), existing.getEndTime(),
+                existing.getLogId());
 
         Job job = jobService.findById(existing.getJobId());
         validateTaskCountIfPerTask(job, existing.getTaskCount());
@@ -164,6 +171,23 @@ public class WorkLogService {
                 return null;
             default:
                 throw new IllegalStateException("알 수 없는 정산 방식입니다: " + job.getSettlementType());
+        }
+    }
+
+    /**
+     * 같은 userId + workDate 내에서 시간대가 겹치는 다른 근무일지가 있는지 검사한다(잡 무관).
+     * excludeLogId는 수정/확정 시 자기 자신의 기존 레코드를 비교 대상에서 제외하기 위함이다.
+     */
+    private void validateNoOverlap(Long userId, LocalDate workDate, LocalTime startTime, LocalTime endTime,
+                                    Long excludeLogId) {
+        for (WorkLog other : workLogMapper.findByUserIdAndWorkDate(userId, workDate)) {
+            if (excludeLogId != null && excludeLogId.equals(other.getLogId())) {
+                continue;
+            }
+            if (WorkTimeUtils.isOverlapping(startTime, endTime, other.getStartTime(), other.getEndTime())) {
+                throw new IllegalArgumentException(
+                        "해당 시간대에 이미 등록된 근무일지가 있습니다. workDate=" + workDate);
+            }
         }
     }
 
