@@ -70,7 +70,7 @@ CREATE TABLE `WORK_LOG` (
 	`start_time`	TIME	NULL,
 	`end_time`	TIME	NULL,
 	`task_count`	BIGINT	NULL	COMMENT 'PER_TASK 잡 확정 시 사용자가 입력하는 실제 건수',
-	`fatigue`	BIGINT	NULL,
+	`fatigue`	BIGINT	NOT NULL,
 	`estimated_income`	BIGINT	NULL,
 	`status`	VARCHAR(20)	NULL	COMMENT 'PLANNED/CONFIRMED',
 	`settlement_status`	VARCHAR(20)	NULL	COMMENT 'NONE/PENDING/COMPLETED',

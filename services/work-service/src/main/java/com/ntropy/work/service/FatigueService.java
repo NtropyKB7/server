@@ -1,13 +1,10 @@
 package com.ntropy.work.service;
 
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
 import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
-import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.util.WorkTimeUtils;
@@ -40,20 +37,17 @@ public class FatigueService {
     private static final String LEVEL_HIGH = "HIGH";
 
     private final WorkLogMapper workLogMapper;
-    private final JobService jobService;
 
     public CalendarFatigueGauge calculateGauge(Long userId, LocalDate date) {
         double weightedFatigue = 0;
-        Map<Long, Job> jobCache = new HashMap<>();
 
         for (int n = 0; n < WINDOW_DAYS; n++) {
             LocalDate day = date.minusDays(n);
             double dayWeight = (WINDOW_DAYS - n) / (double) WINDOW_DAYS;
 
             for (WorkLog workLog : workLogMapper.findByUserIdAndWorkDate(userId, day)) {
-                Job job = jobCache.computeIfAbsent(workLog.getJobId(), jobService::findById);
                 int hours = WorkTimeUtils.durationHours(workLog.getStartTime(), workLog.getEndTime());
-                weightedFatigue += hours * job.getBaseFatigue() * dayWeight;
+                weightedFatigue += hours * workLog.getFatigue() * dayWeight;
             }
         }
 
