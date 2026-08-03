@@ -140,6 +140,13 @@ class PersonalBankAccountServiceTest {
             capture(organizationCode, businessType, clientType, loginId, rawPassword, birthDate);
         }
 
+        @Override
+        public void updateConnection(String connectedId, String organizationCode,
+                                     String businessType, String clientType,
+                                     String loginId, String rawPassword, String birthDate) {
+            capture(organizationCode, businessType, clientType, loginId, rawPassword, birthDate);
+        }
+
         private void capture(String organizationCode, String businessType, String clientType,
                              String loginId, String rawPassword, String birthDate) {
             this.organizationCode = organizationCode;

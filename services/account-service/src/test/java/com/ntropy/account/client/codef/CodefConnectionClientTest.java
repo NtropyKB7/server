@@ -40,6 +40,25 @@ class CodefConnectionClientTest {
     }
 
     @Test
+    void updatesAccountCredentialsForExistingInstitution() throws Exception {
+        StubCodefApiClient apiClient = new StubCodefApiClient(successResponse("0011"));
+        CodefConnectionClient client = new CodefConnectionClient(properties(), apiClient);
+
+        client.updateConnection(
+                "connected-id", "0011", "BK", "P",
+                "login-id", "raw-password", null
+        );
+
+        assertEquals("/v1/account/update", apiClient.path);
+        assertEquals("connected-id", apiClient.requestBody.get("connectedId"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> account = ((List<Map<String, Object>>) apiClient.requestBody.get("accountList")).get(0);
+        assertEquals("0011", account.get("organization"));
+        assertEquals("login-id", account.get("id"));
+        assertNotEquals("raw-password", account.get("password"));
+    }
+
+    @Test
     void rejectsCodefAccountAddFailure() throws Exception {
         CodefConnectionCreateResponse response = new CodefConnectionCreateResponse();
         CodefConnectionCreateResponse.Result result = new CodefConnectionCreateResponse.Result();
