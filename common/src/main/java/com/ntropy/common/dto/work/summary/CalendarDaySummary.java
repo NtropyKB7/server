@@ -18,4 +18,7 @@ public class CalendarDaySummary {
     private String settlementStatus;
 
     private List<CalendarJobBrief> jobs;
+
+    /** 단기예보 범위(3~5일) 밖의 날짜면 null. */
+    private WeatherForecast weather;
 }

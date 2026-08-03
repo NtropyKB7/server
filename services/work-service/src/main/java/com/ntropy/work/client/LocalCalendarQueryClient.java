@@ -18,12 +18,12 @@ public class LocalCalendarQueryClient implements CalendarQueryClient {
     private final CalendarService calendarService;
 
     @Override
-    public CalendarMonthlySummary getMonthlySummary(Long userId, int year, int month) {
-        return calendarService.getMonthlySummary(userId, year, month);
+    public CalendarMonthlySummary getMonthlySummary(Long userId, int year, int month, Double latitude, Double longitude) {
+        return calendarService.getMonthlySummary(userId, year, month, latitude, longitude);
     }
 
     @Override
-    public CalendarDailySummary getDailySummary(Long userId, LocalDate date) {
-        return calendarService.getDailySummary(userId, date);
+    public CalendarDailySummary getDailySummary(Long userId, LocalDate date, Double latitude, Double longitude) {
+        return calendarService.getDailySummary(userId, date, latitude, longitude);
     }
 }

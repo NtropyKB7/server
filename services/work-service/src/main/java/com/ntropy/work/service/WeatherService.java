@@ -24,8 +24,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WeatherService {
 
-    private static final int FORECAST_DAYS = 3;
-    private static final String PREFERRED_TIME = "1200"; // 하루 대표값으로 쓸 시각(정오)
+    private static final int FORECAST_DAYS = 5; // 단기예보가 제공하는 최대 일수만큼 전부 반영
+    private static final String PREFERRED_TIME = "2000"; // 하루 대표값으로 쓸 시각(저녁, N잡 근무 시간대 기준)
     private static final DateTimeFormatter FCST_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private static final String CATEGORY_SKY = "SKY";
@@ -91,7 +91,7 @@ public class WeatherService {
         return new WeatherForecast(date, skyStatus, precipitationType, isRainSurcharge, temperature);
     }
 
-    /** 그날 데이터 중 PREFERRED_TIME(정오)에 가장 가까운 fcstTime을 고른다. */
+    /** 그날 데이터 중 PREFERRED_TIME(저녁)에 가장 가까운 fcstTime을 고른다. */
     private String nearestTime(List<KmaForecastItem> dayItems) {
         int preferred = Integer.parseInt(PREFERRED_TIME);
         return dayItems.stream()

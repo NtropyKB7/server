@@ -1,5 +1,6 @@
 package com.ntropy.work.client.kma;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -15,13 +16,14 @@ import com.ntropy.work.config.WeatherProperties;
 
 /**
  * 기상청 단기예보(getVilageFcst) 호출 전담 클라이언트.
- * service-key는 공공데이터포털의 "Decoding" 키를 그대로 넣으면 UriComponentsBuilder가 인코딩한다
- * ("Encoding" 키를 넣으면 이중 인코딩되어 401이 난다).
+ * weather-local.properties의 service-key는 공공데이터포털에서 제공하는 "일반 인증키" 값을
+ * (이미 URL 인코딩된 상태 그대로) 넣는다. serviceKey는 별도로 이어붙여서 UriComponentsBuilder의
+ * 인코딩 대상에서 제외한다 — 그러지 않으면 이미 인코딩된 값이 한 번 더 인코딩되어(%25 이중 인코딩)
+ * "등록되지 않은 서비스키" 에러가 난다.
  */
 @Component
 public class KmaForecastClient {
 
-    private static final String ENDPOINT = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst";
     private static final DateTimeFormatter BASE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final int[] BASE_HOURS = {2, 5, 8, 11, 14, 17, 20, 23};
     private static final int PROVIDE_DELAY_MINUTES = 10; // 발표 후 실제 제공까지의 지연
@@ -40,8 +42,7 @@ public class KmaForecastClient {
     public List<KmaForecastItem> fetchForecastItems(int nx, int ny) {
         BaseDateTime baseDateTime = resolveBaseDateTime(LocalDateTime.now());
 
-        var uri = UriComponentsBuilder.fromHttpUrl(ENDPOINT)
-                .queryParam("serviceKey", properties.getServiceKey())
+        String encodedQuery = UriComponentsBuilder.newInstance()
                 .queryParam("dataType", "JSON")
                 .queryParam("numOfRows", 1000)
                 .queryParam("pageNo", 1)
@@ -51,7 +52,11 @@ public class KmaForecastClient {
                 .queryParam("ny", ny)
                 .build()
                 .encode()
-                .toUri();
+                .toUri()
+                .getRawQuery();
+
+        URI uri = URI.create(properties.getBaseUrl() + "?serviceKey=" + properties.getServiceKey()
+                + "&" + encodedQuery);
 
         KmaApiResponse response = restTemplate.getForObject(uri, KmaApiResponse.class);
 
@@ -84,3 +89,4 @@ public class KmaForecastClient {
     private record BaseDateTime(LocalDate date, int hour) {
     }
 }
+

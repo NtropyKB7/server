@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.common.client.WeatherQueryClient;
 import com.ntropy.common.dto.work.summary.CalendarDailySummary;
 import com.ntropy.common.dto.work.summary.CalendarDaySummary;
 import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
@@ -20,6 +21,8 @@ import com.ntropy.common.dto.work.summary.CalendarJobBrief;
 import com.ntropy.common.dto.work.summary.CalendarMonthlyHours;
 import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
 import com.ntropy.common.dto.work.summary.CalendarWorkBrief;
+import com.ntropy.common.dto.work.summary.WeatherForecast;
+import com.ntropy.common.dto.work.summary.WeatherForecastList;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
@@ -52,8 +55,9 @@ public class CalendarService {
     private final AllocationGoalMapper allocationGoalMapper;
     private final JobService jobService;
     private final FatigueService fatigueService;
+    private final WeatherQueryClient weatherQueryClient;
 
-    public CalendarMonthlySummary getMonthlySummary(Long userId, int year, int month) {
+    public CalendarMonthlySummary getMonthlySummary(Long userId, int year, int month, Double latitude, Double longitude) {
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
@@ -69,8 +73,10 @@ public class CalendarService {
                 ? List.of()
                 : allocationGoalMapper.findByJobIdsAndTargetMonth(jobIds, targetMonth);
 
+        Map<LocalDate, WeatherForecast> weatherByDate = weatherByDate(latitude, longitude);
+
         CalendarMonthlyHours hours = summarizeHours(workLogs, allocationGoals);
-        List<CalendarDaySummary> days = summarizeDays(workLogs, jobNames);
+        List<CalendarDaySummary> days = summarizeDays(workLogs, jobNames, weatherByDate);
 
         return new CalendarMonthlySummary(year, month, hours, days);
     }
@@ -78,7 +84,7 @@ public class CalendarService {
     /**
      * fatigue는 7일 가중 게이지로 계산한다.
      */
-    public CalendarDailySummary getDailySummary(Long userId, LocalDate date) {
+    public CalendarDailySummary getDailySummary(Long userId, LocalDate date, Double latitude, Double longitude) {
         List<WorkLog> workLogs = workLogMapper.findByUserIdAndWorkDate(userId, date);
 
         List<Long> jobIds = workLogs.stream().map(WorkLog::getJobId).distinct().collect(Collectors.toList());
@@ -92,8 +98,16 @@ public class CalendarService {
 
         String dayOfWeek = KOREAN_DAY_OF_WEEK.get(date.getDayOfWeek());
         CalendarFatigueGauge fatigue = fatigueService.calculateGauge(userId, date);
+        WeatherForecast weather = weatherByDate(latitude, longitude).get(date);
 
-        return new CalendarDailySummary(date, dayOfWeek, works, fatigue);
+        return new CalendarDailySummary(date, dayOfWeek, works, fatigue, weather);
+    }
+
+    /** 단기예보(3~5일치)를 날짜 기준 Map으로 변환. 범위 밖 날짜는 Map에 아예 없다(null 취급). */
+    private Map<LocalDate, WeatherForecast> weatherByDate(Double latitude, Double longitude) {
+        WeatherForecastList forecastList = weatherQueryClient.getForecasts(latitude, longitude);
+        return forecastList.getForecasts().stream()
+                .collect(Collectors.toMap(WeatherForecast::getDate, f -> f, (a, b) -> a));
     }
 
     /**
@@ -116,7 +130,8 @@ public class CalendarService {
         return new CalendarMonthlyHours(plannedHours, actualHours, expectedIncome);
     }
 
-    private List<CalendarDaySummary> summarizeDays(List<WorkLog> workLogs, Map<Long, String> jobNames) {
+    private List<CalendarDaySummary> summarizeDays(List<WorkLog> workLogs, Map<Long, String> jobNames,
+                                                     Map<LocalDate, WeatherForecast> weatherByDate) {
         Map<LocalDate, List<WorkLog>> byDate = new TreeMap<>();
         for (WorkLog workLog : workLogs) {
             byDate.computeIfAbsent(workLog.getWorkDate(), d -> new ArrayList<>()).add(workLog);
@@ -136,7 +151,8 @@ public class CalendarService {
                         jobId -> new CalendarJobBrief(jobId, jobNames.get(jobId)));
             }
 
-            days.add(new CalendarDaySummary(entry.getKey(), settlementStatus, new ArrayList<>(jobsById.values())));
+            WeatherForecast weather = weatherByDate.get(entry.getKey());
+            days.add(new CalendarDaySummary(entry.getKey(), settlementStatus, new ArrayList<>(jobsById.values()), weather));
         }
         return days;
     }

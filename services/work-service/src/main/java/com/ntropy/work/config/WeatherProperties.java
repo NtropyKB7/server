@@ -10,19 +10,22 @@ import lombok.Getter;
 public class WeatherProperties {
 
     private final String serviceKey;
+    private final String baseUrl;
     private final double defaultLatitude;
     private final double defaultLongitude;
     private final int connectTimeoutMillis;
     private final int readTimeoutMillis;
 
     public WeatherProperties(
-            @Value("${weather.service-key:}") String serviceKey,
-            @Value("${weather.default-latitude:37.5665}") double defaultLatitude,
-            @Value("${weather.default-longitude:126.9780}") double defaultLongitude,
-            @Value("${weather.connect-timeout-ms:5000}") int connectTimeoutMillis,
-            @Value("${weather.read-timeout-ms:10000}") int readTimeoutMillis
+            @Value("${weather.service-key}") String serviceKey,
+            @Value("${weather.base-url}") String baseUrl,
+            @Value("${weather.default-latitude}") double defaultLatitude,
+            @Value("${weather.default-longitude}") double defaultLongitude,
+            @Value("${weather.connect-timeout-ms}") int connectTimeoutMillis,
+            @Value("${weather.read-timeout-ms}") int readTimeoutMillis
     ) {
         this.serviceKey = serviceKey;
+        this.baseUrl = baseUrl;
         this.defaultLatitude = defaultLatitude;
         this.defaultLongitude = defaultLongitude;
         this.connectTimeoutMillis = connectTimeoutMillis;
