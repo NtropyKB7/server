@@ -257,7 +257,7 @@ class CalendarServiceTest {
         private final CalendarFatigueGauge gauge;
 
         StubFatigueService(CalendarFatigueGauge gauge) {
-            super(null);
+            super(null, null);
             this.gauge = gauge;
         }
 
