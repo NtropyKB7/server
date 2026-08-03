@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import javax.sql.DataSource;
 
@@ -88,34 +89,58 @@ class CodefConnectionManualVerificationTest {
                     ",", groups.stream().map(Enum::name).sorted().toList()
             ));
 
-            Account ordinaryDepositAccount = savedAccounts.stream()
-                    .filter(a -> a.getAccountGroup() == AccountGroup.DEPOSIT_TRUST)
-                    .filter(a -> "10".equals(a.getDepositTypeCode()) || "11".equals(a.getDepositTypeCode()))
-                    .findFirst()
-                    .orElse(null);
-
-            if (ordinaryDepositAccount == null || bank == PersonalBank.SC_BANK) {
-                System.out.println("CODEF_TRANSACTION_COUNT=skipped (수시입출 계좌 없음 또는 SC은행 제외)");
-            } else {
-                DataSource dataSource = ctx.getBean(DataSource.class);
-                long transactionCount = countAccountTransactions(dataSource, ordinaryDepositAccount.getId());
-                System.out.println("CODEF_TRANSACTION_COUNT=" + transactionCount);
-            }
+            DataSource dataSource = ctx.getBean(DataSource.class);
+            long ordinaryTransactionCount = bank == PersonalBank.SC_BANK ? 0 : sumTransactionCount(
+                    dataSource, "ORDINARY", savedAccounts,
+                    account -> account.getAccountGroup() == AccountGroup.DEPOSIT_TRUST
+                            && ("10".equals(account.getDepositTypeCode())
+                            || "11".equals(account.getDepositTypeCode()))
+            );
+            long installmentTransactionCount = sumTransactionCount(
+                    dataSource, "INSTALLMENT", savedAccounts,
+                    account -> account.getAccountGroup() == AccountGroup.DEPOSIT_TRUST
+                            && ("12".equals(account.getDepositTypeCode())
+                            || "14".equals(account.getDepositTypeCode()))
+            );
+            long loanTransactionCount = sumTransactionCount(
+                    dataSource, "LOAN", savedAccounts,
+                    account -> account.getAccountGroup() == AccountGroup.LOAN
+                            || "40".equals(account.getDepositTypeCode())
+            );
+            System.out.println("CODEF_ORDINARY_TRANSACTION_COUNT=" + ordinaryTransactionCount);
+            System.out.println("CODEF_INSTALLMENT_TRANSACTION_COUNT=" + installmentTransactionCount);
+            System.out.println("CODEF_LOAN_TRANSACTION_COUNT=" + loanTransactionCount);
         }
     }
 
-    private static long countAccountTransactions(DataSource dataSource, Long accountId) {
+    private static long sumTransactionCount(DataSource dataSource, String category, List<Account> accounts,
+                                            Predicate<Account> filter) {
+        long total = 0;
+        for (Account account : accounts) {
+            if (filter.test(account)) {
+                total += countTransactions(dataSource, category, account.getId());
+            }
+        }
+        return total;
+    }
+
+    private static long countTransactions(DataSource dataSource, String category, Long accountId) {
+        String safeCategory = switch (category) {
+            case "ORDINARY", "INSTALLMENT", "LOAN" -> category;
+            default -> throw new IllegalArgumentException("허용하지 않는 거래 분류입니다: " + category);
+        };
+        String sql = "SELECT COUNT(*) FROM ACCOUNT_TRANSACTION"
+                + " WHERE account_id = ? AND transaction_category = ?";
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT COUNT(*) FROM ACCOUNT_TRANSACTION WHERE account_id = ?"
-             )) {
+             PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, accountId);
+            statement.setString(2, safeCategory);
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 return resultSet.getLong(1);
             }
         } catch (Exception e) {
-            throw new IllegalStateException("ACCOUNT_TRANSACTION 개수 조회 실패", e);
+            throw new IllegalStateException(category + " 거래 개수 조회 실패", e);
         }
     }
 

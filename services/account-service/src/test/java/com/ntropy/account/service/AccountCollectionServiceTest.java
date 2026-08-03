@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.account.client.codef.CodefBankTransactionClient;
+import com.ntropy.account.client.codef.CodefInstallmentSavingsClient;
+import com.ntropy.account.client.codef.CodefLoanTransactionClient;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
@@ -71,6 +73,75 @@ class AccountCollectionServiceTest {
             }
             """;
 
+    private static final String ACCOUNT_LIST_WITH_INSTALLMENT_SAVINGS = """
+            {
+              "result": {"code": "CF-00000"},
+              "data": {
+                "resDepositTrust": [
+                  {
+                    "resAccount": "302123456789",
+                    "resAccountDeposit": "12",
+                    "resAccountBalance": "1300000",
+                    "resAccountCurrency": "KRW"
+                  }
+                ]
+              }
+            }
+            """;
+
+    private static final String INSTALLMENT_SAVINGS_WITH_ONE_ENTRY = """
+            {
+              "result": {"code": "CF-00000"},
+              "data": {
+                "resAccountStatus": "정상",
+                "resTrHistoryList": [
+                  {
+                    "resRoundNo": "13",
+                    "resAccountTrDate": "20260105",
+                    "resAccountIn": "100000",
+                    "resAfterTranBalance": "1300000"
+                  }
+                ]
+              }
+            }
+            """;
+
+    private static final String ACCOUNT_LIST_WITH_LOAN = """
+            {
+              "result": {"code": "CF-00000"},
+              "data": {
+                "resLoan": [
+                  {
+                    "resAccount": "302987654321",
+                    "resAccountDeposit": "40",
+                    "resAccountBalance": "95000000",
+                    "resAccountCurrency": "KRW",
+                    "resAccountLoanExecNo": "execution-1"
+                  }
+                ]
+              }
+            }
+            """;
+
+    private static final String LOAN_WITH_ONE_ENTRY = """
+            {
+              "result": {"code": "CF-00000"},
+              "data": {
+                "resPrincipal": "120000000",
+                "resLoanBalance": "95000000",
+                "resTrHistoryList": [
+                  {
+                    "resAccountTrDate": "20260105",
+                    "resTransTypeNm": "원리금상환",
+                    "resPrincipal": "900000",
+                    "resInterest": "300000",
+                    "resLoanBalance": "95000000"
+                  }
+                ]
+              }
+            }
+            """;
+
     @Test
     void collectsTransactionsOnlyForOrdinaryDepositAccounts() throws Exception {
         FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
@@ -83,7 +154,8 @@ class AccountCollectionServiceTest {
                 objectMapper.readTree(ACCOUNT_LIST_WITH_ORDINARY_AND_FUND)
         );
         AccountCollectionService service = new AccountCollectionService(
-                personalBankAccountService, connectionMapper, transactionClient, accountMapper, transactionMapper
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
         );
 
         List<Account> savedAccounts = service.collect(
@@ -109,7 +181,8 @@ class AccountCollectionServiceTest {
                 objectMapper.readTree(ACCOUNT_LIST_WITH_ORDINARY_AND_FUND)
         );
         AccountCollectionService service = new AccountCollectionService(
-                personalBankAccountService, connectionMapper, transactionClient, accountMapper, transactionMapper
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
         );
 
         service.collect(
@@ -122,10 +195,98 @@ class AccountCollectionServiceTest {
     }
 
     @Test
+    void collectsInstallmentSavingsForDepositType12() throws Exception {
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
+        FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
+                objectMapper.readTree("{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")
+        );
+        FakeCodefInstallmentSavingsClient installmentClient = new FakeCodefInstallmentSavingsClient(
+                objectMapper.readTree(INSTALLMENT_SAVINGS_WITH_ONE_ENTRY)
+        );
+        StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
+                objectMapper.readTree(ACCOUNT_LIST_WITH_INSTALLMENT_SAVINGS)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                personalBankAccountService, connectionMapper, transactionClient, installmentClient, null,
+                accountMapper, transactionMapper
+        );
+
+        service.collect(
+                1L, PersonalBank.NH_BANK, null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
+        );
+
+        assertTrue(transactionClient.calls.isEmpty());
+        assertEquals(1, installmentClient.calls.size());
+        assertEquals("302123456789", installmentClient.calls.get(0).account());
+        assertEquals(1, accountMapper.updatedAccountDetails);
+        assertEquals(1, transactionMapper.insertedTransactions.size());
+    }
+
+    @Test
+    void doesNotCollectInstallmentSavingsForUnclassifiedDepositType14() throws Exception {
+        FakeCodefInstallmentSavingsClient installmentClient = new FakeCodefInstallmentSavingsClient(
+                objectMapper.readTree(INSTALLMENT_SAVINGS_WITH_ONE_ENTRY)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                new StubPersonalBankAccountService(objectMapper.readTree(
+                        ACCOUNT_LIST_WITH_INSTALLMENT_SAVINGS.replace("\"12\"", "\"14\"")
+                )),
+                new FakeCodefConnectionMapper(1L, "connected-id"),
+                new FakeCodefBankTransactionClient(objectMapper.readTree("{}")),
+                installmentClient,
+                null,
+                new FakeAccountMapper(),
+                new FakeAccountTransactionMapper()
+        );
+
+        service.collect(
+                1L, PersonalBank.NH_BANK, null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
+        );
+
+        assertTrue(installmentClient.calls.isEmpty());
+    }
+
+    @Test
+    void collectsLoanTransactionsWithoutUnusedExecutionNumber() throws Exception {
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
+        FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
+                objectMapper.readTree("{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")
+        );
+        FakeCodefLoanTransactionClient loanClient = new FakeCodefLoanTransactionClient(
+                objectMapper.readTree(LOAN_WITH_ONE_ENTRY)
+        );
+        StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
+                objectMapper.readTree(ACCOUNT_LIST_WITH_LOAN)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                personalBankAccountService, connectionMapper, transactionClient, null, loanClient,
+                accountMapper, transactionMapper
+        );
+
+        service.collect(
+                1L, PersonalBank.NH_BANK, null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
+        );
+
+        assertTrue(transactionClient.calls.isEmpty());
+        assertEquals(1, loanClient.calls.size());
+        assertEquals("302987654321", loanClient.calls.get(0).account());
+        assertEquals(null, loanClient.calls.get(0).loanExecutionNumber());
+        assertEquals(1, accountMapper.updatedAccountDetails);
+        assertEquals(1, transactionMapper.insertedTransactions.size());
+    }
+
+    @Test
     void rejectsCollectWhenConnectionDoesNotExist() {
         FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(null, null);
         AccountCollectionService service = new AccountCollectionService(
-                null, connectionMapper, null, null, null
+                null, connectionMapper, null, null, null, null, null
         );
 
         assertThrows(
@@ -149,7 +310,8 @@ class AccountCollectionServiceTest {
                 objectMapper.readTree(ACCOUNT_LIST_WITH_ORDINARY_AND_FUND)
         );
         AccountCollectionService service = new AccountCollectionService(
-                personalBankAccountService, connectionMapper, transactionClient, accountMapper, transactionMapper
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
         );
 
         service.registerAndCollect(
@@ -177,6 +339,47 @@ class AccountCollectionServiceTest {
         public JsonNode getPersonalTransactionList(String organizationCode, String connectedId, String account,
                                                    LocalDate startDate, LocalDate endDate, String birthDate) {
             calls.add(new TransactionCall(organizationCode, connectedId, account));
+            return response;
+        }
+    }
+
+    private static class FakeCodefInstallmentSavingsClient extends CodefInstallmentSavingsClient {
+
+        private final JsonNode response;
+        private final List<TransactionCall> calls = new ArrayList<>();
+
+        FakeCodefInstallmentSavingsClient(JsonNode response) {
+            super(null);
+            this.response = response;
+        }
+
+        @Override
+        public JsonNode getPersonalTransactionList(String organizationCode, String connectedId, String account,
+                                                   LocalDate startDate, LocalDate endDate, String birthDate) {
+            calls.add(new TransactionCall(organizationCode, connectedId, account));
+            return response;
+        }
+    }
+
+    private record LoanTransactionCall(String organizationCode, String connectedId, String account,
+                                       String loanExecutionNumber) {
+    }
+
+    private static class FakeCodefLoanTransactionClient extends CodefLoanTransactionClient {
+
+        private final JsonNode response;
+        private final List<LoanTransactionCall> calls = new ArrayList<>();
+
+        FakeCodefLoanTransactionClient(JsonNode response) {
+            super(null);
+            this.response = response;
+        }
+
+        @Override
+        public JsonNode getPersonalTransactionList(String organizationCode, String connectedId, String account,
+                                                   String accountLoanExecNo, LocalDate startDate,
+                                                   LocalDate endDate, String birthDate) {
+            calls.add(new LoanTransactionCall(organizationCode, connectedId, account, accountLoanExecNo));
             return response;
         }
     }
@@ -244,6 +447,7 @@ class AccountCollectionServiceTest {
 
         private final Map<String, Account> store = new HashMap<>();
         private long nextId = 1;
+        private int updatedAccountDetails;
 
         @Override
         public void upsert(Account account) {
@@ -254,6 +458,15 @@ class AccountCollectionServiceTest {
                 account.setId(store.get(key).getId());
             }
             store.put(key, account);
+        }
+
+        @Override
+        public void updateAccountDetails(Account account) {
+            updatedAccountDetails++;
+            store.values().stream()
+                    .filter(existing -> existing.getId().equals(account.getId()))
+                    .findFirst()
+                    .ifPresent(existing -> existing.setNextPaymentDate(account.getNextPaymentDate()));
         }
 
         @Override
@@ -275,10 +488,12 @@ class AccountCollectionServiceTest {
     private static class FakeAccountTransactionMapper implements AccountTransactionMapper {
 
         private int insertedBatches;
+        private final List<AccountTransaction> insertedTransactions = new ArrayList<>();
 
         @Override
         public void insertAll(List<AccountTransaction> transactions) {
             insertedBatches++;
+            insertedTransactions.addAll(transactions);
         }
     }
 }

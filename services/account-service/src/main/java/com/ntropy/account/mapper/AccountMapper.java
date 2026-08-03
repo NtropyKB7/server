@@ -11,6 +11,8 @@ public interface AccountMapper {
 
     void upsert(Account account);
 
+    void updateAccountDetails(Account account);
+
     Account findByConnectionIdAndAccountNoHash(@Param("codefConnectionId") Long codefConnectionId,
                                                @Param("accountNoHash") String accountNoHash);
 
