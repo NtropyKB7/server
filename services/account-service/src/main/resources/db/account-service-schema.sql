@@ -8,11 +8,12 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 (
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id                     BIGINT       NOT NULL COMMENT 'user-service USER.id 참조 (크로스 도메인 FK 없음)',
-    connected_id                VARCHAR(100) NOT NULL COMMENT 'CODEF 커넥티드 아이디 (계정 등록 API 응답값)',
+    provider                    VARCHAR(10)  NOT NULL DEFAULT 'CODEF' COMMENT '연결 제공자: CODEF(실제 CODEF 연동), NTROPY(가상 연결, 이슈 #35)',
+    connected_id                VARCHAR(100) NOT NULL COMMENT 'CODEF 커넥티드 아이디 (실연결은 계정 등록 API 응답값, 가상연결은 서버에서 발급한 NTROPY-{UUID})',
     registered_institution_keys JSON         NULL COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용',
     created_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_codef_connection_user (user_id)
+    UNIQUE KEY uk_codef_connection_user_provider (user_id, provider)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -22,6 +23,9 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 --     ADD COLUMN registered_institution_keys JSON NULL
 --         COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용'
 --         AFTER connected_id;
+
+-- 이슈 #35 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
+-- services/account-service/src/main/resources/db/migration/FIN-004-add-connection-provider.sql
 
 -- CODEF OAuth2 accessToken 캐시. client_credentials 방식이라 사용자 단위가 아닌 클라이언트(서비스) 단위로 존재.
 -- 지금은 DB로만 캐싱하고, 추후 Redis 도입 시 CodefTokenStore의 Redis 구현체로 대체 예정 (DEVLOG 참고).

@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.ntropy.account.client.codef.CodefConnectionClient;
+import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.InstitutionKeys;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.CodefConnectionMapper;
@@ -26,7 +27,7 @@ public class CodefConnectionService {
     public CodefConnection registerAndSave(Long userId, String organizationCode,
                                            String businessType, String clientType,
                                            String loginId, String rawPassword, String birthDate) {
-        CodefConnection existing = codefConnectionMapper.findByUserId(userId);
+        CodefConnection existing = codefConnectionMapper.findByUserIdAndProvider(userId, ConnectionProvider.CODEF.name());
         if (existing != null && existing.getConnectedId() != null
                 && !existing.getConnectedId().isBlank()) {
             List<String> registeredKeys = InstitutionKeys.parse(existing.getRegisteredInstitutionKeys());
@@ -47,7 +48,7 @@ public class CodefConnectionService {
             registeredKeys.add(organizationCode);
             existing.setRegisteredInstitutionKeys(InstitutionKeys.serialize(registeredKeys));
             codefConnectionMapper.upsert(existing);
-            return codefConnectionMapper.findByUserId(userId);
+            return codefConnectionMapper.findByUserIdAndProvider(userId, ConnectionProvider.CODEF.name());
         }
 
         String connectedId = codefConnectionClient.createConnection(
@@ -56,11 +57,12 @@ public class CodefConnectionService {
 
         CodefConnection connection = new CodefConnection();
         connection.setUserId(userId);
+        connection.setProvider(ConnectionProvider.CODEF.name());
         connection.setConnectedId(connectedId);
         connection.setRegisteredInstitutionKeys(InstitutionKeys.serialize(List.of(organizationCode)));
         codefConnectionMapper.upsert(connection);
 
-        CodefConnection saved = codefConnectionMapper.findByUserId(userId);
+        CodefConnection saved = codefConnectionMapper.findByUserIdAndProvider(userId, ConnectionProvider.CODEF.name());
         if (saved == null || !connectedId.equals(saved.getConnectedId())) {
             throw new IllegalStateException("CODEF connectedId 저장 확인 실패");
         }

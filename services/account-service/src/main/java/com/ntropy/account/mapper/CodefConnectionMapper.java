@@ -9,7 +9,9 @@ public interface CodefConnectionMapper {
 
     void insert(CodefConnection codefConnection);
 
+    void insertIfAbsent(CodefConnection codefConnection);
+
     void upsert(CodefConnection codefConnection);
 
-    CodefConnection findByUserId(@Param("userId") Long userId);
+    CodefConnection findByUserIdAndProvider(@Param("userId") Long userId, @Param("provider") String provider);
 }

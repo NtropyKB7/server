@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ntropy.account.client.codef.CodefBankAccountClient;
+import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.CodefConnectionMapper;
@@ -49,7 +50,7 @@ public class PersonalBankAccountService {
         validateUserId(userId);
         requireBank(bank);
 
-        CodefConnection connection = codefConnectionMapper.findByUserId(userId);
+        CodefConnection connection = codefConnectionMapper.findByUserIdAndProvider(userId, ConnectionProvider.CODEF.name());
         if (connection == null || connection.getConnectedId() == null
                 || connection.getConnectedId().isBlank()) {
             throw new IllegalStateException("등록된 CODEF 연결이 없습니다");
