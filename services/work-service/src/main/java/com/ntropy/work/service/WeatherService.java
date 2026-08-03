@@ -82,8 +82,8 @@ public class WeatherService {
         String ptyCode = valuesAtTime.get(CATEGORY_PTY);
         String tmpValue = valuesAtTime.get(CATEGORY_TMP);
 
-        String skyStatus = SKY_STATUS.get(skyCode);
-        String precipitationType = PRECIPITATION_TYPE.get(ptyCode);
+        String skyStatus = skyCode != null ? SKY_STATUS.get(skyCode) : null;
+        String precipitationType = ptyCode != null ? PRECIPITATION_TYPE.get(ptyCode) : null;
         boolean isRainSurcharge = ptyCode != null && !PTY_NONE.equals(ptyCode);
         Integer temperature = tmpValue != null ? (int) Math.round(Double.parseDouble(tmpValue)) : null;
 
