@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -60,5 +62,17 @@ final class CodefJsonSupport {
             return Boolean.FALSE;
         }
         return null;
+    }
+
+    static List<JsonNode> accountResults(JsonNode data) {
+        if (data.isArray()) {
+            List<JsonNode> nodes = new ArrayList<>();
+            data.forEach(nodes::add);
+            return nodes;
+        }
+        if (data.isObject()) {
+            return List.of(data);
+        }
+        return List.of();
     }
 }

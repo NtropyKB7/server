@@ -1,5 +1,6 @@
 package com.ntropy.account.client.codef.parser;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,30 +57,42 @@ public final class AccountResponseParser {
 
         String nickName = CodefJsonSupport.text(node, "resAccountNickName");
         String productName = CodefJsonSupport.text(node, "resAccountName");
-        account.setAccountName(nickName != null ? nickName : productName);
+        account.setAccountName(productName != null ? productName : nickName);
 
         account.setBalance(CodefJsonSupport.amount(node, "resAccountBalance"));
         String currencyCode = CodefJsonSupport.text(node, "resAccountCurrency");
         account.setCurrencyCode(currencyCode != null ? currencyCode : "KRW");
 
         account.setAccountStartDate(CodefJsonSupport.date(node, "resAccountStartDate"));
-        account.setAccountEndDate(CodefJsonSupport.date(node, "resAccountEndDate"));
         account.setLastTranDate(CodefJsonSupport.date(node, "resLastTranDate"));
 
         if (group == AccountGroup.DEPOSIT_TRUST) {
-            account.setAccountLifetime(CodefJsonSupport.text(node, "resAccountLifetime"));
             account.setOverdraftYn(CodefJsonSupport.flag01(node, "resOverdraftAcctYN"));
-            account.setLoanKind(CodefJsonSupport.text(node, "resLoanKind"));
-            account.setLoanBalance(CodefJsonSupport.amount(node, "resLoanBalance"));
-            account.setLoanStartDate(CodefJsonSupport.date(node, "resLoanStartDate"));
-            account.setLoanEndDate(CodefJsonSupport.date(node, "resLoanEndDate"));
-        } else if (group == AccountGroup.FUND) {
-            account.setInvestedCost(CodefJsonSupport.amount(node, "resAccountInvestedCost"));
-            account.setEarningsRate(CodefJsonSupport.amount(node, "resEarningsRate"));
+            if (Boolean.TRUE.equals(account.getOverdraftYn())) {
+                account.setBalance(normalizeOverdraftBalance(
+                        CodefJsonSupport.amount(node, "resLoanBalance"), account.getBalance()
+                ));
+                var loanStartDate = CodefJsonSupport.date(node, "resLoanStartDate");
+                if (loanStartDate != null) {
+                    account.setAccountStartDate(loanStartDate);
+                }
+            }
         } else if (group == AccountGroup.LOAN) {
-            account.setLoanExecNo(CodefJsonSupport.text(node, "resAccountLoanExecNo"));
+            if (account.getBalance() != null) {
+                account.setBalance(account.getBalance().abs());
+            }
         }
 
         return new ParsedAccount(account, rawAccountNo);
+    }
+
+    private static BigDecimal normalizeOverdraftBalance(BigDecimal loanBalance, BigDecimal accountBalance) {
+        if (loanBalance != null) {
+            return loanBalance.abs();
+        }
+        if (accountBalance != null && accountBalance.signum() < 0) {
+            return accountBalance.abs();
+        }
+        return BigDecimal.ZERO;
     }
 }

@@ -4,12 +4,14 @@
 
     <insert id="insertAll">
         INSERT INTO ACCOUNT_TRANSACTION (
-            account_id, tran_date, tran_time, out_amount, in_amount, after_balance, desc1, desc2, desc3, desc4
+            account_id, fingerprint, transaction_category, tran_date, tran_time, out_amount, in_amount,
+            after_balance, desc2, desc3, desc4
         ) VALUES
         <foreach collection="list" item="tx" separator=",">
-            (#{tx.accountId}, #{tx.tranDate}, #{tx.tranTime}, #{tx.outAmount}, #{tx.inAmount},
-             #{tx.afterBalance}, #{tx.desc1}, #{tx.desc2}, #{tx.desc3}, #{tx.desc4})
+            (#{tx.accountId}, #{tx.fingerprint}, #{tx.transactionCategory}, #{tx.tranDate}, #{tx.tranTime},
+             #{tx.outAmount}, #{tx.inAmount}, #{tx.afterBalance}, #{tx.desc2}, #{tx.desc3}, #{tx.desc4})
         </foreach>
+        ON DUPLICATE KEY UPDATE fingerprint = VALUES(fingerprint)
     </insert>
 
 </mapper>
