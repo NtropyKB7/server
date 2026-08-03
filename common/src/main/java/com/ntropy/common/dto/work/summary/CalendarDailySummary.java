@@ -21,4 +21,7 @@ public class CalendarDailySummary {
 
     /** 피로도 게이지 산출 전이라 당분간 null. */
     private CalendarFatigueGauge fatigue;
+
+    /** 단기예보 범위(3~5일) 밖의 날짜면 null. */
+    private WeatherForecast weather;
 }

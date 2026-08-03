@@ -12,6 +12,7 @@ application-*.properties
 !application.properties.example
 codef-local.properties
 portone-local.properties
+weather-local.properties
 
 ### 개인 문서/도구 ###
 CLAUDE.local.md
