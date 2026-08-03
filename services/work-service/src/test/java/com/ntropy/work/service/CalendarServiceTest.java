@@ -1,18 +1,23 @@
 package com.ntropy.work.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.client.WeatherQueryClient;
 import com.ntropy.common.dto.work.summary.CalendarDailySummary;
 import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
 import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
+import com.ntropy.common.dto.work.summary.WeatherForecast;
+import com.ntropy.common.dto.work.summary.WeatherForecastList;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
@@ -33,6 +38,7 @@ class CalendarServiceTest {
 
     private InMemoryWorkLogMapper workLogMapper;
     private InMemoryAllocationGoalMapper allocationGoalMapper;
+    private JobService jobService;
     private CalendarService calendarService;
 
     @BeforeEach
@@ -43,12 +49,13 @@ class CalendarServiceTest {
 
         workLogMapper = new InMemoryWorkLogMapper();
         allocationGoalMapper = new InMemoryAllocationGoalMapper();
-        JobService jobService = new JobService(
+        jobService = new JobService(
                 jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
 
         calendarService = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null)
+                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                new StubWeatherQueryClient(List.of())
         );
     }
 
@@ -91,7 +98,7 @@ class CalendarServiceTest {
         seedWorkLog(JOB_B, LocalDate.of(2026, 8, 5), LocalTime.of(10, 0), LocalTime.of(14, 0),
                 "CONFIRMED", SettlementStatus.PENDING, 20000L);
 
-        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8);
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
         assertEquals(30, summary.getSummary().getPlannedHours());
         assertEquals(8, summary.getSummary().getActualHours());
@@ -104,7 +111,7 @@ class CalendarServiceTest {
         seedWorkLog(JOB_A, LocalDate.of(2026, 7, 31), LocalTime.of(18, 0), LocalTime.of(22, 0),
                 "PLANNED", SettlementStatus.NONE, 48000L);
 
-        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8);
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
         assertEquals(0, summary.getSummary().getActualHours());
         assertTrue(summary.getDays().isEmpty());
@@ -123,7 +130,7 @@ class CalendarServiceTest {
         seedWorkLog(JOB_A, completedDay, LocalTime.of(9, 0), LocalTime.of(12, 0),
                 "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
 
-        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8);
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
         assertEquals("PENDING", findDay(summary, mixedDay).getSettlementStatus());
         assertEquals("COMPLETED", findDay(summary, completedDay).getSettlementStatus());
@@ -138,7 +145,7 @@ class CalendarServiceTest {
         seedWorkLog(JOB_A, date, LocalTime.of(14, 0), LocalTime.of(16, 0),
                 "CONFIRMED", SettlementStatus.COMPLETED, 24000L);
 
-        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8);
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
         assertEquals(1, findDay(summary, date).getJobs().size());
     }
@@ -146,7 +153,7 @@ class CalendarServiceTest {
     @Test
     @DisplayName("근무 이력이 없으면 시간 합계는 0이고 일자 목록은 비어 있다")
     void monthlySummary_noDataReturnsZeroedSummary() {
-        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8);
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
         assertEquals(0, summary.getSummary().getPlannedHours());
         assertEquals(0, summary.getSummary().getActualHours());
@@ -161,7 +168,7 @@ class CalendarServiceTest {
         seedWorkLog(JOB_A, monday, LocalTime.of(18, 0), LocalTime.of(22, 0),
                 "PLANNED", SettlementStatus.NONE, 48000L);
 
-        CalendarDailySummary summary = calendarService.getDailySummary(USER_ID, monday);
+        CalendarDailySummary summary = calendarService.getDailySummary(USER_ID, monday, null, null);
 
         assertEquals("월", summary.getDayOfWeek());
         assertEquals(1, summary.getWorks().size());
@@ -176,12 +183,66 @@ class CalendarServiceTest {
                 new InMemoryJobMapper(), new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(gauge)
+                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(gauge),
+                new StubWeatherQueryClient(List.of())
         );
 
-        CalendarDailySummary summary = service.getDailySummary(USER_ID, LocalDate.of(2026, 8, 3));
+        CalendarDailySummary summary = service.getDailySummary(USER_ID, LocalDate.of(2026, 8, 3), null, null);
 
         assertEquals(gauge, summary.getFatigue());
+    }
+
+    @Test
+    @DisplayName("예보 범위 안의 날짜에는 날씨가 채워지고 범위 밖 날짜는 null이다")
+    void monthlySummary_attachesWeatherOnlyForForecastDates() {
+        LocalDate forecastDate = LocalDate.of(2026, 8, 3);
+        LocalDate noForecastDate = LocalDate.of(2026, 8, 10);
+        WeatherForecast forecast = new WeatherForecast(forecastDate, "맑음", "없음", false, 28);
+        CalendarService service = new CalendarService(
+                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                new StubWeatherQueryClient(List.of(forecast))
+        );
+        seedWorkLog(JOB_A, forecastDate, LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
+        seedWorkLog(JOB_A, noForecastDate, LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
+
+        CalendarMonthlySummary summary = service.getMonthlySummary(USER_ID, 2026, 8, null, null);
+
+        assertEquals(forecast, findDay(summary, forecastDate).getWeather());
+        assertNull(findDay(summary, noForecastDate).getWeather());
+    }
+
+    @Test
+    @DisplayName("날씨 조회가 예외를 던져도 캘린더 집계 결과는 정상 반환되고 weather는 null이다")
+    void monthlySummary_weatherQueryFails_degradesToNullWeather() {
+        LocalDate date = LocalDate.of(2026, 8, 3);
+        CalendarService service = new CalendarService(
+                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                new ThrowingWeatherQueryClient()
+        );
+        seedWorkLog(JOB_A, date, LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
+
+        CalendarMonthlySummary summary = service.getMonthlySummary(USER_ID, 2026, 8, null, null);
+
+        assertNull(findDay(summary, date).getWeather());
+    }
+
+    @Test
+    @DisplayName("예보 목록이 null이어도 예외 없이 동작하고 weather는 null이다")
+    void dailySummary_forecastListIsNull_returnsNullWeather() {
+        LocalDate date = LocalDate.of(2026, 8, 3);
+        CalendarService service = new CalendarService(
+                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                new StubWeatherQueryClient(null)
+        );
+        seedWorkLog(JOB_A, date, LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "PLANNED", SettlementStatus.NONE, 48000L);
+
+        CalendarDailySummary summary = service.getDailySummary(USER_ID, date, null, null);
+
+        assertNull(summary.getWeather());
     }
 
     private com.ntropy.common.dto.work.summary.CalendarDaySummary findDay(CalendarMonthlySummary summary, LocalDate date) {
@@ -203,6 +264,28 @@ class CalendarServiceTest {
         @Override
         public CalendarFatigueGauge calculateGauge(Long userId, LocalDate date) {
             return gauge;
+        }
+    }
+
+    private static class StubWeatherQueryClient implements WeatherQueryClient {
+
+        private final List<WeatherForecast> forecasts;
+
+        StubWeatherQueryClient(List<WeatherForecast> forecasts) {
+            this.forecasts = forecasts;
+        }
+
+        @Override
+        public WeatherForecastList getForecasts(Double latitude, Double longitude) {
+            return new WeatherForecastList(forecasts);
+        }
+    }
+
+    private static class ThrowingWeatherQueryClient implements WeatherQueryClient {
+
+        @Override
+        public WeatherForecastList getForecasts(Double latitude, Double longitude) {
+            throw new RuntimeException("기상청 API 장애");
         }
     }
 }

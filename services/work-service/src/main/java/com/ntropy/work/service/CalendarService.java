@@ -32,7 +32,9 @@ import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CalendarService {
@@ -103,11 +105,22 @@ public class CalendarService {
         return new CalendarDailySummary(date, dayOfWeek, works, fatigue, weather);
     }
 
-    /** 단기예보(3~5일치)를 날짜 기준 Map으로 변환. 범위 밖 날짜는 Map에 아예 없다(null 취급). */
+    /**
+     * 단기예보(3~5일치)를 날짜 기준 Map으로 변환. 범위 밖 날짜는 Map에 아예 없다(null 취급).
+     * 날씨는 부가 정보이므로 조회 실패(예외/응답 누락) 시에도 캘린더 조회 자체는 실패하지 않도록 빈 Map을 반환한다.
+     */
     private Map<LocalDate, WeatherForecast> weatherByDate(Double latitude, Double longitude) {
-        WeatherForecastList forecastList = weatherQueryClient.getForecasts(latitude, longitude);
-        return forecastList.getForecasts().stream()
-                .collect(Collectors.toMap(WeatherForecast::getDate, f -> f, (a, b) -> a));
+        try {
+            WeatherForecastList forecastList = weatherQueryClient.getForecasts(latitude, longitude);
+            if (forecastList == null || forecastList.getForecasts() == null) {
+                return Map.of();
+            }
+            return forecastList.getForecasts().stream()
+                    .collect(Collectors.toMap(WeatherForecast::getDate, f -> f, (a, b) -> a));
+        } catch (Exception e) {
+            log.warn("날씨 예보 조회 실패 - latitude={}, longitude={}", latitude, longitude, e);
+            return Map.of();
+        }
     }
 
     /**
