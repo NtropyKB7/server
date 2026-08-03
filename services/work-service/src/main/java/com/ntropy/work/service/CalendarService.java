@@ -25,9 +25,11 @@ import com.ntropy.common.dto.work.summary.WeatherForecast;
 import com.ntropy.common.dto.work.summary.WeatherForecastList;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.AllocationGoalMapper;
+import com.ntropy.work.mapper.SavingGoalMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
@@ -55,6 +57,7 @@ public class CalendarService {
 
     private final WorkLogMapper workLogMapper;
     private final AllocationGoalMapper allocationGoalMapper;
+    private final SavingGoalMapper savingGoalMapper;
     private final JobService jobService;
     private final FatigueService fatigueService;
     private final WeatherQueryClient weatherQueryClient;
@@ -74,10 +77,11 @@ public class CalendarService {
         List<AllocationGoal> allocationGoals = jobIds.isEmpty()
                 ? List.of()
                 : allocationGoalMapper.findByJobIdsAndTargetMonth(jobIds, targetMonth);
+        SavingGoal savingGoal = savingGoalMapper.findByUserIdAndTargetMonth(userId, targetMonth);
 
         Map<LocalDate, WeatherForecast> weatherByDate = weatherByDate(latitude, longitude);
 
-        CalendarMonthlyHours hours = summarizeHours(workLogs, allocationGoals);
+        CalendarMonthlyHours hours = summarizeHours(workLogs, allocationGoals, savingGoal);
         List<CalendarDaySummary> days = summarizeDays(workLogs, jobNames, weatherByDate);
 
         return new CalendarMonthlySummary(year, month, hours, days);
@@ -126,8 +130,10 @@ public class CalendarService {
     /**
      * plannedHours: 해당 월 ALLOCATION_GOAL(잡별 추천 근무시간) 합
      * actualHours: 해당 월 WORK_LOG 전체(PLANNED+CONFIRMED) 근무시간 합
+     * targetAmount: 해당 월 SAVING_GOAL이 없으면 null (달성률 미표시는 프론트 책임)
      */
-    private CalendarMonthlyHours summarizeHours(List<WorkLog> workLogs, List<AllocationGoal> allocationGoals) {
+    private CalendarMonthlyHours summarizeHours(List<WorkLog> workLogs, List<AllocationGoal> allocationGoals,
+                                                 SavingGoal savingGoal) {
         int plannedHours = allocationGoals.stream()
                 .mapToInt(goal -> goal.getRecommendHour() == null ? 0 : goal.getRecommendHour().intValue())
                 .sum();
@@ -140,7 +146,9 @@ public class CalendarService {
                 expectedIncome += workLog.getEstimatedIncome();
             }
         }
-        return new CalendarMonthlyHours(plannedHours, actualHours, expectedIncome);
+
+        Long targetAmount = savingGoal == null ? null : savingGoal.getTargetAmount();
+        return new CalendarMonthlyHours(plannedHours, actualHours, expectedIncome, targetAmount);
     }
 
     private List<CalendarDaySummary> summarizeDays(List<WorkLog> workLogs, Map<Long, String> jobNames,

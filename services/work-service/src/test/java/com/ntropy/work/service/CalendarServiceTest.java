@@ -20,6 +20,7 @@ import com.ntropy.common.dto.work.summary.WeatherForecast;
 import com.ntropy.common.dto.work.summary.WeatherForecastList;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
@@ -27,6 +28,7 @@ import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 
 class CalendarServiceTest {
@@ -38,6 +40,7 @@ class CalendarServiceTest {
 
     private InMemoryWorkLogMapper workLogMapper;
     private InMemoryAllocationGoalMapper allocationGoalMapper;
+    private InMemorySavingGoalMapper savingGoalMapper;
     private JobService jobService;
     private CalendarService calendarService;
 
@@ -49,12 +52,13 @@ class CalendarServiceTest {
 
         workLogMapper = new InMemoryWorkLogMapper();
         allocationGoalMapper = new InMemoryAllocationGoalMapper();
+        savingGoalMapper = new InMemorySavingGoalMapper();
         jobService = new JobService(
                 jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
 
         calendarService = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
                 new StubWeatherQueryClient(List.of())
         );
     }
@@ -89,10 +93,12 @@ class CalendarServiceTest {
     }
 
     @Test
-    @DisplayName("월간 요약은 목표시간 합/근무시간 합/예상수입 합을 계산한다")
+    @DisplayName("월간 요약은 목표시간 합/근무시간 합/예상수입 합/저축 목표 금액을 계산한다")
     void monthlySummary_aggregatesPlannedActualAndIncome() {
         allocationGoalMapper.insert(AllocationGoal.builder().jobId(JOB_A).targetMonth(TARGET_MONTH).recommendHour(20L).build());
         allocationGoalMapper.insert(AllocationGoal.builder().jobId(JOB_B).targetMonth(TARGET_MONTH).recommendHour(10L).build());
+        savingGoalMapper.insert(SavingGoal.builder()
+                .userId(USER_ID).targetMonth(TARGET_MONTH).targetAmount(2_500_000L).laborIntensity(3L).build());
         seedWorkLog(JOB_A, LocalDate.of(2026, 8, 3), LocalTime.of(18, 0), LocalTime.of(22, 0),
                 "PLANNED", SettlementStatus.NONE, 48000L);
         seedWorkLog(JOB_B, LocalDate.of(2026, 8, 5), LocalTime.of(10, 0), LocalTime.of(14, 0),
@@ -103,6 +109,7 @@ class CalendarServiceTest {
         assertEquals(30, summary.getSummary().getPlannedHours());
         assertEquals(8, summary.getSummary().getActualHours());
         assertEquals(68000L, summary.getSummary().getExpectedIncome());
+        assertEquals(2_500_000L, summary.getSummary().getTargetAmount());
     }
 
     @Test
@@ -162,6 +169,25 @@ class CalendarServiceTest {
     }
 
     @Test
+    @DisplayName("해당 월 SAVING_GOAL이 없으면 targetAmount는 null이다")
+    void monthlySummary_noSavingGoal_targetAmountIsNull() {
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
+
+        assertNull(summary.getSummary().getTargetAmount());
+    }
+
+    @Test
+    @DisplayName("다른 달의 SAVING_GOAL은 이번 달 targetAmount에 반영되지 않는다")
+    void monthlySummary_savingGoalForOtherMonth_targetAmountIsNull() {
+        savingGoalMapper.insert(SavingGoal.builder()
+                .userId(USER_ID).targetMonth("2026-09").targetAmount(2_500_000L).laborIntensity(3L).build());
+
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
+
+        assertNull(summary.getSummary().getTargetAmount());
+    }
+
+    @Test
     @DisplayName("일간 요약은 근무 목록과 요일 한글 표기를 채운다")
     void dailySummary_returnsWorksAndKoreanDayOfWeek() {
         LocalDate monday = LocalDate.of(2026, 8, 3);
@@ -183,7 +209,7 @@ class CalendarServiceTest {
                 new InMemoryJobMapper(), new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(gauge),
+                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(gauge),
                 new StubWeatherQueryClient(List.of())
         );
 
@@ -199,7 +225,7 @@ class CalendarServiceTest {
         LocalDate noForecastDate = LocalDate.of(2026, 8, 10);
         WeatherForecast forecast = new WeatherForecast(forecastDate, "맑음", "없음", false, 28);
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
                 new StubWeatherQueryClient(List.of(forecast))
         );
         seedWorkLog(JOB_A, forecastDate, LocalTime.of(9, 0), LocalTime.of(12, 0),
@@ -218,7 +244,7 @@ class CalendarServiceTest {
     void monthlySummary_weatherQueryFails_degradesToNullWeather() {
         LocalDate date = LocalDate.of(2026, 8, 3);
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
                 new ThrowingWeatherQueryClient()
         );
         seedWorkLog(JOB_A, date, LocalTime.of(9, 0), LocalTime.of(12, 0),
@@ -234,7 +260,7 @@ class CalendarServiceTest {
     void dailySummary_forecastListIsNull_returnsNullWeather() {
         LocalDate date = LocalDate.of(2026, 8, 3);
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, jobService, new StubFatigueService(null),
+                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
                 new StubWeatherQueryClient(null)
         );
         seedWorkLog(JOB_A, date, LocalTime.of(9, 0), LocalTime.of(12, 0),
