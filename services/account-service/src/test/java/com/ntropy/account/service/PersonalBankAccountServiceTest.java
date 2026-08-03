@@ -180,13 +180,21 @@ class PersonalBankAccountServiceTest {
         }
 
         @Override
+        public void insertIfAbsent(CodefConnection codefConnection) {
+            if (this.connection == null) {
+                insert(codefConnection);
+            }
+        }
+
+        @Override
         public void upsert(CodefConnection codefConnection) {
             this.connection = codefConnection;
         }
 
         @Override
-        public CodefConnection findByUserId(Long userId) {
-            return connection != null && userId.equals(connection.getUserId()) ? connection : null;
+        public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
+            return connection != null && userId.equals(connection.getUserId())
+                    && provider.equals(connection.getProvider()) ? connection : null;
         }
     }
 }

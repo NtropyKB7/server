@@ -219,17 +219,22 @@ class AccountCollectionServiceTest {
         }
 
         @Override
+        public void insertIfAbsent(CodefConnection codefConnection) {
+        }
+
+        @Override
         public void upsert(CodefConnection codefConnection) {
         }
 
         @Override
-        public CodefConnection findByUserId(Long userId) {
+        public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
             if (connectedId == null) {
                 return null;
             }
             CodefConnection connection = new CodefConnection();
             connection.setId(connectionId);
             connection.setUserId(userId);
+            connection.setProvider(provider);
             connection.setConnectedId(connectedId);
             return connection;
         }
@@ -254,6 +259,16 @@ class AccountCollectionServiceTest {
         @Override
         public Account findByConnectionIdAndAccountNoHash(Long codefConnectionId, String accountNoHash) {
             return store.get(codefConnectionId + ":" + accountNoHash);
+        }
+
+        @Override
+        public Account findByIdAndProvider(Long id, String provider) {
+            return store.values().stream().filter(a -> id.equals(a.getId())).findFirst().orElse(null);
+        }
+
+        @Override
+        public List<Account> findByUserIdAndProvider(Long userId, String provider) {
+            return store.values().stream().filter(a -> userId.equals(a.getUserId())).toList();
         }
     }
 

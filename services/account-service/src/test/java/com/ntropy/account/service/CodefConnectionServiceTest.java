@@ -40,6 +40,7 @@ class CodefConnectionServiceTest {
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         CodefConnection existing = new CodefConnection();
         existing.setUserId(1L);
+        existing.setProvider("CODEF");
         existing.setConnectedId("existing-connected-id");
         mapper.upsert(existing);
         CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
@@ -62,6 +63,7 @@ class CodefConnectionServiceTest {
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         CodefConnection existing = new CodefConnection();
         existing.setUserId(1L);
+        existing.setProvider("CODEF");
         existing.setConnectedId("existing-connected-id");
         existing.setRegisteredInstitutionKeys("[\"0088\"]");
         mapper.upsert(existing);
@@ -83,6 +85,7 @@ class CodefConnectionServiceTest {
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         CodefConnection existing = new CodefConnection();
         existing.setUserId(1L);
+        existing.setProvider("CODEF");
         existing.setConnectedId("existing-connected-id");
         existing.setRegisteredInstitutionKeys("[\"0004\"]");
         mapper.upsert(existing);
@@ -135,13 +138,21 @@ class CodefConnectionServiceTest {
         }
 
         @Override
+        public void insertIfAbsent(CodefConnection codefConnection) {
+            if (this.connection == null) {
+                insert(codefConnection);
+            }
+        }
+
+        @Override
         public void upsert(CodefConnection codefConnection) {
             this.connection = codefConnection;
         }
 
         @Override
-        public CodefConnection findByUserId(Long userId) {
-            return connection != null && userId.equals(connection.getUserId()) ? connection : null;
+        public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
+            return connection != null && userId.equals(connection.getUserId())
+                    && provider.equals(connection.getProvider()) ? connection : null;
         }
     }
 }

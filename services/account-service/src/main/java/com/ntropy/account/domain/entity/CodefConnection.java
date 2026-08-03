@@ -17,6 +17,12 @@ public class CodefConnection {
 
     private Long id;
     private Long userId;
+
+    /**
+     * 연결 제공자 (CODEF: 실제 연동, NTROPY: 가상 연결). {@link com.ntropy.account.domain.ConnectionProvider}의 name() 값.
+     */
+    private String provider;
+
     private String connectedId;
 
     /**

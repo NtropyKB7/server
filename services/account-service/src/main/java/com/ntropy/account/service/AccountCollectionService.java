@@ -12,6 +12,7 @@ import com.ntropy.account.client.codef.parser.AccountResponseParser;
 import com.ntropy.account.client.codef.parser.AccountResponseParser.ParsedAccount;
 import com.ntropy.account.client.codef.parser.AccountTransactionResponseParser;
 import com.ntropy.account.domain.AccountGroup;
+import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
@@ -49,7 +50,7 @@ public class AccountCollectionService {
 
     public List<Account> collect(Long userId, PersonalBank bank, String birthDate,
                                  LocalDate transactionStartDate, LocalDate transactionEndDate) {
-        CodefConnection connection = codefConnectionMapper.findByUserId(userId);
+        CodefConnection connection = codefConnectionMapper.findByUserIdAndProvider(userId, ConnectionProvider.CODEF.name());
         if (connection == null || connection.getConnectedId() == null
                 || connection.getConnectedId().isBlank()) {
             throw new IllegalStateException("등록된 CODEF 연결이 없습니다");

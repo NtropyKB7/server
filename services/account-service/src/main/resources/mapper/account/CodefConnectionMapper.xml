@@ -4,27 +4,35 @@
 
     <insert id="insert" parameterType="com.ntropy.account.domain.entity.CodefConnection"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO CODEF_CONNECTION (user_id, connected_id, registered_institution_keys)
-        VALUES (#{userId}, #{connectedId}, #{registeredInstitutionKeys})
+        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
+        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
+    </insert>
+
+    <insert id="insertIfAbsent" parameterType="com.ntropy.account.domain.entity.CodefConnection">
+        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
+        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
+        ON DUPLICATE KEY UPDATE id = id
     </insert>
 
     <insert id="upsert" parameterType="com.ntropy.account.domain.entity.CodefConnection">
-        INSERT INTO CODEF_CONNECTION (user_id, connected_id, registered_institution_keys)
-        VALUES (#{userId}, #{connectedId}, #{registeredInstitutionKeys})
+        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
+        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
         ON DUPLICATE KEY UPDATE
             connected_id = #{connectedId},
             registered_institution_keys = #{registeredInstitutionKeys}
     </insert>
 
-    <select id="findByUserId" parameterType="long" resultType="com.ntropy.account.domain.entity.CodefConnection">
+    <select id="findByUserIdAndProvider" resultType="com.ntropy.account.domain.entity.CodefConnection">
         SELECT id,
                user_id                     AS userId,
+               provider,
                connected_id                AS connectedId,
                registered_institution_keys AS registeredInstitutionKeys,
                created_at                  AS createdAt,
                updated_at                  AS updatedAt
         FROM CODEF_CONNECTION
         WHERE user_id = #{userId}
+          AND provider = #{provider}
     </select>
 
 </mapper>
