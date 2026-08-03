@@ -25,6 +25,12 @@ public class JobPlatformMappingService {
         if (platformMapper.findById(platformId) == null) {
             throw new IllegalArgumentException("존재하지 않는 플랫폼입니다. platformId=" + platformId);
         }
+        boolean alreadyMapped = jobPlatformMappingMapper.findByJobId(jobId).stream()
+                .anyMatch(mapping -> mapping.getPlatformId().equals(platformId));
+        if (alreadyMapped) {
+            throw new IllegalArgumentException(
+                    "이미 등록된 잡-플랫폼 매핑입니다. jobId=" + jobId + ", platformId=" + platformId);
+        }
 
         JobPlatformMapping mapping = JobPlatformMapping.builder()
                 .jobId(jobId)

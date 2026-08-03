@@ -2,8 +2,8 @@ package com.ntropy.bff.controller.work;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -55,7 +55,7 @@ public class JobController {
         return ApiResponse.success(HttpStatus.OK.value(), "잡이 수정되었습니다.", null);
     }
 
-    @DeleteMapping("/{jobId}")
+    @PatchMapping("/{jobId}/deactivate")
     public ApiResponse<Void> deactivateJob(@PathVariable Long jobId) {
         jobCommandClient.deactivateJob(jobId);
         return ApiResponse.success(HttpStatus.OK.value(), "잡이 비활성화되었습니다.", null);
