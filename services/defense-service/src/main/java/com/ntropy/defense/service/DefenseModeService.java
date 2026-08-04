@@ -2,14 +2,14 @@ package com.ntropy.defense.service;
 
 import com.ntropy.common.client.DiagnosisQueryClient;
 import com.ntropy.common.client.FinancialCommitmentQueryClient;
-import com.ntropy.common.client.PlannedWorkIncomeQueryClient;
+import com.ntropy.common.client.ExpectedIncomeLossQueryClient;
 import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseSummary;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
-import com.ntropy.common.dto.work.summary.PlannedWorkIncomeSummary;
+import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.defense.domain.DefenseCause;
@@ -34,20 +34,20 @@ public class DefenseModeService {
     private final DefenseModeMapper defenseModeMapper;
     private final DiagnosisQueryClient diagnosisQueryClient;
     private final FinancialCommitmentQueryClient financialCommitmentQueryClient;
-    private final PlannedWorkIncomeQueryClient plannedWorkIncomeQueryClient;
+    private final ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient;
 
     @Autowired
     public DefenseModeService(
             DefenseModeMapper defenseModeMapper,
             ObjectProvider<DiagnosisQueryClient> diagnosisQueryClientProvider,
             ObjectProvider<FinancialCommitmentQueryClient> financialCommitmentQueryClientProvider,
-            ObjectProvider<PlannedWorkIncomeQueryClient> plannedWorkIncomeQueryClientProvider) {
+            ObjectProvider<ExpectedIncomeLossQueryClient> expectedIncomeLossQueryClientProvider) {
         this(
                 defenseModeMapper,
                 diagnosisQueryClientProvider.getIfAvailable(() -> userId -> null),
                 financialCommitmentQueryClientProvider.getIfAvailable(
                         () -> (userId, fromDate, toDate) -> Collections.emptyList()),
-                plannedWorkIncomeQueryClientProvider.getIfAvailable(
+                expectedIncomeLossQueryClientProvider.getIfAvailable(
                         () -> (userId, fromDate, toDate) -> Collections.emptyList()));
     }
 
@@ -55,11 +55,11 @@ public class DefenseModeService {
             DefenseModeMapper defenseModeMapper,
             DiagnosisQueryClient diagnosisQueryClient,
             FinancialCommitmentQueryClient financialCommitmentQueryClient,
-            PlannedWorkIncomeQueryClient plannedWorkIncomeQueryClient) {
+            ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient) {
         this.defenseModeMapper = defenseModeMapper;
         this.diagnosisQueryClient = diagnosisQueryClient;
         this.financialCommitmentQueryClient = financialCommitmentQueryClient;
-        this.plannedWorkIncomeQueryClient = plannedWorkIncomeQueryClient;
+        this.expectedIncomeLossQueryClient = expectedIncomeLossQueryClient;
     }
 
     @Transactional
@@ -117,24 +117,34 @@ public class DefenseModeService {
         LocalDate periodStartDate = laterOf(defenseMode.getUnavailableStartDate(), currentMonth.atDay(1));
         LocalDate periodEndDate = earlierOf(defenseMode.getExpectedReturnDate(), currentMonth.atEndOfMonth());
         if (periodStartDate.isAfter(periodEndDate)) {
-            return new ExpectedIncomeLossSummary(0L, null, null, "NO_SCHEDULE");
+            return new ExpectedIncomeLossSummary(0L, null, null, "NO_SCHEDULE", Collections.emptyList());
         }
 
-        List<PlannedWorkIncomeSummary> plannedWorks = plannedWorkIncomeQueryClient.findPlannedWorkIncome(
+        List<JobExpectedIncomeLossSummary> jobs = expectedIncomeLossQueryClient.findExpectedIncomeLossByJob(
                 defenseMode.getUserId(), periodStartDate, periodEndDate);
-        if (plannedWorks == null || plannedWorks.isEmpty()) {
-            return new ExpectedIncomeLossSummary(0L, periodStartDate, periodEndDate, "NO_SCHEDULE");
-        }
-        if (plannedWorks.stream().anyMatch(work -> work.getExpectedIncome() == null)) {
-            return new ExpectedIncomeLossSummary(null, periodStartDate, periodEndDate, "INSUFFICIENT");
+        if (jobs == null || jobs.isEmpty()) {
+            return new ExpectedIncomeLossSummary(
+                    0L, periodStartDate, periodEndDate, "NO_SCHEDULE", Collections.emptyList());
         }
 
-        long amount = plannedWorks.stream()
-                .map(PlannedWorkIncomeSummary::getExpectedIncome)
-                .filter(income -> income > 0)
+        long totalAmount = jobs.stream()
+                .map(JobExpectedIncomeLossSummary::getExpectedIncomeLoss)
+                .filter(income -> income != null && income > 0)
                 .mapToLong(Long::longValue)
                 .sum();
-        return new ExpectedIncomeLossSummary(amount, periodStartDate, periodEndDate, "CALCULATED");
+        long calculatedJobCount = jobs.stream()
+                .filter(job -> job.getExpectedIncomeLoss() != null)
+                .count();
+        String calculationStatus;
+        if (calculatedJobCount == 0) {
+            calculationStatus = "INSUFFICIENT";
+        } else if (calculatedJobCount < jobs.size()) {
+            calculationStatus = "PARTIALLY_CALCULATED";
+        } else {
+            calculationStatus = "CALCULATED";
+        }
+        return new ExpectedIncomeLossSummary(
+                totalAmount, periodStartDate, periodEndDate, calculationStatus, jobs);
     }
 
     @Transactional

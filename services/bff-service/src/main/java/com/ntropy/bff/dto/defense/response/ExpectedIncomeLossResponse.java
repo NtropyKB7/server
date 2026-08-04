@@ -6,23 +6,29 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Getter
 @AllArgsConstructor
 public class ExpectedIncomeLossResponse {
-    private Long amount;
+    private Long totalAmount;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate periodStartDate;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate periodEndDate;
     private String calculationStatus;
+    private List<JobExpectedIncomeLossResponse> jobs;
 
     public static ExpectedIncomeLossResponse from(ExpectedIncomeLossSummary summary) {
         if (summary == null) {
             return null;
         }
         return new ExpectedIncomeLossResponse(
-                summary.getAmount(), summary.getPeriodStartDate(), summary.getPeriodEndDate(),
-                summary.getCalculationStatus());
+                summary.getTotalAmount(), summary.getPeriodStartDate(), summary.getPeriodEndDate(),
+                summary.getCalculationStatus(),
+                summary.getJobs().stream()
+                        .map(JobExpectedIncomeLossResponse::from)
+                        .collect(Collectors.toList()));
     }
 }

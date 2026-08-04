@@ -6,7 +6,7 @@ import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
 import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
-import com.ntropy.common.dto.work.summary.PlannedWorkIncomeSummary;
+import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseCalculationStatus;
@@ -113,17 +113,19 @@ class DefenseModeServiceTest {
                 userId -> new DiagnosisDefenseSnapshot(4_680_000L, 3_300_000L),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Arrays.asList(
-                        new PlannedWorkIncomeSummary(101L, fromDate, 150_000L),
-                        new PlannedWorkIncomeSummary(102L, toDate, 180_000L)));
+                        new JobExpectedIncomeLossSummary(101L, "대리운전", 150_000L),
+                        new JobExpectedIncomeLossSummary(102L, "배달라이더", 180_000L)));
         DefenseMode entered = incomeLossService.enter(new DefenseModeEnterCommand(
                 1L, "ILLNESS", startDate, endDate));
 
         ExpectedIncomeLossSummary result = incomeLossService.getExpectedIncomeLoss(entered);
 
-        assertEquals(330_000L, result.getAmount());
+        assertEquals(330_000L, result.getTotalAmount());
         assertEquals(startDate, result.getPeriodStartDate());
         assertEquals(endDate, result.getPeriodEndDate());
         assertEquals("CALCULATED", result.getCalculationStatus());
+        assertEquals(2, result.getJobs().size());
+        assertEquals(150_000L, result.getJobs().get(0).getExpectedIncomeLoss());
     }
 
     private static class MemoryMapper implements DefenseModeMapper {
