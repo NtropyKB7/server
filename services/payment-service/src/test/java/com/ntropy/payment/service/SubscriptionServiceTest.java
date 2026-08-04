@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +64,86 @@ class SubscriptionServiceTest {
     void setUp() {
         service = new SubscriptionService(
                 subscriptionMapper, paymentMapper, paymentClient, billingKeyClient, webhookVerifier);
+        lenient().when(paymentClient.schedulePayment(anyString(), anyString(), anyLong(), anyString(), any()))
+                .thenReturn(true);
+        lenient().when(paymentClient.cancelScheduledPayments(anyString())).thenReturn(true);
+    }
+
+    @Test
+    void updatePaymentMethodCancelsOldScheduleAndSchedulesWithNewBillingKey() {
+        String newBillingKey = "new-billing-key";
+        Subscription subscription = activeSubscription();
+        PortOneBillingKeyVerification verification = new PortOneBillingKeyVerification(
+                true, PaymentMethod.KAKAOPAY, "카카오페이", null);
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+        when(billingKeyClient.verifyBillingKey(newBillingKey)).thenReturn(verification);
+
+        Subscription result = service.updatePaymentMethod(USER_ID, newBillingKey);
+
+        assertSame(subscription, result);
+        assertEquals(newBillingKey, result.getCustomerUid());
+        assertEquals(PaymentMethod.KAKAOPAY, result.getPaymentMethod());
+        assertEquals("카카오페이", result.getPaymentLabel());
+        assertNull(result.getPaymentMasked());
+        verify(paymentClient).cancelScheduledPayments(BILLING_KEY);
+        verify(paymentMapper).cancelPendingBySubscriptionId(10L);
+        verify(subscriptionMapper).update(subscription);
+        verify(paymentMapper).insert(org.mockito.ArgumentMatchers.argThat(
+                scheduled -> scheduled.getPaymentStatus() == PaymentStatus.PENDING));
+        verify(paymentClient).schedulePayment(
+                anyString(), eq(newBillingKey), eq(4_900L), anyString(), eq(subscription.getEndDate()));
+    }
+
+    @Test
+    void updatePaymentMethodRejectsNonActiveSubscription() {
+        Subscription subscription = activeSubscription();
+        subscription.setStatus(SubscriptionStatus.CANCEL_SCHEDULED);
+        subscription.setAutoRenewYn(false);
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.updatePaymentMethod(USER_ID, "new-billing-key"));
+
+        assertEquals(409, exception.getStatusCode());
+        verify(billingKeyClient, never()).verifyBillingKey(anyString());
+        verify(paymentClient, never()).cancelScheduledPayments(anyString());
+        verify(subscriptionMapper, never()).update(any());
+    }
+
+    @Test
+    void updatePaymentMethodStopsWhenOldScheduleCancellationFails() {
+        String newBillingKey = "new-billing-key";
+        Subscription subscription = activeSubscription();
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+        when(billingKeyClient.verifyBillingKey(newBillingKey)).thenReturn(validBillingKey());
+        when(paymentClient.cancelScheduledPayments(BILLING_KEY)).thenReturn(false);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.updatePaymentMethod(USER_ID, newBillingKey));
+
+        assertEquals(502, exception.getStatusCode());
+        assertEquals(BILLING_KEY, subscription.getCustomerUid());
+        verify(paymentMapper, never()).cancelPendingBySubscriptionId(anyLong());
+        verify(subscriptionMapper, never()).update(any());
+        verify(paymentClient, never()).schedulePayment(anyString(), anyString(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    void updatePaymentMethodRaisesErrorWhenNewScheduleFails() {
+        String newBillingKey = "new-billing-key";
+        Subscription subscription = activeSubscription();
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+        when(billingKeyClient.verifyBillingKey(newBillingKey)).thenReturn(validBillingKey());
+        when(paymentClient.schedulePayment(anyString(), eq(newBillingKey), eq(4_900L), anyString(), eq(subscription.getEndDate())))
+                .thenReturn(false);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.updatePaymentMethod(USER_ID, newBillingKey));
+
+        assertEquals(502, exception.getStatusCode());
+        verify(paymentClient).cancelScheduledPayments(BILLING_KEY);
+        verify(paymentMapper).cancelPendingBySubscriptionId(10L);
+        verify(subscriptionMapper).update(subscription);
     }
 
     @Test
