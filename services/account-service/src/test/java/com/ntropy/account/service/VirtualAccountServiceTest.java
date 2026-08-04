@@ -186,6 +186,10 @@ class VirtualAccountServiceTest {
         }
 
         @Override
+        public void updateAccountDetails(Account account) {
+        }
+
+        @Override
         public Account findByConnectionIdAndAccountNoHash(Long codefConnectionId, String accountNoHash) {
             return store.values().stream()
                     .filter(a -> codefConnectionId.equals(a.getCodefConnectionId())

@@ -1,6 +1,7 @@
 package com.ntropy.account.client.codef.parser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.math.BigDecimal;
@@ -67,10 +68,10 @@ class AccountTransactionResponseParserTest {
         assertEquals(BigDecimal.ZERO, tx.getOutAmount());
         assertEquals(new BigDecimal("10000"), tx.getInAmount());
         assertEquals(new BigDecimal("1234567"), tx.getAfterBalance());
-        assertEquals("홍길동", tx.getDesc1());
         assertEquals("이체", tx.getDesc2());
         assertNull(tx.getDesc3());
         assertEquals("강남지점", tx.getDesc4());
+        assertNotNull(tx.getFingerprint());
     }
 
     @Test

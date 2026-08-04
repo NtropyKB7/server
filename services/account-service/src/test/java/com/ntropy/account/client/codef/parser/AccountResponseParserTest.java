@@ -73,9 +73,7 @@ class AccountResponseParserTest {
         assertEquals("생활비통장", deposit.getAccountName());
         assertEquals(new BigDecimal("1234567"), deposit.getBalance());
         assertEquals("KRW", deposit.getCurrencyCode());
-        assertNull(deposit.getAccountEndDate());
         assertFalse(deposit.getOverdraftYn());
-        assertNull(deposit.getLoanKind());
 
         ParsedAccount fund = parsed.get(1);
         Account fundAccount = fund.account();
@@ -83,8 +81,32 @@ class AccountResponseParserTest {
         assertEquals("글로벌성장펀드", fundAccount.getAccountName());
         assertNull(fundAccount.getBalance());
         assertEquals("KRW", fundAccount.getCurrencyCode());
-        assertNull(fundAccount.getInvestedCost());
-        assertNull(fundAccount.getEarningsRate());
+    }
+
+    @Test
+    void normalizesOverdraftBalanceAndPeriodIntoCommonColumns() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "resDepositTrust": [
+                    {
+                      "resAccount": "110123456789",
+                      "resAccountDeposit": "11",
+                      "resAccountBalance": "-500000",
+                      "resOverdraftAcctYN": "1",
+                      "resLoanBalance": "750000",
+                      "resAccountStartDate": "20200101",
+                      "resAccountEndDate": "20300101",
+                      "resLoanStartDate": "20240101",
+                      "resLoanEndDate": "20270101"
+                    }
+                  ]
+                }
+                """);
+
+        Account account = AccountResponseParser.parse(data, 1L, 100L, "0088").get(0).account();
+
+        assertEquals(new BigDecimal("750000"), account.getBalance());
+        assertEquals(java.time.LocalDate.of(2024, 1, 1), account.getAccountStartDate());
     }
 
     @Test

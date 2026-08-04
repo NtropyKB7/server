@@ -58,7 +58,7 @@ class CodefConnectionServiceTest {
     }
 
     @Test
-    void skipsAddConnectionWhenInstitutionAlreadyRegistered() {
+    void updatesConnectionWhenInstitutionAlreadyRegistered() {
         StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         CodefConnection existing = new CodefConnection();
@@ -76,6 +76,9 @@ class CodefConnectionServiceTest {
         assertEquals("existing-connected-id", saved.getConnectedId());
         assertEquals(0, connectionClient.createCalls);
         assertEquals(0, connectionClient.addCalls);
+        assertEquals(1, connectionClient.updateCalls);
+        assertEquals("existing-connected-id", connectionClient.connectedId);
+        assertEquals("0088", connectionClient.organizationCode);
         assertEquals("[\"0088\"]", saved.getRegisteredInstitutionKeys());
     }
 
@@ -103,6 +106,7 @@ class CodefConnectionServiceTest {
 
         private int createCalls;
         private int addCalls;
+        private int updateCalls;
         private String connectedId;
         private String organizationCode;
 
@@ -123,6 +127,15 @@ class CodefConnectionServiceTest {
                                   String businessType, String clientType,
                                   String loginId, String rawPassword, String birthDate) {
             addCalls++;
+            this.connectedId = connectedId;
+            this.organizationCode = organizationCode;
+        }
+
+        @Override
+        public void updateConnection(String connectedId, String organizationCode,
+                                     String businessType, String clientType,
+                                     String loginId, String rawPassword, String birthDate) {
+            updateCalls++;
             this.connectedId = connectedId;
             this.organizationCode = organizationCode;
         }

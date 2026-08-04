@@ -2,6 +2,7 @@
 -- account-service DDL
 -- CODEF_CONNECTION: 이슈 #5(CODEF 초기 세팅/PoC) 범위.
 -- ACCOUNT, ACCOUNT_TRANSACTION: 이슈 #20(계좌/거래내역 파싱·저장) 범위.
+-- 적금·대출 거래와 거래 fingerprint: 이슈 #38 범위.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
@@ -26,6 +27,10 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 
 -- 이슈 #35 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
 -- services/account-service/src/main/resources/db/migration/FIN-004-add-connection-provider.sql
+-- 이슈 #38 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
+-- services/account-service/src/main/resources/db/migration/FIN-007-add-codef-product-transactions.sql
+-- 미사용 계좌·거래 컬럼 정리 이전 DB는 아래 마이그레이션을 이어서 실행한다.
+-- services/account-service/src/main/resources/db/migration/FIN-008-remove-unused-account-columns.sql
 
 -- CODEF OAuth2 accessToken 캐시. client_credentials 방식이라 사용자 단위가 아닌 클라이언트(서비스) 단위로 존재.
 -- 지금은 DB로만 캐싱하고, 추후 Redis 도입 시 CodefTokenStore의 Redis 구현체로 대체 예정 (DEVLOG 참고).
@@ -53,21 +58,13 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     deposit_type_code   VARCHAR(2)    NOT NULL COMMENT 'resAccountDeposit 분류값 (10~99)',
     account_no_masked   VARCHAR(64)   NOT NULL COMMENT '서버 생성 표시용 마스킹 계좌번호 (끝 4자리만 노출)',
     account_no_hash     CHAR(64)      NOT NULL COMMENT 'SHA-256(기관코드+실제계좌번호) 중복 판별용 해시. 원문 계좌번호는 저장하지 않음',
-    account_name        VARCHAR(100)  NULL COMMENT 'resAccountNickName 우선, 없으면 resAccountName',
-    balance             DECIMAL(18,2) NULL COMMENT 'resAccountBalance',
+    account_name        VARCHAR(100)  NULL COMMENT 'resAccountName 우선, 없으면 resAccountNickName',
+    balance             DECIMAL(18,2) NULL COMMENT '자산 잔액 또는 정규화된 부채 잔액(양수)',
     currency_code       VARCHAR(3)    NOT NULL DEFAULT 'KRW' COMMENT 'resAccountCurrency (ISO 4217)',
-    account_start_date  DATE          NULL COMMENT 'resAccountStartDate',
-    account_end_date    DATE          NULL COMMENT 'resAccountEndDate',
+    account_start_date  DATE          NULL COMMENT '정규화된 상품 시작일(마이너스통장은 resLoanStartDate 우선)',
     last_tran_date      DATE          NULL COMMENT 'resLastTranDate',
-    account_lifetime    VARCHAR(20)   NULL COMMENT 'resAccountLifetime (예금/신탁)',
     overdraft_yn        BOOLEAN       NULL COMMENT 'resOverdraftAcctYN (예금/신탁)',
-    loan_kind           VARCHAR(50)   NULL COMMENT 'resLoanKind (예금/신탁 마이너스통장)',
-    loan_balance        DECIMAL(18,2) NULL COMMENT 'resLoanBalance (예금/신탁 마이너스통장)',
-    loan_start_date     DATE          NULL COMMENT 'resLoanStartDate (예금/신탁 마이너스통장)',
-    loan_end_date       DATE          NULL COMMENT 'resLoanEndDate (예금/신탁 마이너스통장)',
-    invested_cost       DECIMAL(18,2) NULL COMMENT 'resAccountInvestedCost (펀드)',
-    earnings_rate       DECIMAL(9,4)  NULL COMMENT 'resEarningsRate (펀드)',
-    loan_exec_no        VARCHAR(50)   NULL COMMENT 'resAccountLoanExecNo (대출)',
+    next_payment_date   DATE          NULL COMMENT '다음 적금 납입일 또는 대출 상환일(resDatePayment/추정)',
     created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash),
@@ -75,21 +72,23 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
--- CODEF 수시입출 거래내역(transaction-list) 응답을 저장. 이번 이슈에서는 거래 중복 방지를 적용하지 않고 조회 시마다 그대로 insert한다.
+-- CODEF 수시입출 거래내역(transaction-list) 응답을 저장. fingerprint로 동일 거래의 반복 저장을 막는다.
 CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.id 참조',
-    tran_date     DATE          NOT NULL COMMENT 'resAccountTrDate',
+    fingerprint   CHAR(64)      NOT NULL COMMENT '계좌·거래일시·상품별 금액·상세 기반 SHA-256',
+    transaction_category VARCHAR(20) NOT NULL DEFAULT 'ORDINARY' COMMENT 'ORDINARY, INSTALLMENT, LOAN',
+    tran_date     DATE          NULL COMMENT 'resAccountTrDate',
     tran_time     TIME          NULL COMMENT 'resAccountTrTime (hhmmss)',
     out_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountOut',
     in_amount     DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountIn',
-    after_balance DECIMAL(18,2) NOT NULL COMMENT 'resAfterTranBalance',
-    desc1         VARCHAR(255)  NULL COMMENT 'resAccountDesc1, 은행별 의미가 달라 원본 필드명 유지',
+    after_balance DECIMAL(18,2) NULL COMMENT '거래 후 잔액 또는 대출 잔액',
     desc2         VARCHAR(255)  NULL COMMENT 'resAccountDesc2, 은행별 의미가 달라 원본 필드명 유지',
     desc3         VARCHAR(255)  NULL COMMENT 'resAccountDesc3, 은행별 의미가 달라 원본 필드명 유지',
     desc4         VARCHAR(255)  NULL COMMENT 'resAccountDesc4, 은행별 의미가 달라 원본 필드명 유지',
     created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (id)
 ) ENGINE = InnoDB

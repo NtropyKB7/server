@@ -23,6 +23,7 @@ public class CodefConnectionClient {
 
     private static final String ACCOUNT_CREATE_PATH = "/v1/account/create";
     private static final String ACCOUNT_ADD_PATH = "/v1/account/add";
+    private static final String ACCOUNT_UPDATE_PATH = "/v1/account/update";
 
     private final CodefProperties codefProperties;
     private final CodefApiClient codefApiClient;
@@ -71,6 +72,27 @@ public class CodefConnectionClient {
     public void addConnection(String connectedId, String organizationCode,
                               String businessType, String clientType,
                               String loginId, String rawPassword, String birthDate) {
+        changeConnection(
+                ACCOUNT_ADD_PATH, "추가", connectedId, organizationCode,
+                businessType, clientType, loginId, rawPassword, birthDate
+        );
+    }
+
+    /**
+     * 기존 connectedId에 등록된 기관의 로그인 정보를 갱신한다.
+     */
+    public void updateConnection(String connectedId, String organizationCode,
+                                 String businessType, String clientType,
+                                 String loginId, String rawPassword, String birthDate) {
+        changeConnection(
+                ACCOUNT_UPDATE_PATH, "수정", connectedId, organizationCode,
+                businessType, clientType, loginId, rawPassword, birthDate
+        );
+    }
+
+    private void changeConnection(String path, String action, String connectedId, String organizationCode,
+                                  String businessType, String clientType,
+                                  String loginId, String rawPassword, String birthDate) {
         try {
             Map<String, Object> requestBody = new LinkedHashMap<>();
             requestBody.put("accountList", List.of(createAccount(
@@ -79,19 +101,19 @@ public class CodefConnectionClient {
             requestBody.put("connectedId", connectedId);
 
             CodefConnectionCreateResponse response = codefApiClient.post(
-                    ACCOUNT_ADD_PATH,
+                    path,
                     requestBody,
                     CodefConnectionCreateResponse.class
             );
             if (response.getResult() == null || !"CF-00000".equals(response.getResult().getCode())) {
                 String message = response.getResult() != null ? response.getResult().getMessage() : "알 수 없는 오류";
-                throw new IllegalStateException("CODEF 계정 추가 실패: " + message);
+                throw new IllegalStateException("CODEF 계정 " + action + " 실패: " + message);
             }
-            validateInstitutionSuccess(response, organizationCode, "추가");
+            validateInstitutionSuccess(response, organizationCode, action);
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalStateException("CODEF 계정 추가 요청 실패", e);
+            throw new IllegalStateException("CODEF 계정 " + action + " 요청 실패", e);
         }
     }
 

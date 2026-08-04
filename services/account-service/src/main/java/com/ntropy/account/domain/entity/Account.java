@@ -31,23 +31,13 @@ public class Account {
     private BigDecimal balance;
     private String currencyCode;
     private LocalDate accountStartDate;
-    private LocalDate accountEndDate;
     private LocalDate lastTranDate;
 
-    // 예금/신탁 그룹 전용 (마이너스통장 대출 정보 포함)
-    private String accountLifetime;
+    // 예금/신탁 그룹 전용
     private Boolean overdraftYn;
-    private String loanKind;
-    private BigDecimal loanBalance;
-    private LocalDate loanStartDate;
-    private LocalDate loanEndDate;
 
-    // 펀드 그룹 전용
-    private BigDecimal investedCost;
-    private BigDecimal earningsRate;
-
-    // 대출 그룹 전용
-    private String loanExecNo;
+    // 다음 적금 납입일 또는 대출 상환일
+    private LocalDate nextPaymentDate;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

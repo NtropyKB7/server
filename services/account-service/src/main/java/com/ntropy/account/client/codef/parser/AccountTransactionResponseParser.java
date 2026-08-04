@@ -1,10 +1,11 @@
 package com.ntropy.account.client.codef.parser;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ntropy.account.domain.AccountTransactionCategory;
+import com.ntropy.account.domain.TransactionFingerprint;
 import com.ntropy.account.domain.entity.AccountTransaction;
 
 /**
@@ -19,8 +20,8 @@ public final class AccountTransactionResponseParser {
     }
 
     public static List<AccountTransaction> parse(JsonNode data, Long accountId) {
-        List<AccountTransaction> result = new ArrayList<>();
-        for (JsonNode accountResult : accountResults(data)) {
+        List<AccountTransaction> result = new java.util.ArrayList<>();
+        for (JsonNode accountResult : CodefJsonSupport.accountResults(data)) {
             JsonNode historyList = accountResult.path("resTrHistoryList");
             if (!historyList.isArray()) {
                 continue;
@@ -32,21 +33,10 @@ public final class AccountTransactionResponseParser {
         return result;
     }
 
-    private static List<JsonNode> accountResults(JsonNode data) {
-        if (data.isArray()) {
-            List<JsonNode> nodes = new ArrayList<>();
-            data.forEach(nodes::add);
-            return nodes;
-        }
-        if (data.isObject()) {
-            return List.of(data);
-        }
-        return List.of();
-    }
-
     private static AccountTransaction parseOne(JsonNode node, Long accountId) {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccountId(accountId);
+        transaction.setTransactionCategory(AccountTransactionCategory.ORDINARY);
         transaction.setTranDate(CodefJsonSupport.date(node, "resAccountTrDate"));
         transaction.setTranTime(CodefJsonSupport.time(node, "resAccountTrTime"));
 
@@ -56,10 +46,14 @@ public final class AccountTransactionResponseParser {
         transaction.setInAmount(inAmount != null ? inAmount : BigDecimal.ZERO);
         transaction.setAfterBalance(CodefJsonSupport.amount(node, "resAfterTranBalance"));
 
-        transaction.setDesc1(CodefJsonSupport.text(node, "resAccountDesc1"));
         transaction.setDesc2(CodefJsonSupport.text(node, "resAccountDesc2"));
         transaction.setDesc3(CodefJsonSupport.text(node, "resAccountDesc3"));
         transaction.setDesc4(CodefJsonSupport.text(node, "resAccountDesc4"));
+        transaction.setFingerprint(TransactionFingerprint.hash(
+                accountId, transaction.getTranDate(), transaction.getTranTime(),
+                transaction.getOutAmount(), transaction.getInAmount(), transaction.getAfterBalance(),
+                transaction.getDesc2(), transaction.getDesc3(), transaction.getDesc4()
+        ));
         return transaction;
     }
 }

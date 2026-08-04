@@ -6,13 +6,11 @@
         INSERT INTO ACCOUNT (
             codef_connection_id, user_id, organization_code, account_group, deposit_type_code,
             account_no_masked, account_no_hash, account_name, balance, currency_code,
-            account_start_date, account_end_date, last_tran_date, account_lifetime, overdraft_yn,
-            loan_kind, loan_balance, loan_start_date, loan_end_date, invested_cost, earnings_rate, loan_exec_no
+            account_start_date, last_tran_date, overdraft_yn
         ) VALUES (
             #{codefConnectionId}, #{userId}, #{organizationCode}, #{accountGroup}, #{depositTypeCode},
             #{accountNoMasked}, #{accountNoHash}, #{accountName}, #{balance}, #{currencyCode},
-            #{accountStartDate}, #{accountEndDate}, #{lastTranDate}, #{accountLifetime}, #{overdraftYn},
-            #{loanKind}, #{loanBalance}, #{loanStartDate}, #{loanEndDate}, #{investedCost}, #{earningsRate}, #{loanExecNo}
+            #{accountStartDate}, #{lastTranDate}, #{overdraftYn}
         )
         ON DUPLICATE KEY UPDATE
             account_no_masked = VALUES(account_no_masked),
@@ -20,18 +18,17 @@
             balance = VALUES(balance),
             currency_code = VALUES(currency_code),
             account_start_date = VALUES(account_start_date),
-            account_end_date = VALUES(account_end_date),
             last_tran_date = VALUES(last_tran_date),
-            account_lifetime = VALUES(account_lifetime),
-            overdraft_yn = VALUES(overdraft_yn),
-            loan_kind = VALUES(loan_kind),
-            loan_balance = VALUES(loan_balance),
-            loan_start_date = VALUES(loan_start_date),
-            loan_end_date = VALUES(loan_end_date),
-            invested_cost = VALUES(invested_cost),
-            earnings_rate = VALUES(earnings_rate),
-            loan_exec_no = VALUES(loan_exec_no)
+            overdraft_yn = VALUES(overdraft_yn)
     </insert>
+
+    <update id="updateAccountDetails" parameterType="com.ntropy.account.domain.entity.Account">
+        UPDATE ACCOUNT
+        SET account_start_date = COALESCE(#{accountStartDate}, account_start_date),
+            balance = COALESCE(#{balance}, balance),
+            next_payment_date = #{nextPaymentDate}
+        WHERE id = #{id}
+    </update>
 
     <select id="findByConnectionIdAndAccountNoHash" resultType="com.ntropy.account.domain.entity.Account">
         SELECT id,
@@ -46,17 +43,9 @@
                balance,
                currency_code       AS currencyCode,
                account_start_date  AS accountStartDate,
-               account_end_date    AS accountEndDate,
                last_tran_date      AS lastTranDate,
-               account_lifetime    AS accountLifetime,
                overdraft_yn        AS overdraftYn,
-               loan_kind           AS loanKind,
-               loan_balance        AS loanBalance,
-               loan_start_date     AS loanStartDate,
-               loan_end_date       AS loanEndDate,
-               invested_cost       AS investedCost,
-               earnings_rate       AS earningsRate,
-               loan_exec_no        AS loanExecNo,
+               next_payment_date   AS nextPaymentDate,
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
@@ -77,17 +66,9 @@
                balance,
                currency_code       AS currencyCode,
                account_start_date  AS accountStartDate,
-               account_end_date    AS accountEndDate,
                last_tran_date      AS lastTranDate,
-               account_lifetime    AS accountLifetime,
                overdraft_yn        AS overdraftYn,
-               loan_kind           AS loanKind,
-               loan_balance        AS loanBalance,
-               loan_start_date     AS loanStartDate,
-               loan_end_date       AS loanEndDate,
-               invested_cost       AS investedCost,
-               earnings_rate       AS earningsRate,
-               loan_exec_no        AS loanExecNo,
+               next_payment_date   AS nextPaymentDate,
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
@@ -112,17 +93,9 @@
                balance,
                currency_code       AS currencyCode,
                account_start_date  AS accountStartDate,
-               account_end_date    AS accountEndDate,
                last_tran_date      AS lastTranDate,
-               account_lifetime    AS accountLifetime,
                overdraft_yn        AS overdraftYn,
-               loan_kind           AS loanKind,
-               loan_balance        AS loanBalance,
-               loan_start_date     AS loanStartDate,
-               loan_end_date       AS loanEndDate,
-               invested_cost       AS investedCost,
-               earnings_rate       AS earningsRate,
-               loan_exec_no        AS loanExecNo,
+               next_payment_date   AS nextPaymentDate,
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
