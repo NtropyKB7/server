@@ -38,14 +38,14 @@ class VirtualFinancialDataServiceTest {
 
         assertEquals(50, first.users());
         assertEquals(100, first.accounts());
-        assertEquals(10, first.logicalJobs());
+        assertEquals(11, first.platforms());
         assertEquals(15_000, first.transactions());
         assertEquals(first, second);
         assertEquals(50, connectionMapper.store.size());
         assertEquals(100, accountMapper.store.size());
         assertEquals(15_000, transactionMapper.store.size());
-        assertEquals(10, transactionMapper.store.values().stream()
-                .map(AccountTransaction::getJobId)
+        assertEquals(11, transactionMapper.store.values().stream()
+                .map(AccountTransaction::getPlatformId)
                 .filter(java.util.Objects::nonNull)
                 .distinct()
                 .count());
@@ -143,7 +143,7 @@ class VirtualFinancialDataServiceTest {
                 if (existing == null) {
                     store.put(key, transaction);
                 } else {
-                    existing.setJobId(transaction.getJobId());
+                    existing.setPlatformId(transaction.getPlatformId());
                 }
             }
         }

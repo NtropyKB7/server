@@ -52,21 +52,26 @@ class VirtualFinancialTransactionGeneratorTest {
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.INSTALLMENT));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getInAmount().signum() > 0));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getOutAmount().signum() > 0));
-        assertEquals(30, generated.transactions().stream().filter(transaction -> transaction.getJobId() != null).count());
-        assertEquals(2, generated.transactions().stream()
-                .map(AccountTransaction::getJobId).filter(java.util.Objects::nonNull).distinct().count());
+        List<AccountTransaction> platformTransactions = generated.transactions().stream()
+                .filter(transaction -> transaction.getPlatformId() != null)
+                .toList();
+        assertEquals(30, platformTransactions.size());
+        assertEquals(Set.of(1L, 4L), platformTransactions.stream()
+                .map(AccountTransaction::getPlatformId).collect(Collectors.toSet()));
+        assertEquals(Set.of("우아한형제들", "카카오모빌리티"), platformTransactions.stream()
+                .map(AccountTransaction::getDesc3).collect(Collectors.toSet()));
     }
 
     @Test
-    void assignsThreeJobsToEverySecondUserAndGeneratesLoanRepayments() {
+    void assignsThreePlatformsToEverySecondUserAndGeneratesLoanRepayments() {
         Account ordinary = account(20L, AccountGroup.DEPOSIT_TRUST);
         Account loan = account(21L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(26, PersonalBank.NH_BANK, ordinary, loan);
 
-        assertEquals(3, generated.userJobCount());
+        assertEquals(3, generated.userPlatformCount());
         assertEquals(3, generated.transactions().stream()
-                .map(AccountTransaction::getJobId).filter(java.util.Objects::nonNull).distinct().count());
+                .map(AccountTransaction::getPlatformId).filter(java.util.Objects::nonNull).distinct().count());
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.LOAN));
         assertTrue(generated.transactions().stream()
                 .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.LOAN)
@@ -107,7 +112,7 @@ class VirtualFinancialTransactionGeneratorTest {
         );
         assertTrue(ibk.transactions().stream().allMatch(transaction -> transaction.getDesc4() == null));
         assertTrue(ibk.transactions().stream()
-                .filter(transaction -> transaction.getJobId() != null)
+                .filter(transaction -> transaction.getPlatformId() != null)
                 .allMatch(transaction -> transaction.getDesc1() != null));
         assertNull(ibk.transactions().get(0).getDesc4());
     }

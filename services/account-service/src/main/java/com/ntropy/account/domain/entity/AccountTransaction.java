@@ -22,7 +22,7 @@ public class AccountTransaction {
 
     private Long id;
     private Long accountId;
-    private Long jobId;
+    private Long platformId;
     private String fingerprint;
     private AccountTransactionCategory transactionCategory;
     private LocalDate tranDate;
