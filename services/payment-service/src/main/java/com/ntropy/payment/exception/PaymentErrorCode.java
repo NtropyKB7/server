@@ -16,6 +16,7 @@ public enum PaymentErrorCode implements ServiceErrorCode {
     PAYMENT_SCHEDULE_CANCEL_FAILED(502, "기존 정기결제 예약 취소에 실패했습니다."),
     PAYMENT_SCHEDULE_FAILED(502, "정기결제 예약에 실패했습니다."),
     ALREADY_CANCELLED(400, "이미 해지된 구독입니다."),
+    CANCEL_REVOCATION_EXPIRED(409, "이미 만료된 구독은 해지 예약을 취소할 수 없습니다."),
     NOT_CANCEL_SCHEDULED(400, "해지예약 상태가 아닙니다.");
 
     private final int statusCode;

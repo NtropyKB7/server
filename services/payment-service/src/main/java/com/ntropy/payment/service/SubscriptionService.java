@@ -339,6 +339,10 @@ public class SubscriptionService {
         if (subscription == null || subscription.getStatus() != SubscriptionStatus.CANCEL_SCHEDULED) {
             throw new ServiceException(PaymentErrorCode.NOT_CANCEL_SCHEDULED);
         }
+        if (subscription.getEndDate() == null
+                || !subscription.getEndDate().isAfter(LocalDateTime.now())) {
+            throw new ServiceException(PaymentErrorCode.CANCEL_REVOCATION_EXPIRED);
+        }
 
         subscription.setStatus(SubscriptionStatus.ACTIVE);
         subscription.setCancelRequestedAt(null);

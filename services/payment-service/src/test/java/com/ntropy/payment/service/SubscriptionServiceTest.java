@@ -353,6 +353,42 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    void revokeCancelRejectsExpiredSubscription() {
+        Subscription subscription = activeSubscription();
+        subscription.setStatus(SubscriptionStatus.CANCEL_SCHEDULED);
+        subscription.setAutoRenewYn(false);
+        subscription.setCancelRequestedAt(LocalDateTime.now().minusMonths(1));
+        subscription.setEndDate(LocalDateTime.now().minusSeconds(1));
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.revokeCancel(USER_ID));
+
+        assertEquals(409, exception.getStatusCode());
+        assertEquals(SubscriptionStatus.CANCEL_SCHEDULED, subscription.getStatus());
+        assertFalse(subscription.getAutoRenewYn());
+        verify(subscriptionMapper, never()).update(any());
+        verify(paymentMapper, never()).insert(any());
+        verify(paymentClient, never()).schedulePayment(anyString(), anyString(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    void revokeCancelRejectsSubscriptionWithoutEndDate() {
+        Subscription subscription = activeSubscription();
+        subscription.setStatus(SubscriptionStatus.CANCEL_SCHEDULED);
+        subscription.setAutoRenewYn(false);
+        subscription.setEndDate(null);
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.revokeCancel(USER_ID));
+
+        assertEquals(409, exception.getStatusCode());
+        verify(subscriptionMapper, never()).update(any());
+        verify(paymentClient, never()).schedulePayment(anyString(), anyString(), anyLong(), anyString(), any());
+    }
+
+    @Test
     void getPaymentHistoryCombinesSubscriptionsExcludesPendingAndSortsNewestFirst() {
         Subscription first = activeSubscription();
         Subscription second = activeSubscription();
