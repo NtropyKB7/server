@@ -314,7 +314,11 @@ public class SubscriptionService {
             throw new ServiceException(PaymentErrorCode.ALREADY_CANCELLED);
         }
 
-        portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid());
+        if (!portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid())) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_SCHEDULE_CANCEL_FAILED);
+        }
+
+        paymentMapper.cancelPendingBySubscriptionId(subscription.getSubscriptionId());
 
         subscription.setStatus(SubscriptionStatus.CANCEL_SCHEDULED);
         subscription.setCancelRequestedAt(LocalDateTime.now());

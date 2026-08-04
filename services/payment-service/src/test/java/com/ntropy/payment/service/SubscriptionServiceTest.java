@@ -313,7 +313,25 @@ class SubscriptionServiceTest {
         assertNotNull(result.getCancelRequestedAt());
         assertTrue(result.isUsable());
         verify(paymentClient).cancelScheduledPayments(BILLING_KEY);
+        verify(paymentMapper).cancelPendingBySubscriptionId(10L);
         verify(subscriptionMapper).update(subscription);
+    }
+
+    @Test
+    void cancelSubscriptionDoesNotChangeDatabaseWhenScheduleCancellationFails() {
+        Subscription subscription = activeSubscription();
+        when(subscriptionMapper.findLatestByUserId(USER_ID)).thenReturn(subscription);
+        when(paymentClient.cancelScheduledPayments(BILLING_KEY)).thenReturn(false);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.cancelSubscription(USER_ID));
+
+        assertEquals(502, exception.getStatusCode());
+        assertEquals(SubscriptionStatus.ACTIVE, subscription.getStatus());
+        assertTrue(subscription.getAutoRenewYn());
+        assertNull(subscription.getCancelRequestedAt());
+        verify(paymentMapper, never()).cancelPendingBySubscriptionId(anyLong());
+        verify(subscriptionMapper, never()).update(any());
     }
 
     @Test
