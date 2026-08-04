@@ -46,6 +46,7 @@ public final class AccountTransactionResponseParser {
         transaction.setInAmount(inAmount != null ? inAmount : BigDecimal.ZERO);
         transaction.setAfterBalance(CodefJsonSupport.amount(node, "resAfterTranBalance"));
 
+        transaction.setDesc1(CodefJsonSupport.text(node, "resAccountDesc1"));
         transaction.setDesc2(CodefJsonSupport.text(node, "resAccountDesc2"));
         transaction.setDesc3(CodefJsonSupport.text(node, "resAccountDesc3"));
         transaction.setDesc4(CodefJsonSupport.text(node, "resAccountDesc4"));

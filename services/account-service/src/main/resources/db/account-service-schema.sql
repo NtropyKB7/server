@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 
 -- 이슈 #35 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
 -- services/account-service/src/main/resources/db/migration/FIN-004-add-connection-provider.sql
+-- 이슈 #46의 desc1 원본 필드와 소득-일자리 논리 참조를 추가하려면 아래 마이그레이션을 한 번 실행한다.
+-- services/account-service/src/main/resources/db/migration/FIN-005-add-transaction-job-id.sql
 -- 이슈 #38 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
 -- services/account-service/src/main/resources/db/migration/FIN-007-add-codef-product-transactions.sql
 -- 미사용 계좌·거래 컬럼 정리 이전 DB는 아래 마이그레이션을 이어서 실행한다.
@@ -77,6 +79,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.id 참조',
+    job_id        BIGINT        NULL COMMENT 'work-service JOB.job_id 논리 참조 (크로스 도메인 FK 없음)',
     fingerprint   CHAR(64)      NOT NULL COMMENT '계좌·거래일시·상품별 금액·상세 기반 SHA-256',
     transaction_category VARCHAR(20) NOT NULL DEFAULT 'ORDINARY' COMMENT 'ORDINARY, INSTALLMENT, LOAN',
     tran_date     DATE          NULL COMMENT 'resAccountTrDate',
@@ -84,12 +87,14 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     out_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountOut',
     in_amount     DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountIn',
     after_balance DECIMAL(18,2) NULL COMMENT '거래 후 잔액 또는 대출 잔액',
+    desc1         VARCHAR(255)  NULL COMMENT 'resAccountDesc1, 은행별 의미가 달라 원본 필드명 유지',
     desc2         VARCHAR(255)  NULL COMMENT 'resAccountDesc2, 은행별 의미가 달라 원본 필드명 유지',
     desc3         VARCHAR(255)  NULL COMMENT 'resAccountDesc3, 은행별 의미가 달라 원본 필드명 유지',
     desc4         VARCHAR(255)  NULL COMMENT 'resAccountDesc4, 은행별 의미가 달라 원본 필드명 유지',
     created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
+    INDEX ix_account_transaction_job (job_id),
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
