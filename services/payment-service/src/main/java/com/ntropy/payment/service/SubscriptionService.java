@@ -115,17 +115,30 @@ public class SubscriptionService {
         if (subscription == null) {
             throw new ServiceException(PaymentErrorCode.SUBSCRIPTION_NOT_FOUND);
         }
+        if (subscription.getStatus() != SubscriptionStatus.ACTIVE
+                || !subscription.isUsable()
+                || !Boolean.TRUE.equals(subscription.getAutoRenewYn())) {
+            throw new ServiceException(PaymentErrorCode.SUBSCRIPTION_NOT_ACTIVE);
+        }
 
         PortOneBillingKeyVerification verification = portOneBillingKeyClient.verifyBillingKey(billingKey);
         if (!verification.isValid()) {
             throw new ServiceException(PaymentErrorCode.INVALID_BILLING_KEY);
         }
 
+        if (!portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid())) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_SCHEDULE_CANCEL_FAILED);
+        }
+
+        paymentMapper.cancelPendingBySubscriptionId(subscription.getSubscriptionId());
+
         subscription.setCustomerUid(billingKey);
         subscription.setPaymentMethod(verification.getPaymentMethod());
         subscription.setPaymentLabel(verification.getPaymentLabel());
         subscription.setPaymentMasked(verification.getPaymentMasked());
         subscriptionMapper.update(subscription);
+
+        scheduleUpcomingPayment(subscription, subscription.getEndDate());
 
         return subscription;
     }
@@ -236,9 +249,12 @@ public class SubscriptionService {
         pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
         paymentMapper.insert(pendingPayment);
 
-        portOnePaymentClient.schedulePayment(
+        boolean scheduled = portOnePaymentClient.schedulePayment(
                 paymentId, subscription.getCustomerUid(), PlanCode.PRO.getMonthlyPrice(),
                 "Ntropy Pro 정기결제", timeToPay);
+        if (!scheduled) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_SCHEDULE_FAILED);
+        }
     }
 
     private Subscription defaultBasicSubscription() {

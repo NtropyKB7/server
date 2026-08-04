@@ -17,4 +17,6 @@ public interface PaymentMapper {
     int insert(Payment payment);
 
     int update(Payment payment);
+
+    int cancelPendingBySubscriptionId(Long subscriptionId);
 }
