@@ -1,0 +1,133 @@
+package com.ntropy.work.client;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
+import com.ntropy.work.domain.entity.Category;
+import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.enums.SettlementType;
+import com.ntropy.work.mapper.InMemoryCategoryMapper;
+import com.ntropy.work.mapper.InMemoryJobMapper;
+import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.service.CategoryService;
+import com.ntropy.work.service.JobService;
+
+class LocalExpectedIncomeLossQueryClientTest {
+
+    private static final Long USER_ID = 1L;
+
+    private InMemoryJobMapper jobMapper;
+    private LocalExpectedIncomeLossQueryClient client;
+
+    @BeforeEach
+    void setUp() {
+        jobMapper = new InMemoryJobMapper();
+        InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
+        categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
+        JobService jobService = new JobService(
+                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(categoryMapper));
+        client = new LocalExpectedIncomeLossQueryClient(jobService);
+    }
+
+    private Job.JobBuilder baseJob() {
+        return Job.builder()
+                .userId(USER_ID)
+                .categoryId(1L)
+                .jobName("배민 배달")
+                .settlementType(SettlementType.MONTHLY)
+                .monthlyWage(3000000)
+                .isRegular(false)
+                .baseFatigue(3)
+                .isActive(true);
+    }
+
+    @Test
+    @DisplayName("방어기간 30일이면 월 예상 소득 전액이 손실로 계산된다")
+    void findExpectedIncomeLossByJob_fullMonth_returnsFullIncome() {
+        jobMapper.seed(baseJob().jobId(1L).monthlyExpectedIncome(3000000L).build());
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30));
+
+        assertEquals(1, result.size());
+        assertEquals(3000000L, result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("방어기간 15일이면 월 예상 소득의 절반이 손실로 계산된다")
+    void findExpectedIncomeLossByJob_halfMonth_returnsHalfIncome() {
+        jobMapper.seed(baseJob().jobId(1L).monthlyExpectedIncome(3000000L).build());
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 15));
+
+        assertEquals(1500000L, result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("월 경계를 넘는 기간도 전체 일수 기준으로 계산된다")
+    void findExpectedIncomeLossByJob_acrossMonths_usesTotalDays() {
+        jobMapper.seed(baseJob().jobId(1L).monthlyExpectedIncome(3000000L).build());
+
+        // 1/20~2/10 = 22일
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 1, 20), LocalDate.of(2026, 2, 10));
+
+        assertEquals(Math.round(3000000 * (22.0 / 30.0)), result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("월 예상 소득이 없는 잡은 손실액이 null로 반환된다")
+    void findExpectedIncomeLossByJob_nullExpectedIncome_returnsNullLoss() {
+        jobMapper.seed(baseJob().jobId(1L).monthlyExpectedIncome(null).build());
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30));
+
+        assertEquals(1, result.size());
+        assertNull(result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("비활성 잡은 손실 계산에서 제외된다")
+    void findExpectedIncomeLossByJob_inactiveJob_isExcluded() {
+        jobMapper.seed(baseJob().jobId(1L).monthlyExpectedIncome(3000000L).isActive(false).build());
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30));
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("잡이 여러 개면 각각 손실액을 반환한다")
+    void findExpectedIncomeLossByJob_multipleJobs_returnsEach() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("본업").monthlyExpectedIncome(3000000L).build());
+        jobMapper.seed(baseJob().jobId(2L).jobName("배달").monthlyExpectedIncome(600000L).build());
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30));
+
+        assertEquals(2, result.size());
+        assertEquals(3000000L, result.get(0).getExpectedIncomeLoss());
+        assertEquals(600000L, result.get(1).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("등록된 잡이 없으면 빈 리스트를 반환한다")
+    void findExpectedIncomeLossByJob_noJobs_returnsEmpty() {
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30));
+
+        assertTrue(result.isEmpty());
+    }
+}

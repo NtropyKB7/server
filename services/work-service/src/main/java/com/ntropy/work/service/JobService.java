@@ -44,6 +44,7 @@ public class JobService {
         if (job.getIsActive() == null) {
             job.setIsActive(true);
         }
+        job.setMonthlyExpectedIncome(calculateMonthlyExpectedIncome(job, safe(schedules)));
 
         jobMapper.insert(job);
 
@@ -76,6 +77,10 @@ public class JobService {
         job.setIsActive(existing.getIsActive());
         job.setCreatedAt(existing.getCreatedAt());
         job.setUpdatedAt(LocalDateTime.now());
+        // 시급/정산방식이 바뀌면 월 예상 소득도 다시 계산한다. 스케줄은 잡 수정 요청에 없으므로
+        // 이미 등록된 것을 그대로 조회해 쓴다.
+        job.setMonthlyExpectedIncome(
+                calculateMonthlyExpectedIncome(job, jobScheduleMapper.findByJobId(job.getJobId())));
         jobMapper.update(job);
         return job;
     }
@@ -134,6 +139,31 @@ public class JobService {
 
     private List<JobSchedule> safe(List<JobSchedule> schedules) {
         return schedules == null ? Collections.emptyList() : schedules;
+    }
+
+    /**
+     * 방어모드 예상 손실소득 계산에 쓰이는 월 환산 예상 소득을 정산 방식별로 계산한다.
+     *
+     * <p>MONTHLY는 월급을 그대로 쓰고, HOURLY는 정기근무 스케줄의 주간 근무시간을
+     * 월(30일)로 환산해 시급을 곱한다. PER_TASK는 계산 방식이 정해지지 않아 null을 반환하며,
+     * 방어모드는 이를 "계산 불가"로 처리한다.</p>
+     */
+    private Long calculateMonthlyExpectedIncome(Job job, List<JobSchedule> schedules) {
+        switch (job.getSettlementType()) {
+            case MONTHLY:
+                return job.getMonthlyWage().longValue();
+            case HOURLY:
+                long weeklyMinutes = schedules.stream()
+                        .mapToLong(s -> WorkTimeUtils.durationMinutes(s.getStartTime(), s.getEndTime()))
+                        .sum();
+                if (weeklyMinutes == 0) {
+                    return null;
+                }
+                double monthlyHours = weeklyMinutes / 60.0 * (30.0 / 7.0);
+                return Math.round(monthlyHours * job.getHourlyWage());
+            default:
+                return null;
+        }
     }
 
     private void validateScheduleConsistency(Job job, List<JobSchedule> schedules) {
