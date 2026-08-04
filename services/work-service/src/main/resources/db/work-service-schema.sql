@@ -85,6 +85,16 @@ CREATE TABLE `ALLOCATION_GOAL` (
 	`recommend_hour`	BIGINT	NULL
 );
 
+-- 8. SAVING_GOAL (월별 저축 목표: 목표 소득액 + 적정 피로도)
+CREATE TABLE `SAVING_GOAL` (
+	`saving_goal_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
+	`user_id`	BIGINT	NOT NULL,
+	`target_month`	VARCHAR(7)	NOT NULL	COMMENT 'YYYY-MM',
+	`target_amount`	BIGINT	NOT NULL,
+	`labor_intensity`	BIGINT	NOT NULL	COMMENT '적정 피로도 T, 1~5',
+	PRIMARY KEY (`saving_goal_id`)
+);
+
 -- ============================================================
 -- Primary Key
 -- ============================================================
@@ -168,6 +178,7 @@ CREATE INDEX `IDX_ALLOCATION_GOAL_JOB_ID` ON `ALLOCATION_GOAL` (`job_id`);
 -- user_id는 크로스 도메인(user-service)이라 FK는 걸지 않되, 조회 성능을 위해 인덱스는 추가
 CREATE INDEX `IDX_JOB_USER_ID` ON `JOB` (`user_id`);
 CREATE INDEX `IDX_WORK_LOG_USER_ID` ON `WORK_LOG` (`user_id`);
+CREATE INDEX `IDX_SAVING_GOAL_USER_ID` ON `SAVING_GOAL` (`user_id`);
 
 -- 캘린더 월별 조회 시 자주 쓰이는 조합이라 함께 추가
 CREATE INDEX `IDX_WORK_LOG_USER_DATE` ON `WORK_LOG` (`user_id`, `work_date`);

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.SavingGoalMapper">
+
+    <resultMap id="savingGoalResultMap" type="com.ntropy.work.domain.entity.SavingGoal">
+        <id property="savingGoalId" column="saving_goal_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="targetMonth" column="target_month"/>
+        <result property="targetAmount" column="target_amount"/>
+        <result property="laborIntensity" column="labor_intensity"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.SavingGoal"
+            useGeneratedKeys="true" keyProperty="savingGoalId">
+        INSERT INTO SAVING_GOAL (user_id, target_month, target_amount, labor_intensity)
+        VALUES (#{userId}, #{targetMonth}, #{targetAmount}, #{laborIntensity})
+    </insert>
+
+    <select id="findById" parameterType="long" resultMap="savingGoalResultMap">
+        SELECT saving_goal_id, user_id, target_month, target_amount, labor_intensity
+        FROM SAVING_GOAL
+        WHERE saving_goal_id = #{savingGoalId}
+    </select>
+
+    <select id="findByUserIdAndTargetMonth" resultMap="savingGoalResultMap">
+        SELECT saving_goal_id, user_id, target_month, target_amount, labor_intensity
+        FROM SAVING_GOAL
+        WHERE user_id = #{userId}
+          AND target_month = #{targetMonth}
+    </select>
+
+</mapper>

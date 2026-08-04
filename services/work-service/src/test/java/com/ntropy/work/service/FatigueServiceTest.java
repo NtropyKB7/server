@@ -12,8 +12,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
+import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
+import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 
 class FatigueServiceTest {
@@ -22,12 +24,14 @@ class FatigueServiceTest {
     private static final LocalDate TARGET_DATE = LocalDate.of(2026, 8, 10);
 
     private InMemoryWorkLogMapper workLogMapper;
+    private InMemorySavingGoalMapper savingGoalMapper;
     private FatigueService fatigueService;
 
     @BeforeEach
     void setUp() {
         workLogMapper = new InMemoryWorkLogMapper();
-        fatigueService = new FatigueService(workLogMapper);
+        savingGoalMapper = new InMemorySavingGoalMapper();
+        fatigueService = new FatigueService(workLogMapper, savingGoalMapper);
     }
 
     private void seedWorkLog(Long jobId, LocalDate date, LocalTime start, LocalTime end, long fatigue) {
@@ -117,6 +121,32 @@ class FatigueServiceTest {
         CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
 
         assertEquals(156, gauge.getScore());
+    }
+
+    @Test
+    @DisplayName("해당 월 SAVING_GOAL이 있으면 labor_intensity가 T로 쓰여 게이지 점수가 달라진다")
+    void calculateGauge_savingGoalPresent_usesLaborIntensityAsTargetFatigue() {
+        seedWorkLog(1L, TARGET_DATE, LocalTime.of(9, 0), LocalTime.of(17, 0), 3);
+        savingGoalMapper.insert(SavingGoal.builder()
+                .userId(USER_ID).targetMonth("2026-08").targetAmount(2_500_000L).laborIntensity(5L).build());
+
+        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+
+        assertEquals(56, gauge.getScore());
+        assertEquals("LOW", gauge.getLevel());
+    }
+
+    @Test
+    @DisplayName("다른 달의 SAVING_GOAL은 이번 달 계산에 영향을 주지 않고 기본값으로 폴백한다")
+    void calculateGauge_savingGoalForOtherMonth_fallsBackToDefault() {
+        seedWorkLog(1L, TARGET_DATE, LocalTime.of(9, 0), LocalTime.of(17, 0), 3);
+        savingGoalMapper.insert(SavingGoal.builder()
+                .userId(USER_ID).targetMonth("2026-09").targetAmount(2_500_000L).laborIntensity(5L).build());
+
+        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+
+        assertEquals(94, gauge.getScore());
+        assertEquals("MEDIUM", gauge.getLevel());
     }
 }
 
