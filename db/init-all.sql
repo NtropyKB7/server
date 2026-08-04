@@ -19,10 +19,10 @@ SOURCE services/work-service/src/main/resources/db/work-service-seed.sql;
 -- SOURCE services/diagnosis-service/src/main/resources/db/diagnosis-service-schema.sql;
 
 -- defense-service
--- SOURCE services/defense-service/src/main/resources/db/defense-service-schema.sql;
+SOURCE services/defense-service/src/main/resources/db/defense-service-schema.sql;
 
 -- payment-service
--- SOURCE services/payment-service/src/main/resources/db/payment-service-schema.sql;
+SOURCE services/payment-service/src/main/resources/db/payment-service-schema.sql;
 
 -- notification-service
 -- SOURCE services/notification-service/src/main/resources/db/notification-service-schema.sql;
