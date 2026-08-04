@@ -28,6 +28,7 @@ public class Job {
     private Float taskPerHour;
     private Boolean isRegular;
     private Integer baseFatigue;
+    private Long monthlyExpectedIncome;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isActive;

@@ -1,6 +1,7 @@
 package com.ntropy.work.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -203,5 +204,70 @@ class JobServiceTest {
     @DisplayName("존재하지 않는 잡을 조회하면 실패한다")
     void findById_notFound_throws() {
         assertThrows(IllegalArgumentException.class, () -> jobService.findById(999L));
+    }
+
+    @Test
+    @DisplayName("MONTHLY 잡의 월 예상 소득은 월급 그대로다")
+    void registerJob_monthly_usesMonthlyWageAsExpectedIncome() {
+        Job job = baseJob()
+                .settlementType(SettlementType.MONTHLY)
+                .hourlyWage(null)
+                .monthlyWage(2500000)
+                .build();
+
+        Job result = jobService.registerJob(job, null);
+
+        assertEquals(2500000L, result.getMonthlyExpectedIncome());
+    }
+
+    @Test
+    @DisplayName("HOURLY 잡의 월 예상 소득은 주간 근무시간을 30일로 환산해 계산한다")
+    void registerJob_hourly_calculatesFromWeeklyScheduleHours() {
+        // 주 15시간(월/수/금 각 5시간) x 30/7주 환산 x 시급 12,000원
+        Job job = baseJob().isRegular(true).hourlyWage(12000).build();
+        List<JobSchedule> schedules = List.of(
+                scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(23, 0)),
+                scheduleOf("WED", LocalTime.of(18, 0), LocalTime.of(23, 0)),
+                scheduleOf("FRI", LocalTime.of(18, 0), LocalTime.of(23, 0))
+        );
+
+        Job result = jobService.registerJob(job, schedules);
+
+        assertEquals(Math.round(15 * (30.0 / 7.0) * 12000), result.getMonthlyExpectedIncome());
+    }
+
+    @Test
+    @DisplayName("스케줄 없는 HOURLY 잡은 월 예상 소득을 계산할 수 없다")
+    void registerJob_hourlyWithoutSchedule_hasNullExpectedIncome() {
+        Job result = jobService.registerJob(baseJob().build(), null);
+
+        assertNull(result.getMonthlyExpectedIncome());
+    }
+
+    @Test
+    @DisplayName("PER_TASK 잡은 계산 방식이 없어 월 예상 소득이 null이다")
+    void registerJob_perTask_hasNullExpectedIncome() {
+        Job job = baseJob()
+                .settlementType(SettlementType.PER_TASK)
+                .hourlyWage(null)
+                .perTaskWage(3000)
+                .taskPerHour(4.0f)
+                .build();
+
+        Job result = jobService.registerJob(job, null);
+
+        assertNull(result.getMonthlyExpectedIncome());
+    }
+
+    @Test
+    @DisplayName("시급을 수정하면 월 예상 소득도 다시 계산된다")
+    void updateJob_recalculatesMonthlyExpectedIncome() {
+        Job job = jobService.registerJob(baseJob().isRegular(true).hourlyWage(12000).build(),
+                List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(23, 0))));
+
+        Job patch = baseJob().jobId(job.getJobId()).isRegular(true).hourlyWage(15000).build();
+        Job result = jobService.updateJob(patch);
+
+        assertEquals(Math.round(5 * (30.0 / 7.0) * 15000), result.getMonthlyExpectedIncome());
     }
 }

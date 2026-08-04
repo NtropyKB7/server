@@ -45,6 +45,7 @@ CREATE TABLE `JOB` (
 	`task_per_hour`	FLOAT	NULL,
 	`is_regular`	BOOLEAN	NOT NULL,
 	`base_fatigue`	INT	NOT NULL,
+	`monthly_expected_income`	BIGINT	NULL	COMMENT '월 환산 예상 소득 (등록/수정 시 정산 방식에 따라 서버가 계산해 저장. PER_TASK는 계산 방식 미정이라 NULL)',
 	`created_at`	DATETIME	NOT NULL,
 	`updated_at`	DATETIME	NOT NULL,
 	`is_active`	BOOLEAN	NOT NULL,
