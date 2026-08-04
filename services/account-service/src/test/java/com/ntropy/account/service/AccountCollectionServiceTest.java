@@ -495,5 +495,15 @@ class AccountCollectionServiceTest {
             insertedBatches++;
             insertedTransactions.addAll(transactions);
         }
+
+        @Override
+        public List<AccountTransaction> findByAccountIdAndDateRange(Long accountId, LocalDate startDate,
+                                                                    LocalDate endDate) {
+            return insertedTransactions.stream()
+                    .filter(transaction -> accountId.equals(transaction.getAccountId()))
+                    .filter(transaction -> !transaction.getTranDate().isBefore(startDate)
+                            && !transaction.getTranDate().isAfter(endDate))
+                    .toList();
+        }
     }
 }

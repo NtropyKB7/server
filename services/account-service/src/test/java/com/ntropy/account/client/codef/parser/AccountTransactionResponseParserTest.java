@@ -68,6 +68,7 @@ class AccountTransactionResponseParserTest {
         assertEquals(BigDecimal.ZERO, tx.getOutAmount());
         assertEquals(new BigDecimal("10000"), tx.getInAmount());
         assertEquals(new BigDecimal("1234567"), tx.getAfterBalance());
+        assertEquals("홍길동", tx.getDesc1());
         assertEquals("이체", tx.getDesc2());
         assertNull(tx.getDesc3());
         assertEquals("강남지점", tx.getDesc4());
@@ -90,5 +91,20 @@ class AccountTransactionResponseParserTest {
         List<AccountTransaction> transactions = AccountTransactionResponseParser.parse(data, 42L);
 
         assertEquals(0, transactions.size());
+    }
+
+    @Test
+    void keepsLegacyFingerprintStableWhenOnlyDesc1Changes() throws Exception {
+        JsonNode first = objectMapper.readTree(
+                "{\"resTrHistoryList\":" + HISTORY_LIST_JSON + "}"
+        );
+        JsonNode second = objectMapper.readTree(
+                "{\"resTrHistoryList\":" + HISTORY_LIST_JSON.replace("홍길동", "김민수") + "}"
+        );
+
+        AccountTransaction firstTransaction = AccountTransactionResponseParser.parse(first, 42L).get(0);
+        AccountTransaction secondTransaction = AccountTransactionResponseParser.parse(second, 42L).get(0);
+
+        assertEquals(firstTransaction.getFingerprint(), secondTransaction.getFingerprint());
     }
 }
