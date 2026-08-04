@@ -8,6 +8,7 @@ import com.ntropy.bff.dto.subscription.response.*;
 import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.dto.payment.PlanSummary;
+import com.ntropy.common.dto.payment.PaymentConfigSummary;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.Duration;
 import java.util.stream.Collectors;
+import org.springframework.http.CacheControl;
 
 @RestController
 @RequestMapping("/api/subscriptions")
@@ -39,6 +42,14 @@ public class SubscriptionController {
     public ApiResponse<PlansResponse> getPlans() {
         PlansResponse response = new PlansResponse(subscriptionQueryClient.getPlans());
         return ApiResponse.success(response);
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<ApiResponse<PaymentConfigSummary>> getPaymentConfig() {
+        PaymentConfigSummary config = subscriptionQueryClient.getPaymentConfig();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(10)).cachePublic())
+                .body(ApiResponse.success(config));
     }
 
     @GetMapping
