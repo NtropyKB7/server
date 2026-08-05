@@ -35,7 +35,7 @@ public class JobService {
     public Job registerJob(Job job, List<JobSchedule> schedules) {
         validate(job);
         validateScheduleConsistency(job, schedules);
-        validateScheduleOverlap(job.getUserId(), schedules);
+        validateScheduleOverlap(job.getUserId(), schedules, null);
         categoryService.findById(job.getCategoryId());
 
         LocalDateTime now = LocalDateTime.now();
@@ -72,20 +72,32 @@ public class JobService {
         return jobScheduleMapper.findByJobId(jobId);
     }
 
+    /**
+     * 잡 수정. 스케줄은 부분 수정이 아니라 전체 교체다 — 넘어온 리스트로
+     * 기존 스케줄을 다 지우고 새로 넣는다(PUT이 나머지 필드를 통째로 덮어쓰는 것과 동일한 규칙).
+     *
+     * @param schedules 정기잡 아니면 null 또는 빈 리스트
+     */
     @Transactional
-    public Job updateJob(Job job) {
+    public Job updateJob(Job job, List<JobSchedule> schedules) {
         Job existing = findById(job.getJobId());
         validate(job);
+        validateScheduleConsistency(job, schedules);
+        validateScheduleOverlap(job.getUserId(), schedules, job.getJobId());
         categoryService.findById(job.getCategoryId());
 
         job.setIsActive(existing.getIsActive());
         job.setCreatedAt(existing.getCreatedAt());
         job.setUpdatedAt(LocalDateTime.now());
-        // 시급/정산방식이 바뀌면 월 예상 소득도 다시 계산한다. 스케줄은 잡 수정 요청에 없으므로
-        // 이미 등록된 것을 그대로 조회해 쓴다.
-        job.setMonthlyExpectedIncome(
-                calculateMonthlyExpectedIncome(job, jobScheduleMapper.findByJobId(job.getJobId())));
+        job.setMonthlyExpectedIncome(calculateMonthlyExpectedIncome(job, safe(schedules)));
         jobMapper.update(job);
+
+        jobScheduleMapper.deleteByJobId(job.getJobId());
+        for (JobSchedule schedule : safe(schedules)) {
+            schedule.setJobId(job.getJobId());
+            jobScheduleMapper.insert(schedule);
+        }
+
         return job;
     }
 
@@ -184,8 +196,10 @@ public class JobService {
      * 신규 스케줄끼리, 그리고 같은 유저의 다른 잡에 이미 등록된 스케줄과 같은 요일에
      * 시간대가 겹치지 않는지 검사한다. 한 사람이 동시에 두 근무를 뛸 수 없기 때문에
      * 잡 단위가 아니라 유저 단위로 검사한다.
+     *
+     * @param excludeJobId 수정 시 자기 자신의 기존 스케줄을 비교 대상에서 빼기 위함(신규 등록이면 null)
      */
-    private void validateScheduleOverlap(Long userId, List<JobSchedule> schedules) {
+    private void validateScheduleOverlap(Long userId, List<JobSchedule> schedules, Long excludeJobId) {
         List<JobSchedule> newSchedules = safe(schedules);
         if (newSchedules.isEmpty()) {
             return;
@@ -193,6 +207,9 @@ public class JobService {
 
         List<JobSchedule> allSchedules = new ArrayList<>(newSchedules);
         for (Job existingJob : jobMapper.findByUserId(userId)) {
+            if (existingJob.getJobId().equals(excludeJobId)) {
+                continue;
+            }
             allSchedules.addAll(jobScheduleMapper.findByJobId(existingJob.getJobId()));
         }
 
