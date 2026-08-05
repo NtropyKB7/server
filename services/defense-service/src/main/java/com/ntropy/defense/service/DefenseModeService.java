@@ -8,6 +8,7 @@ import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseSummary;
+import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
 import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
@@ -192,13 +193,17 @@ public class DefenseModeService {
     }
 
     private void applyDiagnosisSnapshot(DefenseMode defenseMode, DiagnosisDefenseSnapshot snapshot) {
-        Long liquidAssets = snapshot == null ? null : snapshot.getLiquidAssets();
+        Long reserveAmount = snapshot == null ? null : snapshot.getReserveAmount();
+        Long safeAssetAmount = snapshot == null ? null : snapshot.getSafeAssetAmount();
+        Long availableAssets = sumNullable(reserveAmount, safeAssetAmount);
         Long averageMonthlyExpense = snapshot == null ? null : snapshot.getAverageMonthlyExpense();
 
-        defenseMode.setAvailableAssetsSnapshot(liquidAssets);
+        defenseMode.setReserveAmountSnapshot(reserveAmount);
+        defenseMode.setSafeAssetAmountSnapshot(safeAssetAmount);
+        defenseMode.setAvailableAssetsSnapshot(availableAssets);
         defenseMode.setAverageMonthlyExpense(averageMonthlyExpense);
 
-        if (liquidAssets == null) {
+        if (availableAssets == null) {
             defenseMode.setCalculationStatus(DefenseCalculationStatus.DIAGNOSIS_REQUIRED);
             return;
         }
@@ -208,10 +213,17 @@ public class DefenseModeService {
         }
 
         long dailyExpense = (long) Math.ceil(averageMonthlyExpense / 30.0);
-        long calculatedDays = liquidAssets / dailyExpense;
+        long calculatedDays = availableAssets / dailyExpense;
         defenseMode.setDailyExpense(dailyExpense);
         defenseMode.setDDay(calculatedDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculatedDays);
         defenseMode.setCalculationStatus(DefenseCalculationStatus.CALCULATED);
+    }
+
+    private Long sumNullable(Long first, Long second) {
+        if (first == null && second == null) {
+            return null;
+        }
+        return (first == null ? 0L : first) + (second == null ? 0L : second);
     }
 
     private FixedExpenseSummary toFixedExpense(
@@ -233,6 +245,7 @@ public class DefenseModeService {
             dDayReduction = Math.max(defenseMode.getDDay() - dDayAfter, 0);
         }
 
+        FixedExpenseMaintainStatus maintainStatus = maintainStatus(commitment.getExpenseType());
         return new FixedExpenseSummary(
                 commitment.getCommitmentId(),
                 commitment.getAccountId(),
@@ -247,7 +260,20 @@ public class DefenseModeService {
                 defenseMode.getDDay(),
                 dDayAfter,
                 dDayReduction,
-                "UNDETERMINED");
+                maintainStatus);
+    }
+
+    private FixedExpenseMaintainStatus maintainStatus(String expenseType) {
+        if ("LOAN_REPAYMENT".equals(expenseType)) {
+            return FixedExpenseMaintainStatus.NORMAL;
+        }
+        if ("INSURANCE_PREMIUM".equals(expenseType)) {
+            return FixedExpenseMaintainStatus.DIFFICULT;
+        }
+        if ("SAVING_PAYMENT".equals(expenseType)) {
+            return FixedExpenseMaintainStatus.REVIEW_SUSPENSION;
+        }
+        return FixedExpenseMaintainStatus.UNDETERMINED;
     }
 
     private String expenseName(String expenseType) {

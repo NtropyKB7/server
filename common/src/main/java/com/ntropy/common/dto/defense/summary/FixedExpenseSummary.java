@@ -23,5 +23,5 @@ public class FixedExpenseSummary {
     private Integer dDayBefore;
     private Integer dDayAfter;
     private Integer dDayReduction;
-    private String maintainStatus;
+    private FixedExpenseMaintainStatus maintainStatus;
 }

@@ -17,7 +17,7 @@ public class ExpectedIncomeLossResponse {
     private LocalDate periodStartDate;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate periodEndDate;
-    private String calculationStatus;
+    private ExpectedIncomeLossCalculationStatus calculationStatus;
     private List<JobExpectedIncomeLossResponse> jobs;
 
     public static ExpectedIncomeLossResponse from(ExpectedIncomeLossSummary summary) {
@@ -26,9 +26,13 @@ public class ExpectedIncomeLossResponse {
         }
         return new ExpectedIncomeLossResponse(
                 summary.getTotalAmount(), summary.getPeriodStartDate(), summary.getPeriodEndDate(),
-                summary.getCalculationStatus(),
+                toCalculationStatus(summary.getCalculationStatus()),
                 summary.getJobs().stream()
                         .map(JobExpectedIncomeLossResponse::from)
                         .collect(Collectors.toList()));
+    }
+
+    private static ExpectedIncomeLossCalculationStatus toCalculationStatus(String status) {
+        return status == null ? null : ExpectedIncomeLossCalculationStatus.valueOf(status);
     }
 }

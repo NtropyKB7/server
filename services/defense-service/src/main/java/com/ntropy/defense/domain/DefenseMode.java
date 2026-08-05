@@ -17,6 +17,8 @@ public class DefenseMode {
     private LocalDate unavailableStartDate;
     private LocalDate expectedReturnDate;
     private LocalDate returnDate;
+    private Long reserveAmountSnapshot;
+    private Long safeAssetAmountSnapshot;
     private Long availableAssetsSnapshot;
     private Long averageMonthlyExpense;
     private Long dailyExpense;

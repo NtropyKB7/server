@@ -69,8 +69,10 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
                 .collect(Collectors.toList());
         return new DefenseModeSummary(
                 defenseMode.getDefenseId(), defenseMode.getUserId(), defenseMode.getCauseCode().name(),
+                defenseMode.getCauseCode().getCauseName(),
                 defenseMode.getUnavailableStartDate(), defenseMode.getExpectedReturnDate(),
-                defenseMode.getReturnDate(), defenseMode.getAvailableAssetsSnapshot(),
+                defenseMode.getReturnDate(), defenseMode.getReserveAmountSnapshot(),
+                defenseMode.getSafeAssetAmountSnapshot(), defenseMode.getAvailableAssetsSnapshot(),
                 defenseMode.getAverageMonthlyExpense(), defenseMode.getDailyExpense(), defenseMode.getDDay(),
                 defenseMode.getCalculationStatus() == null ? null : defenseMode.getCalculationStatus().name(),
                 defenseMode.getStatus().name(),
