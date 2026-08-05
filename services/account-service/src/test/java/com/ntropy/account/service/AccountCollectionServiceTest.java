@@ -66,7 +66,8 @@ class AccountCollectionServiceTest {
                     "resAccountTrDate": "20260110",
                     "resAccountOut": "0",
                     "resAccountIn": "10000",
-                    "resAfterTranBalance": "10000"
+                    "resAfterTranBalance": "10000",
+                    "resAccountDesc3": "쿠팡 이츠"
                   }
                 ]
               }
@@ -475,8 +476,10 @@ class AccountCollectionServiceTest {
         }
 
         @Override
-        public Account findByIdAndProvider(Long id, String provider) {
-            return store.values().stream().filter(a -> id.equals(a.getId())).findFirst().orElse(null);
+        public Account findByIdAndUserIdAndProvider(Long id, Long userId, String provider) {
+            return store.values().stream()
+                    .filter(a -> id.equals(a.getId()) && userId.equals(a.getUserId()))
+                    .findFirst().orElse(null);
         }
 
         @Override
@@ -505,5 +508,6 @@ class AccountCollectionServiceTest {
                             && !transaction.getTranDate().isAfter(endDate))
                     .toList();
         }
+
     }
 }

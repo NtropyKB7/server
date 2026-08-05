@@ -1,29 +1,26 @@
 package com.ntropy.bff.controller.subscription;
 
 import com.ntropy.bff.dto.common.ApiResponse;
-import com.ntropy.bff.dto.common.ErrorCode;
 import com.ntropy.bff.dto.subscription.request.PaymentMethodUpdateRequest;
 import com.ntropy.bff.dto.subscription.request.SubscriptionInitRequest;
 import com.ntropy.bff.dto.subscription.response.*;
 import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.dto.payment.PlanSummary;
+import com.ntropy.common.dto.payment.PaymentConfigSummary;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.Duration;
 import java.util.stream.Collectors;
+import org.springframework.http.CacheControl;
 
 @RestController
 @RequestMapping("/api/subscriptions")
 public class SubscriptionController {
-
-    // 임시 Auth 코드
-    private static final String AUTH_NOT_WIRED_HINT =
-            "(AUTH 미연동 상태 - 임시로 ?userId= 파라미터를 넘겨서 테스트하세요)";
 
     private final SubscriptionQueryClient subscriptionQueryClient;
     private final SubscriptionCommandClient subscriptionCommandClient;
@@ -41,17 +38,19 @@ public class SubscriptionController {
         return ApiResponse.success(response);
     }
 
+    @GetMapping("/config")
+    public ResponseEntity<ApiResponse<PaymentConfigSummary>> getPaymentConfig() {
+        PaymentConfigSummary config = subscriptionQueryClient.getPaymentConfig();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(10)).cachePublic())
+                .body(ApiResponse.success(config));
+    }
+
     @GetMapping
     public ApiResponse<SubscriptionResponse> getMySubscription(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId // TODO: AUTH 연동되면 제거
+            @RequestParam Long userId // TODO: AUTH 연동 후 인증 사용자 ID 사용
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
-        SubscriptionResponse response = SubscriptionResponse.from(subscriptionQueryClient.getMySubscription(resolvedUserId));
+        SubscriptionResponse response = SubscriptionResponse.from(subscriptionQueryClient.getMySubscription(userId));
         return ApiResponse.success(response);
     }
 
@@ -60,39 +59,22 @@ public class SubscriptionController {
 
     @PostMapping
     public ApiResponse<SubscriptionResponse> initSubscription(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId,
+            @RequestParam Long userId,
             @RequestBody SubscriptionInitRequest request
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
         SubscriptionResponse response = SubscriptionResponse.from(
-                subscriptionCommandClient.initSubscription(resolvedUserId, request.getBillingKey())
+                subscriptionCommandClient.initSubscription(userId, request.getBillingKey())
         );
         return ApiResponse.success(response);
     }
 
-
-    private Long resolveUserId(Authentication authentication, Long userId) {
-        return authentication != null ? Long.valueOf(authentication.getName()) : userId;
-    }
-
     @PostMapping("/payment-method")
     public ApiResponse<SubscriptionResponse> updatePaymentMethod(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId,
+            @RequestParam Long userId,
             @RequestBody PaymentMethodUpdateRequest request
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
         SubscriptionResponse response = SubscriptionResponse.from(
-                subscriptionCommandClient.updatePaymentMethod(resolvedUserId, request.getBillingKey())
+                subscriptionCommandClient.updatePaymentMethod(userId, request.getBillingKey())
         );
         return ApiResponse.success(response);
     }
@@ -110,44 +92,26 @@ public class SubscriptionController {
 
     @PostMapping("/cancel")
     public ApiResponse<SubscriptionResponse> cancelSubscription(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId
+            @RequestParam Long userId
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
-        SubscriptionResponse response = SubscriptionResponse.from(subscriptionCommandClient.cancelSubscription(resolvedUserId));
+        SubscriptionResponse response = SubscriptionResponse.from(subscriptionCommandClient.cancelSubscription(userId));
         return ApiResponse.success(response);
     }
 
     @DeleteMapping("/cancel")
     public ApiResponse<SubscriptionResponse> revokeCancel(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId
+            @RequestParam Long userId
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
-        SubscriptionResponse response = SubscriptionResponse.from(subscriptionCommandClient.revokeCancel(resolvedUserId));
+        SubscriptionResponse response = SubscriptionResponse.from(subscriptionCommandClient.revokeCancel(userId));
         return ApiResponse.success(response);
     }
 
     @GetMapping("/payments")
     public ApiResponse<PaymentHistoryResponse> getPaymentHistory(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId
+            @RequestParam Long userId
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
         PaymentHistoryResponse response = new PaymentHistoryResponse(
-                subscriptionQueryClient.getPaymentHistory(resolvedUserId).stream()
+                subscriptionQueryClient.getPaymentHistory(userId).stream()
                         .map(PaymentHistoryItemResponse::from)
                         .collect(Collectors.toList())
         );
@@ -156,15 +120,9 @@ public class SubscriptionController {
 
     @GetMapping("/management")
     public ApiResponse<SubscriptionManagementResponse> getSubscriptionManagement(
-            Authentication authentication,
-            @RequestParam(required = false) Long userId // TODO: AUTH 연동되면 제거
+            @RequestParam Long userId // TODO: AUTH 연동 후 인증 사용자 ID 사용
     ) {
-        Long resolvedUserId = resolveUserId(authentication, userId);
-        if (resolvedUserId == null) {
-            return ApiResponse.fail(ErrorCode.UNAUTHORIZED, AUTH_NOT_WIRED_HINT);
-        }
-
-        SubscriptionResponse currentSubscription = SubscriptionResponse.from(subscriptionQueryClient.getMySubscription(resolvedUserId));
+        SubscriptionResponse currentSubscription = SubscriptionResponse.from(subscriptionQueryClient.getMySubscription(userId));
         List<PlanSummary> availablePlans = subscriptionQueryClient.getPlans();
 
         return ApiResponse.success(new SubscriptionManagementResponse(currentSubscription, availablePlans));

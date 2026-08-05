@@ -26,6 +26,10 @@ class VirtualFinancialTransactionGeneratorTest {
             "삼성생명 실손보험", "현대해상 건강보험", "DB손해보험 운전자보험",
             "KB손해보험 암보험", "교보생명 종신보험", "한화생명 연금보험"
     );
+    private static final Set<String> INCOME_COUNTERPARTY_NAMES = Set.of(
+            "우아한형제들", "쿠팡이츠", "위대한상상", "카카오모빌리티", "구글코리아",
+            "로지올", "쿠팡풀필먼트서비스", "미소", "알바몬", "도그메이트", "엠브레인패널파워"
+    );
 
     private final VirtualFinancialTransactionGenerator generator = new VirtualFinancialTransactionGenerator();
 
@@ -52,21 +56,24 @@ class VirtualFinancialTransactionGeneratorTest {
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.INSTALLMENT));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getInAmount().signum() > 0));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getOutAmount().signum() > 0));
-        assertEquals(30, generated.transactions().stream().filter(transaction -> transaction.getJobId() != null).count());
-        assertEquals(2, generated.transactions().stream()
-                .map(AccountTransaction::getJobId).filter(java.util.Objects::nonNull).distinct().count());
+        List<AccountTransaction> incomeTransactions = generated.transactions().stream()
+                .filter(transaction -> INCOME_COUNTERPARTY_NAMES.contains(transaction.getDesc3()))
+                .toList();
+        assertEquals(30, incomeTransactions.size());
+        assertEquals(Set.of("우아한형제들", "카카오모빌리티"), incomeTransactions.stream()
+                .map(AccountTransaction::getDesc3).collect(Collectors.toSet()));
     }
 
     @Test
-    void assignsThreeJobsToEverySecondUserAndGeneratesLoanRepayments() {
+    void assignsThreeIncomeCounterpartiesToEverySecondUserAndGeneratesLoanRepayments() {
         Account ordinary = account(20L, AccountGroup.DEPOSIT_TRUST);
         Account loan = account(21L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(26, PersonalBank.NH_BANK, ordinary, loan);
 
-        assertEquals(3, generated.userJobCount());
+        assertEquals(3, generated.userIncomeCounterpartyCount());
         assertEquals(3, generated.transactions().stream()
-                .map(AccountTransaction::getJobId).filter(java.util.Objects::nonNull).distinct().count());
+                .map(AccountTransaction::getDesc3).filter(INCOME_COUNTERPARTY_NAMES::contains).distinct().count());
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.LOAN));
         assertTrue(generated.transactions().stream()
                 .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.LOAN)
@@ -107,7 +114,7 @@ class VirtualFinancialTransactionGeneratorTest {
         );
         assertTrue(ibk.transactions().stream().allMatch(transaction -> transaction.getDesc4() == null));
         assertTrue(ibk.transactions().stream()
-                .filter(transaction -> transaction.getJobId() != null)
+                .filter(transaction -> INCOME_COUNTERPARTY_NAMES.contains(transaction.getDesc3()))
                 .allMatch(transaction -> transaction.getDesc1() != null));
         assertNull(ibk.transactions().get(0).getDesc4());
     }

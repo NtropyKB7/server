@@ -3,7 +3,7 @@
 <mapper namespace="com.ntropy.account.mapper.CodefConnectionMapper">
 
     <insert id="insert" parameterType="com.ntropy.account.domain.entity.CodefConnection"
-            useGeneratedKeys="true" keyProperty="id">
+            useGeneratedKeys="true" keyProperty="id" keyColumn="codef_connection_id">
         INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
         VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
     </insert>
@@ -11,7 +11,7 @@
     <insert id="insertIfAbsent" parameterType="com.ntropy.account.domain.entity.CodefConnection">
         INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
         VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
-        ON DUPLICATE KEY UPDATE id = id
+        ON DUPLICATE KEY UPDATE codef_connection_id = codef_connection_id
     </insert>
 
     <insert id="upsert" parameterType="com.ntropy.account.domain.entity.CodefConnection">
@@ -23,7 +23,7 @@
     </insert>
 
     <select id="findByUserIdAndProvider" resultType="com.ntropy.account.domain.entity.CodefConnection">
-        SELECT id,
+        SELECT codef_connection_id         AS id,
                user_id                     AS userId,
                provider,
                connected_id                AS connectedId,

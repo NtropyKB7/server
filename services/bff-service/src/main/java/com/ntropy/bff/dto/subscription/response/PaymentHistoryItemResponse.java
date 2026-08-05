@@ -21,7 +21,7 @@ public class PaymentHistoryItemResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
 
-    private String paymentStatus;
+    private PaymentStatus paymentStatus;
     private String failureReason;
     private String receiptUrl;
 
@@ -32,7 +32,8 @@ public class PaymentHistoryItemResponse {
         response.amount = summary.getAmount();
         response.paymentMethod = summary.getPaymentMethod();
         response.createdAt = summary.getCreatedAt();
-        response.paymentStatus = summary.getPaymentStatus();
+        response.paymentStatus = summary.getPaymentStatus() == null
+                ? null : PaymentStatus.valueOf(summary.getPaymentStatus());
         response.failureReason = summary.getFailureReason();
         response.receiptUrl = summary.getReceiptUrl();
         return response;

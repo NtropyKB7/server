@@ -95,6 +95,7 @@ class VirtualAccountServiceTest {
 
         assertEquals("NTROPY", accountMapper.lastListProvider);
         assertEquals("NTROPY", accountMapper.lastDetailProvider);
+        assertEquals(1L, accountMapper.lastDetailUserId);
     }
 
     @Test
@@ -106,7 +107,7 @@ class VirtualAccountServiceTest {
                 ServiceException.class,
                 () -> service.getAccountDetail(2L, created.getId())
         );
-        assertEquals(AccountErrorCode.FORBIDDEN.getStatusCode(), exception.getStatusCode());
+        assertEquals(AccountErrorCode.ACCOUNT_NOT_FOUND.getStatusCode(), exception.getStatusCode());
     }
 
     @Test
@@ -171,6 +172,7 @@ class VirtualAccountServiceTest {
         private long nextId = 1;
         private String lastListProvider;
         private String lastDetailProvider;
+        private Long lastDetailUserId;
 
         @Override
         public void upsert(Account account) {
@@ -198,9 +200,11 @@ class VirtualAccountServiceTest {
         }
 
         @Override
-        public Account findByIdAndProvider(Long id, String provider) {
+        public Account findByIdAndUserIdAndProvider(Long id, Long userId, String provider) {
             lastDetailProvider = provider;
-            return store.get(id);
+            lastDetailUserId = userId;
+            Account account = store.get(id);
+            return account != null && userId.equals(account.getUserId()) ? account : null;
         }
 
         @Override

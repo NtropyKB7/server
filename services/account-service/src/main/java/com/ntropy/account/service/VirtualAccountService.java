@@ -64,12 +64,11 @@ public class VirtualAccountService {
 
     public Account getAccountDetail(Long userId, Long accountId) {
         requireUserId(userId);
-        Account account = accountMapper.findByIdAndProvider(accountId, ConnectionProvider.NTROPY.name());
+        Account account = accountMapper.findByIdAndUserIdAndProvider(
+                accountId, userId, ConnectionProvider.NTROPY.name()
+        );
         if (account == null) {
             throw new ServiceException(AccountErrorCode.ACCOUNT_NOT_FOUND);
-        }
-        if (!account.getUserId().equals(userId)) {
-            throw new ServiceException(AccountErrorCode.FORBIDDEN);
         }
         return account;
     }

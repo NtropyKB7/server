@@ -1,13 +1,16 @@
 package com.ntropy.auth.controller;
 
-import com.ntropy.auth.dto.OAuthLoginRequest;
+import com.ntropy.auth.dto.OAuthLoginResponse;
 import com.ntropy.user.model.User;
 import com.ntropy.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+// 소셜 로그인 및 인증 관련 API를 처리
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -16,20 +19,23 @@ public class AuthController {
 
     private final UserService userService;
 
-    /*
-     OAuth 소셜 로그인 및 회원가입
-     */
-    @PostMapping("/oauth/{provider}")
-    public ResponseEntity<User> oauthLogin(
+    // OAuth 2.0 소셜 로그인 처리
+    @GetMapping("/oauth/{provider}")
+    public ResponseEntity<OAuthLoginResponse> oauthLogin(
             @PathVariable String provider,
-            @RequestBody OAuthLoginRequest requestDto) {
+            @RequestParam("code") String code) {
 
-        log.info("==========> 소셜 로그인 요청 도착! Provider: {}, Code: {}",
-                provider, requestDto.getCode());
+        log.info("소셜 로그인 요청 수신: provider={}, code={}", provider, code);
 
-        // Service를 호출해서 [카카오 통신 -> DB 신규가입/로그인 분기 처리] 진행
-        User loginUser = userService.processOAuthLoginWithCode(provider, requestDto.getCode());
+        OAuthLoginResponse responseDto = userService.processOAuthLoginWithCode(provider, code);
 
-        return ResponseEntity.ok(loginUser);
+        return ResponseEntity.ok(responseDto);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<User> getMyInfo(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.valueOf(userDetails.getUsername());
+        User user = userService.getUserById(userId);
+        return ResponseEntity.ok(user);
     }
 }
