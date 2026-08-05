@@ -4,26 +4,34 @@ import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.domain.Feature;
 import com.ntropy.common.dto.payment.PaymentSummary;
+import com.ntropy.common.dto.payment.PaymentConfigSummary;
 import com.ntropy.common.dto.payment.PlanSummary;
 import com.ntropy.common.dto.payment.SubscriptionSummary;
 import com.ntropy.payment.domain.Payment;
 import com.ntropy.payment.domain.PlanCode;
 import com.ntropy.payment.domain.Subscription;
+import com.ntropy.payment.domain.PaymentMethod;
+import com.ntropy.payment.config.PortOneProperties;
 import com.ntropy.payment.service.SubscriptionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
 public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, SubscriptionCommandClient {
 
     private final SubscriptionService subscriptionService;
+    private final PortOneProperties portOneProperties;
 
     @Autowired
-    public LocalSubscriptionQueryClient(SubscriptionService subscriptionService) {
+    public LocalSubscriptionQueryClient(SubscriptionService subscriptionService,
+                                        PortOneProperties portOneProperties) {
         this.subscriptionService = subscriptionService;
+        this.portOneProperties = portOneProperties;
     }
 
     @Override
@@ -31,6 +39,15 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, Su
         return subscriptionService.getAllPlans().stream()
                 .map(this::toPlanSummary)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public PaymentConfigSummary getPaymentConfig() {
+        Map<String, String> channels = new LinkedHashMap<>();
+        channels.put(PaymentMethod.CARD.name(), portOneProperties.getChannelKey(PaymentMethod.CARD));
+        channels.put(PaymentMethod.KAKAOPAY.name(), portOneProperties.getChannelKey(PaymentMethod.KAKAOPAY));
+        channels.put(PaymentMethod.TOSSPAY.name(), portOneProperties.getChannelKey(PaymentMethod.TOSSPAY));
+        return new PaymentConfigSummary(portOneProperties.getStoreId(), channels);
     }
 
     @Override

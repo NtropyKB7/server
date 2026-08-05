@@ -115,17 +115,30 @@ public class SubscriptionService {
         if (subscription == null) {
             throw new ServiceException(PaymentErrorCode.SUBSCRIPTION_NOT_FOUND);
         }
+        if (subscription.getStatus() != SubscriptionStatus.ACTIVE
+                || !subscription.isUsable()
+                || !Boolean.TRUE.equals(subscription.getAutoRenewYn())) {
+            throw new ServiceException(PaymentErrorCode.SUBSCRIPTION_NOT_ACTIVE);
+        }
 
         PortOneBillingKeyVerification verification = portOneBillingKeyClient.verifyBillingKey(billingKey);
         if (!verification.isValid()) {
             throw new ServiceException(PaymentErrorCode.INVALID_BILLING_KEY);
         }
 
+        if (!portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid())) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_SCHEDULE_CANCEL_FAILED);
+        }
+
+        paymentMapper.cancelPendingBySubscriptionId(subscription.getSubscriptionId());
+
         subscription.setCustomerUid(billingKey);
         subscription.setPaymentMethod(verification.getPaymentMethod());
         subscription.setPaymentLabel(verification.getPaymentLabel());
         subscription.setPaymentMasked(verification.getPaymentMasked());
         subscriptionMapper.update(subscription);
+
+        scheduleUpcomingPayment(subscription, subscription.getEndDate());
 
         return subscription;
     }
@@ -236,9 +249,12 @@ public class SubscriptionService {
         pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
         paymentMapper.insert(pendingPayment);
 
-        portOnePaymentClient.schedulePayment(
+        boolean scheduled = portOnePaymentClient.schedulePayment(
                 paymentId, subscription.getCustomerUid(), PlanCode.PRO.getMonthlyPrice(),
                 "Ntropy Pro 정기결제", timeToPay);
+        if (!scheduled) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_SCHEDULE_FAILED);
+        }
     }
 
     private Subscription defaultBasicSubscription() {
@@ -298,7 +314,11 @@ public class SubscriptionService {
             throw new ServiceException(PaymentErrorCode.ALREADY_CANCELLED);
         }
 
-        portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid());
+        if (!portOnePaymentClient.cancelScheduledPayments(subscription.getCustomerUid())) {
+            throw new ServiceException(PaymentErrorCode.PAYMENT_SCHEDULE_CANCEL_FAILED);
+        }
+
+        paymentMapper.cancelPendingBySubscriptionId(subscription.getSubscriptionId());
 
         subscription.setStatus(SubscriptionStatus.CANCEL_SCHEDULED);
         subscription.setCancelRequestedAt(LocalDateTime.now());
@@ -318,6 +338,10 @@ public class SubscriptionService {
         Subscription subscription = subscriptionMapper.findLatestByUserId(userId);
         if (subscription == null || subscription.getStatus() != SubscriptionStatus.CANCEL_SCHEDULED) {
             throw new ServiceException(PaymentErrorCode.NOT_CANCEL_SCHEDULED);
+        }
+        if (subscription.getEndDate() == null
+                || !subscription.getEndDate().isAfter(LocalDateTime.now())) {
+            throw new ServiceException(PaymentErrorCode.CANCEL_REVOCATION_EXPIRED);
         }
 
         subscription.setStatus(SubscriptionStatus.ACTIVE);

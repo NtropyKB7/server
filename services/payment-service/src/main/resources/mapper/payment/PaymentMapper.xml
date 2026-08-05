@@ -61,4 +61,12 @@
         WHERE payment_id = #{paymentId}
     </update>
 
+    <update id="cancelPendingBySubscriptionId">
+        UPDATE PAYMENT
+        SET payment_status = 'CANCELLED',
+            failure_reason = '결제수단 변경으로 인한 예약 취소'
+        WHERE subscription_id = #{subscriptionId}
+          AND payment_status = 'PENDING'
+    </update>
+
 </mapper>
