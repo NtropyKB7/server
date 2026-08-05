@@ -21,7 +21,7 @@
         <result property="termsAgreed" column="terms_agreed"/>
     </resultMap>
 
-    <!-- 1. 소셜 제공자(provider)와 고유 ID(providerId)로 유저 조회 -->
+    <!-- 유저 조회 -->
     <select id="findByProviderAndProviderId" resultMap="userResultMap">
         SELECT *
         FROM users
@@ -29,7 +29,7 @@
           AND provider_id = #{providerId}
     </select>
 
-    <!-- 2. 신규 소셜 회원 DB에 저장 -->
+    <!-- 신규 소셜 회원 DB에 저장 -->
     <insert id="insertUser" parameterType="com.ntropy.user.model.User" useGeneratedKeys="true" keyProperty="userId">
         INSERT INTO users (
             email, name, provider_id, refresh_token_hash,
@@ -44,14 +44,14 @@
                  )
     </insert>
 
-    <!-- 3. 고유 번호(userId)로 유저 조회 (id 수정: findByUserId -> findById) -->
+    <!-- 고유 번호(userId)로 유저 조회  -->
     <select id="findById" resultMap="userResultMap">
         SELECT *
         FROM users
         WHERE user_id = #{userId}
     </select>
 
-    <!-- 4. 로그인 유지 정보 및 마지막 접속 시간 갱신 -->
+    <!-- 로그인 유지 정보 및 마지막 접속 시간 갱신 -->
     <update id="updateLoginInfo" parameterType="com.ntropy.user.model.User">
         UPDATE users
         SET last_login_at = NOW(),
@@ -60,7 +60,7 @@
         WHERE user_id = #{userId}
     </update>
 
-    <!-- 5. 회원 정보 수정 -->
+    <!-- 회원 정보 수정 -->
     <update id="updateUser" parameterType="com.ntropy.user.model.User">
         UPDATE users
         SET name = #{name},
@@ -69,9 +69,23 @@
         WHERE user_id = #{userId}
     </update>
 
-    <!-- 6. 회원 탈퇴 -->
+    <!-- 회원 탈퇴 -->
     <delete id="deleteUser" parameterType="java.lang.Long">
         DELETE FROM users WHERE user_id = #{userId}
     </delete>
+
+    <!-- 로그아웃 시 Refresh Token 정보 폐기 -->
+    <update id="invalidateRefreshToken" parameterType="java.lang.Long">
+        UPDATE users
+        SET refresh_token_hash = NULL,
+            refresh_token_expire_at = NULL
+        WHERE user_id = #{userId}
+    </update>
+
+    <select id="findByRefreshToken" parameterType="string" resultMap="userResultMap">
+        SELECT *
+        FROM users
+        WHERE refresh_token_hash = #{refreshToken}
+    </select>
 
 </mapper>

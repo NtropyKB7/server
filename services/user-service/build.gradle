@@ -1,13 +1,82 @@
-dependencies {
-    implementation project(':common')
-    implementation "org.springframework:spring-webmvc:${springVersion}"
-    implementation 'org.mybatis:mybatis:3.5.13'
-    implementation 'org.mybatis:mybatis-spring:2.1.2'
-    implementation "org.springframework:spring-tx:${springVersion}"
-    implementation 'org.slf4j:slf4j-api:2.0.12'
-    runtimeOnly 'com.mysql:mysql-connector-j'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+plugins {
+    id 'java'
+    id 'war' // WAR 파일 생성을 위한 플러그인
+}
 
+group = 'com.ntropy'
+version = '1.0.0'
+sourceCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+// 사용할 라이브러리 버전 관리
+ext {
+    springVersion = '5.3.34' // Spring Framework 5.x 버전
+    springSecurityVersion = '5.8.12' // Spring Security 5.x 버전
+    lombokVersion = '1.18.30'
+    mybatisVersion = '3.5.16'
+    mybatisSpringVersion = '2.1.2'
+    jacksonVersion = '2.15.4'
+    jjwtVersion = '0.11.5'
+    springfoxVersion = '2.9.2' // Swagger(Springfox) 버전
+}
+
+dependencies {
+    // 1. Spring Framework (Legacy)
+    implementation "org.springframework:spring-webmvc:${springVersion}"
+    implementation "org.springframework:spring-context:${springVersion}"
+    implementation "org.springframework:spring-tx:${springVersion}" // 트랜잭션 관리
+    implementation "org.springframework:spring-jdbc:${springVersion}" // JDBC 지원
+
+    // 2. Spring Security
+    implementation "org.springframework.security:spring-security-web:${springSecurityVersion}"
+    implementation "org.springframework.security:spring-security-config:${springSecurityVersion}"
+
+    // 3. Servlet API
+    providedCompile 'javax.servlet:javax.servlet-api:4.0.1'
+
+    // 4. 데이터베이스 (MyBatis, MySQL)
+    implementation "org.mybatis:mybatis:${mybatisVersion}"
+    implementation "org.mybatis:mybatis-spring:${mybatisSpringVersion}"
+    runtimeOnly 'mysql:mysql-connector-java:8.0.33'
+    implementation 'com.zaxxer:HikariCP:5.1.0' // DB Connection Pool
+
+    // 5. JSON / JWT
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+    implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
+
+    // 6. Swagger
+    implementation "io.springfox:springfox-swagger2:${springfoxVersion}"
+    implementation "io.springfox:springfox-swagger-ui:${springfoxVersion}"
+
+    // 7. Lombok
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    // 8. 프로젝트 내부 모듈 의존성
+    implementation project(':common')
+    testImplementation project(':api') // <<< 추가
+
+    // 9. 테스트 (JUnit5, Mockito)
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+    testImplementation 'org.mockito:mockito-core:4.5.1'
+    testImplementation 'org.mockito:mockito-junit-jupiter:4.5.1'
+    testImplementation "org.springframework:spring-test:${springVersion}"
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    testImplementation 'org.assertj:assertj-core:3.22.0'
+}
+
+// Java 컴파일러 인코딩 설정
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// 테스트에 JUnit5 사용 설정
+test {
+    useJUnitPlatform()
 }
