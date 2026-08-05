@@ -17,6 +17,7 @@ public class DefenseModeResponse {
     private Long defenseId;
     private Long userId;
     private String causeCode;
+    private String causeName;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate unavailableStartDate;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
@@ -39,7 +40,7 @@ public class DefenseModeResponse {
 
     public static DefenseModeResponse from(DefenseModeSummary summary) {
         return new DefenseModeResponse(
-                summary.getDefenseId(), summary.getUserId(), summary.getCauseCode(),
+                summary.getDefenseId(), summary.getUserId(), summary.getCauseCode(), summary.getCauseName(),
                 summary.getUnavailableStartDate(), summary.getExpectedReturnDate(), summary.getReturnDate(),
                 summary.getAvailableAssetsSnapshot(), summary.getAverageMonthlyExpense(),
                 summary.getDailyExpense(), summary.getDDay(), summary.getCalculationStatus(),

@@ -15,6 +15,7 @@ public class DefenseModeSummary {
     private Long defenseId;
     private Long userId;
     private String causeCode;
+    private String causeName;
     private LocalDate unavailableStartDate;
     private LocalDate expectedReturnDate;
     private LocalDate returnDate;
