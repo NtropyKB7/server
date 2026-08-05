@@ -19,6 +19,9 @@ CLAUDE.local.md
 DEVLOG.md
 .ai/
 
+### mock 데이터 ###
+services/work-service/src/main/resources/db/work-service-mock-data.sql
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml
