@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import com.ntropy.account.domain.AccountTransactionCategory;
 import com.ntropy.account.domain.PersonalBank;
+import com.ntropy.account.domain.PlatformMatchStatus;
 import com.ntropy.account.domain.TransactionFingerprint;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
@@ -304,12 +305,14 @@ public class VirtualFinancialTransactionGenerator {
             Descriptions descriptions = descriptions(bank, plan);
             AccountTransaction transaction = new AccountTransaction();
             transaction.setAccountId(accountId);
-            transaction.setPlatformId(plan.platformId());
             transaction.setTransactionCategory(category);
             transaction.setTranDate(plan.date());
             transaction.setTranTime(plan.time());
             transaction.setOutAmount(plan.outAmount());
             transaction.setInAmount(plan.inAmount());
+            if (category == AccountTransactionCategory.ORDINARY && plan.inAmount().signum() > 0) {
+                transaction.setPlatformMatchStatus(PlatformMatchStatus.PENDING);
+            }
             transaction.setAfterBalance(balance);
             transaction.setDesc1(descriptions.desc1());
             transaction.setDesc2(descriptions.desc2());

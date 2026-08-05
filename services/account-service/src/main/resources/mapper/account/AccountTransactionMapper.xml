@@ -4,11 +4,13 @@
 
     <insert id="insertAll">
         INSERT INTO ACCOUNT_TRANSACTION (
-            account_id, platform_id, fingerprint, transaction_category, tran_date, tran_time, out_amount, in_amount,
+            account_id, platform_id, platform_match_status, fingerprint, transaction_category,
+            tran_date, tran_time, out_amount, in_amount,
             after_balance, desc1, desc2, desc3, desc4
         ) VALUES
         <foreach collection="list" item="tx" separator=",">
-            (#{tx.accountId}, #{tx.platformId}, #{tx.fingerprint}, #{tx.transactionCategory}, #{tx.tranDate}, #{tx.tranTime},
+            (#{tx.accountId}, #{tx.platformId}, #{tx.platformMatchStatus}, #{tx.fingerprint},
+             #{tx.transactionCategory}, #{tx.tranDate}, #{tx.tranTime},
              #{tx.outAmount}, #{tx.inAmount}, #{tx.afterBalance}, #{tx.desc1}, #{tx.desc2}, #{tx.desc3}, #{tx.desc4})
         </foreach>
         ON DUPLICATE KEY UPDATE
@@ -18,24 +20,51 @@
 
     <select id="findByAccountIdAndDateRange" resultType="com.ntropy.account.domain.entity.AccountTransaction">
         SELECT account_transaction_id AS id,
-               account_id           AS accountId,
-               platform_id          AS platformId,
+               account_id             AS accountId,
+               platform_id            AS platformId,
+               platform_match_status  AS platformMatchStatus,
                fingerprint,
-               transaction_category AS transactionCategory,
-               tran_date            AS tranDate,
-               tran_time            AS tranTime,
-               out_amount           AS outAmount,
-               in_amount            AS inAmount,
-               after_balance        AS afterBalance,
+               transaction_category   AS transactionCategory,
+               tran_date              AS tranDate,
+               tran_time              AS tranTime,
+               out_amount             AS outAmount,
+               in_amount              AS inAmount,
+               after_balance          AS afterBalance,
                desc1,
                desc2,
                desc3,
                desc4,
-               created_at           AS createdAt
+               created_at             AS createdAt
         FROM ACCOUNT_TRANSACTION
         WHERE account_id = #{accountId}
           AND tran_date BETWEEN #{startDate} AND #{endDate}
         ORDER BY tran_date, tran_time, account_transaction_id
     </select>
+
+    <select id="findPendingPlatformMatches" resultType="com.ntropy.account.domain.entity.AccountTransaction">
+        SELECT account_transaction_id AS id,
+               account_id            AS accountId,
+               platform_id           AS platformId,
+               platform_match_status AS platformMatchStatus,
+               transaction_category  AS transactionCategory,
+               in_amount             AS inAmount,
+               desc1,
+               desc2,
+               desc3,
+               desc4
+        FROM ACCOUNT_TRANSACTION
+        WHERE platform_match_status = 'PENDING'
+          AND transaction_category = 'ORDINARY'
+          AND in_amount &gt; 0
+        ORDER BY account_transaction_id
+    </select>
+
+    <update id="updatePlatformMatch">
+        UPDATE ACCOUNT_TRANSACTION
+        SET platform_id = #{platformId,jdbcType=BIGINT},
+            platform_match_status = #{status}
+        WHERE account_transaction_id = #{id}
+          AND platform_match_status = 'PENDING'
+    </update>
 
 </mapper>

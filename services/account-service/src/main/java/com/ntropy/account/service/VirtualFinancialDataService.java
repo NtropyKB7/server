@@ -40,6 +40,7 @@ public class VirtualFinancialDataService {
     private final AccountMapper accountMapper;
     private final AccountTransactionMapper accountTransactionMapper;
     private final VirtualFinancialTransactionGenerator transactionGenerator;
+    private final PlatformMatchingService platformMatchingService;
 
     @Transactional
     public GenerationSummary generate() {
@@ -78,6 +79,7 @@ public class VirtualFinancialDataService {
                             + ", actual=" + generatedTransactions
             );
         }
+        platformMatchingService.matchPendingTransactions();
         return new GenerationSummary(
                 USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.PLATFORM_COUNT,
                 generatedTransactions,

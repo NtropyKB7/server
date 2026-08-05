@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import com.ntropy.account.domain.AccountTransactionCategory;
+import com.ntropy.account.domain.PlatformMatchStatus;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,6 +24,7 @@ public class AccountTransaction {
     private Long id;
     private Long accountId;
     private Long platformId;
+    private PlatformMatchStatus platformMatchStatus;
     private String fingerprint;
     private AccountTransactionCategory transactionCategory;
     private LocalDate tranDate;

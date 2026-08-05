@@ -23,6 +23,9 @@ import com.ntropy.account.service.VirtualConnectionService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator;
+import com.ntropy.account.service.PlatformMatchingService;
+import com.ntropy.common.client.PlatformDepositQueryClient;
+import com.ntropy.common.dto.work.internal.PlatformDepositMatchCandidate;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -67,6 +70,20 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND transaction_row.platform_id IS NOT NULL
+                    """));
+            assertEquals(1_500, count(jdbc, """
+                    SELECT COUNT(*)
+                    FROM ACCOUNT_TRANSACTION transaction_row
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
+                    WHERE account_row.user_id BETWEEN ? AND ?
+                      AND transaction_row.platform_match_status = 'MATCHED'
+                    """));
+            assertEquals(0, count(jdbc, """
+                    SELECT COUNT(*)
+                    FROM ACCOUNT_TRANSACTION transaction_row
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
+                    WHERE account_row.user_id BETWEEN ? AND ?
+                      AND transaction_row.platform_match_status = 'PENDING'
                     """));
             assertEquals(0, count(jdbc, """
                     SELECT COUNT(*) FROM (
@@ -174,14 +191,34 @@ class VirtualFinancialDataManualVerificationTest {
         }
 
         @Bean
+        PlatformDepositQueryClient platformDepositQueryClient(DataSource dataSource) {
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+            return () -> jdbc.query(
+                    "SELECT platform_id, deposit_name FROM PLATFORM",
+                    (resultSet, rowNumber) -> new PlatformDepositMatchCandidate(
+                            resultSet.getLong("platform_id"), resultSet.getString("deposit_name")
+                    )
+            );
+        }
+
+        @Bean
+        PlatformMatchingService platformMatchingService(
+                AccountTransactionMapper transactionMapper,
+                PlatformDepositQueryClient platformDepositQueryClient
+        ) {
+            return new PlatformMatchingService(transactionMapper, platformDepositQueryClient);
+        }
+
+        @Bean
         VirtualFinancialDataService virtualFinancialDataService(
                 VirtualConnectionService connectionService,
                 AccountMapper accountMapper,
                 AccountTransactionMapper transactionMapper,
-                VirtualFinancialTransactionGenerator generator
+                VirtualFinancialTransactionGenerator generator,
+                PlatformMatchingService platformMatchingService
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator
+                    connectionService, accountMapper, transactionMapper, generator, platformMatchingService
             );
         }
     }
