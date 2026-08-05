@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 
 import com.ntropy.account.domain.AccountTransactionCategory;
 import com.ntropy.account.domain.PersonalBank;
-import com.ntropy.account.domain.PlatformMatchStatus;
 import com.ntropy.account.domain.TransactionFingerprint;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
@@ -26,12 +25,12 @@ public class VirtualFinancialTransactionGenerator {
     public static final LocalDate START_DATE = LocalDate.of(2026, 4, 1);
     public static final LocalDate END_DATE = LocalDate.of(2026, 6, 30);
     public static final int TRANSACTIONS_PER_USER_PER_MONTH = 100;
-    public static final int PLATFORM_COUNT = 11;
+    public static final int INCOME_COUNTERPARTY_COUNT = 11;
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
-    /** work-service PLATFORM.platform_id 순서에 맞춘 입금 거래 대조용 deposit_name. */
-    private static final String[] PLATFORM_DEPOSIT_NAMES = {
+    /** 가상 소득 입금 거래에 사용할 정산 주체명. */
+    private static final String[] INCOME_COUNTERPARTY_NAMES = {
             "우아한형제들", "쿠팡이츠", "위대한상상", "카카오모빌리티", "구글코리아",
             "로지올", "쿠팡풀필먼트서비스", "미소", "알바몬", "도그메이트", "엠브레인패널파워"
     };
@@ -117,8 +116,8 @@ public class VirtualFinancialTransactionGenerator {
             throw new IllegalArgumentException("가상 사용자 순번이 범위를 벗어났습니다: " + userOrdinal);
         }
 
-        int userPlatformCount = userPlatformCount(userOrdinal);
-        List<Long> platformIds = platformIds(userOrdinal, userPlatformCount);
+        int userIncomeCounterpartyCount = userIncomeCounterpartyCount(userOrdinal);
+        List<String> incomeCounterparties = incomeCounterparties(userOrdinal, userIncomeCounterpartyCount);
         boolean installment = secondaryAccount.getAccountGroup()
                 == com.ntropy.account.domain.AccountGroup.DEPOSIT_TRUST;
 
@@ -127,7 +126,7 @@ public class VirtualFinancialTransactionGenerator {
 
         for (int monthOffset = 0; monthOffset < 3; monthOffset++) {
             YearMonth month = YearMonth.from(START_DATE).plusMonths(monthOffset);
-            addIncomePlans(ordinaryPlans, userOrdinal, monthOffset, month, platformIds);
+            addIncomePlans(ordinaryPlans, userOrdinal, monthOffset, month, incomeCounterparties);
             addFixedExpensePlans(ordinaryPlans, userOrdinal, monthOffset, month);
             addConsumptionPlans(ordinaryPlans, userOrdinal, monthOffset, month);
             addSecondaryTransferPlans(
@@ -161,28 +160,32 @@ public class VirtualFinancialTransactionGenerator {
         Map<Long, BigDecimal> finalBalances = new LinkedHashMap<>();
         finalBalances.put(ordinaryAccount.getId(), lastBalance(ordinaryTransactions));
         finalBalances.put(secondaryAccount.getId(), lastBalance(secondaryTransactions));
-        return new GeneratedTransactions(List.copyOf(all), Map.copyOf(finalBalances), userPlatformCount);
+        return new GeneratedTransactions(
+                List.copyOf(all), Map.copyOf(finalBalances), userIncomeCounterpartyCount
+        );
     }
 
     private static void addIncomePlans(List<PlannedTransaction> plans, int userOrdinal, int monthOffset,
-                                       YearMonth month, List<Long> platformIds) {
+                                       YearMonth month, List<String> incomeCounterparties) {
         long mainIncome = 3_600_000L + userOrdinal * 10_000L + monthOffset * 20_000L;
         plans.add(income(month.atDay(1), LocalTime.of(6, 0), mainIncome,
-                platformIds.get(0), platformDepositName(platformIds.get(0)), "정산입금"));
+                incomeCounterparties.get(0), "정산입금"));
 
         int[] weeklyDays = {6, 13, 20, 27};
         for (int i = 0; i < weeklyDays.length; i++) {
             long amount = 190_000L + ((userOrdinal + monthOffset + i) % 7) * 10_000L;
             plans.add(income(month.atDay(weeklyDays[i]), LocalTime.of(6, 10 + i), amount,
-                    platformIds.get(1), platformDepositName(platformIds.get(1)), "정산입금"));
+                    incomeCounterparties.get(1), "정산입금"));
         }
 
         int[] irregularDays = {4, 9, 16, 22, 27};
         for (int i = 0; i < irregularDays.length; i++) {
             long amount = 100_000L + ((userOrdinal * 3L + monthOffset + i) % 6) * 10_000L;
-            Long irregularPlatformId = platformIds.get(1 + i % (platformIds.size() - 1));
+            String irregularCounterparty = incomeCounterparties.get(
+                    1 + i % (incomeCounterparties.size() - 1)
+            );
             plans.add(income(month.atDay(irregularDays[i]), LocalTime.of(6, 20 + i), amount,
-                    irregularPlatformId, platformDepositName(irregularPlatformId), "정산입금"));
+                    irregularCounterparty, "정산입금"));
         }
 
         plans.add(nonJobIncome(month.atDay(11), LocalTime.of(7, 10), 32_000L,
@@ -195,10 +198,10 @@ public class VirtualFinancialTransactionGenerator {
                 "예금이자", "예금이자", "결산이자"));
     }
 
-    private static PlannedTransaction income(LocalDate date, LocalTime time, long amount, Long platformId,
+    private static PlannedTransaction income(LocalDate date, LocalTime time, long amount,
                                               String counterparty, String method) {
         return new PlannedTransaction(
-                date, time, ZERO, BigDecimal.valueOf(amount), platformId,
+                date, time, ZERO, BigDecimal.valueOf(amount),
                 "입금", method, counterparty, "소득", "정산은행"
         );
     }
@@ -206,7 +209,7 @@ public class VirtualFinancialTransactionGenerator {
     private static PlannedTransaction nonJobIncome(LocalDate date, LocalTime time, long amount,
                                                     String counterparty, String method, String memo) {
         return new PlannedTransaction(
-                date, time, ZERO, BigDecimal.valueOf(amount), null,
+                date, time, ZERO, BigDecimal.valueOf(amount),
                 "입금", method, counterparty, memo, "입금은행"
         );
     }
@@ -223,7 +226,7 @@ public class VirtualFinancialTransactionGenerator {
                     expense.minimumAmount(), expense.maximumAmount(), userOrdinal, monthOffset, i
             );
             plans.add(new PlannedTransaction(
-                    month.atDay(2 + slot * 2), LocalTime.of(8, slot), BigDecimal.valueOf(amount), ZERO, null,
+                    month.atDay(2 + slot * 2), LocalTime.of(8, slot), BigDecimal.valueOf(amount), ZERO,
                     "출금", "자동납부", expense.name(), "고정비", "자동이체은행"
             ));
         }
@@ -234,7 +237,7 @@ public class VirtualFinancialTransactionGenerator {
                     insurance.minimumAmount(), insurance.maximumAmount(), userOrdinal, 0, i + 20
             );
             plans.add(new PlannedTransaction(
-                    month.atDay(2 + slot * 2), LocalTime.of(8, slot), BigDecimal.valueOf(amount), ZERO, null,
+                    month.atDay(2 + slot * 2), LocalTime.of(8, slot), BigDecimal.valueOf(amount), ZERO,
                     "출금", "자동납부", insurance.productName(), "보험료", "자동이체은행"
             ));
         }
@@ -259,7 +262,7 @@ public class VirtualFinancialTransactionGenerator {
             String method = merchant.equals("티머니") || merchant.equals("서울교통공사")
                     ? "교통카드" : paymentMethod(profile, i);
             plans.add(new PlannedTransaction(
-                    month.atDay(day), LocalTime.of(hour, minute, i % 60), BigDecimal.valueOf(amount), ZERO, null,
+                    month.atDay(day), LocalTime.of(hour, minute, i % 60), BigDecimal.valueOf(amount), ZERO,
                     "출금", method, merchant, template.label, "카드사"
             ));
         }
@@ -276,14 +279,14 @@ public class VirtualFinancialTransactionGenerator {
         String counterparty = installment ? "정기적금" : "대출상환";
 
         ordinaryPlans.add(new PlannedTransaction(
-                date, LocalTime.of(21, 0), BigDecimal.valueOf(amount), ZERO, null,
+                date, LocalTime.of(21, 0), BigDecimal.valueOf(amount), ZERO,
                 "출금", "계좌이체", counterparty, installment ? "적금 납입" : "원리금 상환", "동일은행"
         ));
         secondaryPlans.add(new PlannedTransaction(
                 date, LocalTime.of(21, 1),
                 installment ? ZERO : BigDecimal.valueOf(amount),
                 installment ? BigDecimal.valueOf(amount) : ZERO,
-                null, installment ? "입금" : "상환", "자동이체",
+                installment ? "입금" : "상환", "자동이체",
                 installment ? "수시입출금계좌" : "대출계좌",
                 installment ? "정기 납입" : "원리금 상환", "동일은행"
         ));
@@ -310,9 +313,6 @@ public class VirtualFinancialTransactionGenerator {
             transaction.setTranTime(plan.time());
             transaction.setOutAmount(plan.outAmount());
             transaction.setInAmount(plan.inAmount());
-            if (category == AccountTransactionCategory.ORDINARY && plan.inAmount().signum() > 0) {
-                transaction.setPlatformMatchStatus(PlatformMatchStatus.PENDING);
-            }
             transaction.setAfterBalance(balance);
             transaction.setDesc1(descriptions.desc1());
             transaction.setDesc2(descriptions.desc2());
@@ -560,22 +560,20 @@ public class VirtualFinancialTransactionGenerator {
         return (rawAmount / 100L) * 100L;
     }
 
-    private static List<Long> platformIds(int userOrdinal, int count) {
-        List<Long> result = new ArrayList<>(count);
-        int firstPlatformIndex = Math.floorMod(userOrdinal - 1, PLATFORM_COUNT);
+    private static List<String> incomeCounterparties(int userOrdinal, int count) {
+        List<String> result = new ArrayList<>(count);
+        int firstCounterpartyIndex = Math.floorMod(userOrdinal - 1, INCOME_COUNTERPARTY_COUNT);
         for (int i = 0; i < count; i++) {
-            int platformIndex = Math.floorMod(firstPlatformIndex + i * 3, PLATFORM_COUNT);
-            result.add(platformIndex + 1L);
+            int counterpartyIndex = Math.floorMod(
+                    firstCounterpartyIndex + i * 3, INCOME_COUNTERPARTY_COUNT
+            );
+            result.add(INCOME_COUNTERPARTY_NAMES[counterpartyIndex]);
         }
         return result;
     }
 
-    static int userPlatformCount(int userOrdinal) {
+    static int userIncomeCounterpartyCount(int userOrdinal) {
         return userOrdinal % 2 == 0 ? 3 : 2;
-    }
-
-    private static String platformDepositName(Long platformId) {
-        return PLATFORM_DEPOSIT_NAMES[Math.toIntExact(platformId - 1L)];
     }
 
     private static BigDecimal lastBalance(List<AccountTransaction> transactions) {
@@ -594,7 +592,7 @@ public class VirtualFinancialTransactionGenerator {
     public record GeneratedTransactions(
             List<AccountTransaction> transactions,
             Map<Long, BigDecimal> finalBalances,
-            int userPlatformCount
+            int userIncomeCounterpartyCount
     ) {
     }
 
@@ -603,7 +601,6 @@ public class VirtualFinancialTransactionGenerator {
             LocalTime time,
             BigDecimal outAmount,
             BigDecimal inAmount,
-            Long platformId,
             String type,
             String method,
             String counterparty,

@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.account.domain.entity.AccountTransaction;
-import com.ntropy.account.domain.PlatformMatchStatus;
 
 class AccountTransactionResponseParserTest {
 
@@ -68,7 +67,6 @@ class AccountTransactionResponseParserTest {
         assertEquals(LocalTime.of(9, 30, 12), tx.getTranTime());
         assertEquals(BigDecimal.ZERO, tx.getOutAmount());
         assertEquals(new BigDecimal("10000"), tx.getInAmount());
-        assertEquals(PlatformMatchStatus.PENDING, tx.getPlatformMatchStatus());
         assertEquals(new BigDecimal("1234567"), tx.getAfterBalance());
         assertEquals("홍길동", tx.getDesc1());
         assertEquals("이체", tx.getDesc2());
@@ -93,20 +91,6 @@ class AccountTransactionResponseParserTest {
         List<AccountTransaction> transactions = AccountTransactionResponseParser.parse(data, 42L);
 
         assertEquals(0, transactions.size());
-    }
-
-    @Test
-    void doesNotCreatePlatformMatchStatusForWithdrawal() throws Exception {
-        JsonNode data = objectMapper.readTree(
-                "{\"resTrHistoryList\":"
-                        + HISTORY_LIST_JSON.replace("\"resAccountOut\": \"\"", "\"resAccountOut\": \"10000\"")
-                        .replace("\"resAccountIn\": \"10,000\"", "\"resAccountIn\": \"0\"")
-                        + "}"
-        );
-
-        AccountTransaction transaction = AccountTransactionResponseParser.parse(data, 42L).get(0);
-
-        assertNull(transaction.getPlatformMatchStatus());
     }
 
     @Test

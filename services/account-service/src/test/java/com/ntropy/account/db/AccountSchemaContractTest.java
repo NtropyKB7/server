@@ -66,9 +66,8 @@ class AccountSchemaContractTest {
         assertTrue(schema.contains(
                 "UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint)"));
         assertTrue(schema.contains("INDEX ix_account_transaction_account_date (account_id, tran_date)"));
-        assertTrue(schema.contains("INDEX ix_account_transaction_platform (platform_id)"));
-        assertTrue(schema.contains(
-                "INDEX ix_account_transaction_match_pending (platform_match_status, transaction_category)"));
+        assertFalse(schema.contains("platform_id"));
+        assertFalse(schema.contains("platform_match_status"));
     }
 
     @Test

@@ -23,9 +23,6 @@ import com.ntropy.account.service.VirtualConnectionService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator;
-import com.ntropy.account.service.PlatformMatchingService;
-import com.ntropy.common.client.PlatformDepositQueryClient;
-import com.ntropy.common.dto.work.internal.PlatformDepositMatchCandidate;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -65,25 +62,14 @@ class VirtualFinancialDataManualVerificationTest {
                     WHERE account_row.user_id BETWEEN ? AND ?
                     """));
             assertEquals(11, count(jdbc, """
-                    SELECT COUNT(DISTINCT transaction_row.platform_id)
+                    SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
-                      AND transaction_row.platform_id IS NOT NULL
-                    """));
-            assertEquals(1_500, count(jdbc, """
-                    SELECT COUNT(*)
-                    FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
-                      AND transaction_row.platform_match_status = 'MATCHED'
-                    """));
-            assertEquals(0, count(jdbc, """
-                    SELECT COUNT(*)
-                    FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
-                      AND transaction_row.platform_match_status = 'PENDING'
+                      AND REPLACE(transaction_row.desc3, '홈)', '') IN (
+                          '우아한형제들', '쿠팡이츠', '위대한상상', '카카오모빌리티', '구글코리아',
+                          '로지올', '쿠팡풀필먼트서비스', '미소', '알바몬', '도그메이트', '엠브레인패널파워'
+                      )
                     """));
             assertEquals(0, count(jdbc, """
                     SELECT COUNT(*) FROM (
@@ -108,7 +94,10 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND account_row.organization_code = '0003'
-                      AND transaction_row.platform_id IS NOT NULL
+                      AND transaction_row.desc3 IN (
+                          '우아한형제들', '쿠팡이츠', '위대한상상', '카카오모빌리티', '구글코리아',
+                          '로지올', '쿠팡풀필먼트서비스', '미소', '알바몬', '도그메이트', '엠브레인패널파워'
+                      )
                       AND transaction_row.desc1 IS NOT NULL
                     """));
             assertEquals(225, count(jdbc, """
@@ -134,7 +123,7 @@ class VirtualFinancialDataManualVerificationTest {
 
             System.out.println("VIRTUAL_FINANCIAL_USERS=" + first.users());
             System.out.println("VIRTUAL_FINANCIAL_ACCOUNTS=" + first.accounts());
-            System.out.println("VIRTUAL_FINANCIAL_PLATFORMS=" + first.platforms());
+            System.out.println("VIRTUAL_FINANCIAL_INCOME_COUNTERPARTIES=" + first.incomeCounterparties());
             System.out.println("VIRTUAL_FINANCIAL_TRANSACTIONS=" + first.transactions());
         }
     }
@@ -191,34 +180,14 @@ class VirtualFinancialDataManualVerificationTest {
         }
 
         @Bean
-        PlatformDepositQueryClient platformDepositQueryClient(DataSource dataSource) {
-            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-            return () -> jdbc.query(
-                    "SELECT platform_id, deposit_name FROM PLATFORM",
-                    (resultSet, rowNumber) -> new PlatformDepositMatchCandidate(
-                            resultSet.getLong("platform_id"), resultSet.getString("deposit_name")
-                    )
-            );
-        }
-
-        @Bean
-        PlatformMatchingService platformMatchingService(
-                AccountTransactionMapper transactionMapper,
-                PlatformDepositQueryClient platformDepositQueryClient
-        ) {
-            return new PlatformMatchingService(transactionMapper, platformDepositQueryClient);
-        }
-
-        @Bean
         VirtualFinancialDataService virtualFinancialDataService(
                 VirtualConnectionService connectionService,
                 AccountMapper accountMapper,
                 AccountTransactionMapper transactionMapper,
-                VirtualFinancialTransactionGenerator generator,
-                PlatformMatchingService platformMatchingService
+                VirtualFinancialTransactionGenerator generator
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator, platformMatchingService
+                    connectionService, accountMapper, transactionMapper, generator
             );
         }
     }

@@ -18,14 +18,12 @@ import com.ntropy.account.client.codef.CodefBankTransactionClient;
 import com.ntropy.account.client.codef.CodefInstallmentSavingsClient;
 import com.ntropy.account.client.codef.CodefLoanTransactionClient;
 import com.ntropy.account.domain.PersonalBank;
-import com.ntropy.account.domain.PlatformMatchStatus;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
-import com.ntropy.common.dto.work.internal.PlatformDepositMatchCandidate;
 
 class AccountCollectionServiceTest {
 
@@ -158,8 +156,7 @@ class AccountCollectionServiceTest {
         );
         AccountCollectionService service = new AccountCollectionService(
                 personalBankAccountService, connectionMapper, transactionClient, null, null,
-                accountMapper, transactionMapper,
-                matchingService(transactionMapper, new PlatformDepositMatchCandidate(2L, "쿠팡이츠"))
+                accountMapper, transactionMapper
         );
 
         List<Account> savedAccounts = service.collect(
@@ -171,9 +168,6 @@ class AccountCollectionServiceTest {
         assertEquals(1, transactionClient.calls.size());
         assertEquals("110123456789", transactionClient.calls.get(0).account());
         assertEquals(1, transactionMapper.insertedBatches);
-        assertEquals(2L, transactionMapper.insertedTransactions.get(0).getPlatformId());
-        assertEquals(PlatformMatchStatus.MATCHED,
-                transactionMapper.insertedTransactions.get(0).getPlatformMatchStatus());
     }
 
     @Test
@@ -189,7 +183,7 @@ class AccountCollectionServiceTest {
         );
         AccountCollectionService service = new AccountCollectionService(
                 personalBankAccountService, connectionMapper, transactionClient, null, null,
-                accountMapper, transactionMapper, matchingService(transactionMapper)
+                accountMapper, transactionMapper
         );
 
         service.collect(
@@ -217,7 +211,7 @@ class AccountCollectionServiceTest {
         );
         AccountCollectionService service = new AccountCollectionService(
                 personalBankAccountService, connectionMapper, transactionClient, installmentClient, null,
-                accountMapper, transactionMapper, matchingService(transactionMapper)
+                accountMapper, transactionMapper
         );
 
         service.collect(
@@ -237,7 +231,6 @@ class AccountCollectionServiceTest {
         FakeCodefInstallmentSavingsClient installmentClient = new FakeCodefInstallmentSavingsClient(
                 objectMapper.readTree(INSTALLMENT_SAVINGS_WITH_ONE_ENTRY)
         );
-        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
         AccountCollectionService service = new AccountCollectionService(
                 new StubPersonalBankAccountService(objectMapper.readTree(
                         ACCOUNT_LIST_WITH_INSTALLMENT_SAVINGS.replace("\"12\"", "\"14\"")
@@ -247,8 +240,7 @@ class AccountCollectionServiceTest {
                 installmentClient,
                 null,
                 new FakeAccountMapper(),
-                transactionMapper,
-                matchingService(transactionMapper)
+                new FakeAccountTransactionMapper()
         );
 
         service.collect(
@@ -275,7 +267,7 @@ class AccountCollectionServiceTest {
         );
         AccountCollectionService service = new AccountCollectionService(
                 personalBankAccountService, connectionMapper, transactionClient, null, loanClient,
-                accountMapper, transactionMapper, matchingService(transactionMapper)
+                accountMapper, transactionMapper
         );
 
         service.collect(
@@ -295,7 +287,7 @@ class AccountCollectionServiceTest {
     void rejectsCollectWhenConnectionDoesNotExist() {
         FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(null, null);
         AccountCollectionService service = new AccountCollectionService(
-                null, connectionMapper, null, null, null, null, null, null
+                null, connectionMapper, null, null, null, null, null
         );
 
         assertThrows(
@@ -320,7 +312,7 @@ class AccountCollectionServiceTest {
         );
         AccountCollectionService service = new AccountCollectionService(
                 personalBankAccountService, connectionMapper, transactionClient, null, null,
-                accountMapper, transactionMapper, matchingService(transactionMapper)
+                accountMapper, transactionMapper
         );
 
         service.registerAndCollect(
@@ -332,13 +324,6 @@ class AccountCollectionServiceTest {
     }
 
     private record TransactionCall(String organizationCode, String connectedId, String account) {
-    }
-
-    private static PlatformMatchingService matchingService(
-            FakeAccountTransactionMapper transactionMapper,
-            PlatformDepositMatchCandidate... candidates
-    ) {
-        return new PlatformMatchingService(transactionMapper, () -> List.of(candidates));
     }
 
     private static class FakeCodefBankTransactionClient extends CodefBankTransactionClient {
@@ -504,15 +489,11 @@ class AccountCollectionServiceTest {
     private static class FakeAccountTransactionMapper implements AccountTransactionMapper {
 
         private int insertedBatches;
-        private long nextId = 1L;
         private final List<AccountTransaction> insertedTransactions = new ArrayList<>();
 
         @Override
         public void insertAll(List<AccountTransaction> transactions) {
             insertedBatches++;
-            transactions.stream()
-                    .filter(transaction -> transaction.getId() == null)
-                    .forEach(transaction -> transaction.setId(nextId++));
             insertedTransactions.addAll(transactions);
         }
 
@@ -526,25 +507,5 @@ class AccountCollectionServiceTest {
                     .toList();
         }
 
-        @Override
-        public List<AccountTransaction> findPendingPlatformMatches() {
-            return insertedTransactions.stream()
-                    .filter(transaction -> transaction.getPlatformMatchStatus() == PlatformMatchStatus.PENDING)
-                    .toList();
-        }
-
-        @Override
-        public int updatePlatformMatch(Long id, Long platformId, PlatformMatchStatus status) {
-            return insertedTransactions.stream()
-                    .filter(transaction -> java.util.Objects.equals(id, transaction.getId()))
-                    .filter(transaction -> transaction.getPlatformMatchStatus() == PlatformMatchStatus.PENDING)
-                    .findFirst()
-                    .map(transaction -> {
-                        transaction.setPlatformId(platformId);
-                        transaction.setPlatformMatchStatus(status);
-                        return 1;
-                    })
-                    .orElse(0);
-        }
     }
 }

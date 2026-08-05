@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ntropy.account.domain.AccountTransactionCategory;
-import com.ntropy.account.domain.PlatformMatchStatus;
 import com.ntropy.account.domain.TransactionFingerprint;
 import com.ntropy.account.domain.entity.AccountTransaction;
 
@@ -45,9 +44,6 @@ public final class AccountTransactionResponseParser {
         BigDecimal inAmount = CodefJsonSupport.amount(node, "resAccountIn");
         transaction.setOutAmount(outAmount != null ? outAmount : BigDecimal.ZERO);
         transaction.setInAmount(inAmount != null ? inAmount : BigDecimal.ZERO);
-        if (transaction.getInAmount().signum() > 0) {
-            transaction.setPlatformMatchStatus(PlatformMatchStatus.PENDING);
-        }
         transaction.setAfterBalance(CodefJsonSupport.amount(node, "resAfterTranBalance"));
 
         transaction.setDesc1(CodefJsonSupport.text(node, "resAccountDesc1"));

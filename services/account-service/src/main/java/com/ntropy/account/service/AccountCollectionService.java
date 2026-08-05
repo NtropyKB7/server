@@ -53,7 +53,6 @@ public class AccountCollectionService {
     private final CodefLoanTransactionClient codefLoanTransactionClient;
     private final AccountMapper accountMapper;
     private final AccountTransactionMapper accountTransactionMapper;
-    private final PlatformMatchingService platformMatchingService;
 
     public List<Account> registerAndCollect(Long userId, PersonalBank bank, String loginId, String rawPassword,
                                             String birthDate, LocalDate transactionStartDate,
@@ -102,8 +101,6 @@ public class AccountCollectionService {
                 ));
             }
         }
-
-        platformMatchingService.matchPendingTransactions();
 
         if (!collectionFailures.isEmpty()) {
             IllegalStateException aggregate = new IllegalStateException(

@@ -40,7 +40,6 @@ public class VirtualFinancialDataService {
     private final AccountMapper accountMapper;
     private final AccountTransactionMapper accountTransactionMapper;
     private final VirtualFinancialTransactionGenerator transactionGenerator;
-    private final PlatformMatchingService platformMatchingService;
 
     @Transactional
     public GenerationSummary generate() {
@@ -79,9 +78,8 @@ public class VirtualFinancialDataService {
                             + ", actual=" + generatedTransactions
             );
         }
-        platformMatchingService.matchPendingTransactions();
         return new GenerationSummary(
-                USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.PLATFORM_COUNT,
+                USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.INCOME_COUNTERPARTY_COUNT,
                 generatedTransactions,
                 VirtualFinancialTransactionGenerator.START_DATE,
                 VirtualFinancialTransactionGenerator.END_DATE
@@ -159,7 +157,7 @@ public class VirtualFinancialDataService {
     public record GenerationSummary(
             int users,
             int accounts,
-            int platforms,
+            int incomeCounterparties,
             int transactions,
             LocalDate startDate,
             LocalDate endDate

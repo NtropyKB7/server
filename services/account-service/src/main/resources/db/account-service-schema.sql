@@ -3,7 +3,7 @@
 -- 대상: CODEF_CONNECTION, CODEF_TOKEN, ACCOUNT, ACCOUNT_TRANSACTION
 --
 -- 서비스 내부 참조에는 FK를 사용한다.
--- user_id와 platform_id는 다른 서비스 소유 키이므로 FK 없이 논리 참조와 인덱스만 둔다.
+-- user_id는 다른 서비스 소유 키이므로 FK 없이 논리 참조와 인덱스만 둔다.
 -- FIN-004, FIN-005, FIN-007, FIN-008의 누적 결과가 반영되어 있으므로
 -- 신규 환경은 이 파일만 실행한다.
 -- ============================================================
@@ -68,8 +68,6 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
 (
     account_transaction_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.account_id 참조',
-    platform_id   BIGINT        NULL COMMENT 'work-service PLATFORM.platform_id 논리 참조 (크로스 도메인 FK 없음)',
-    platform_match_status VARCHAR(20) NULL COMMENT '입금 플랫폼 매칭 상태: PENDING, MATCHED, UNMATCHED (비대상 거래는 NULL)',
     fingerprint   CHAR(64)      NOT NULL COMMENT '계좌·거래일시·상품별 금액·상세 기반 SHA-256',
     transaction_category VARCHAR(20) NOT NULL DEFAULT 'ORDINARY' COMMENT 'ORDINARY, INSTALLMENT, LOAN',
     tran_date     DATE          NULL COMMENT 'resAccountTrDate',
@@ -84,8 +82,6 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
-    INDEX ix_account_transaction_platform (platform_id),
-    INDEX ix_account_transaction_match_pending (platform_match_status, transaction_category),
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
