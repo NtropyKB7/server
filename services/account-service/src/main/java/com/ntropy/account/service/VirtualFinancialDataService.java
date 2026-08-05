@@ -79,7 +79,7 @@ public class VirtualFinancialDataService {
             );
         }
         return new GenerationSummary(
-                USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.LOGICAL_JOB_COUNT,
+                USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.PLATFORM_COUNT,
                 generatedTransactions,
                 VirtualFinancialTransactionGenerator.START_DATE,
                 VirtualFinancialTransactionGenerator.END_DATE
@@ -157,7 +157,7 @@ public class VirtualFinancialDataService {
     public record GenerationSummary(
             int users,
             int accounts,
-            int logicalJobs,
+            int platforms,
             int transactions,
             LocalDate startDate,
             LocalDate endDate

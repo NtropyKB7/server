@@ -1,8 +1,11 @@
 -- ============================================================
--- account-service DDL
--- CODEF_CONNECTION: 이슈 #5(CODEF 초기 세팅/PoC) 범위.
--- ACCOUNT, ACCOUNT_TRANSACTION: 이슈 #20(계좌/거래내역 파싱·저장) 범위.
--- 적금·대출 거래와 거래 fingerprint: 이슈 #38 범위.
+-- account-service 소유 금융 테이블 최종 DDL
+-- 대상: CODEF_CONNECTION, CODEF_TOKEN, ACCOUNT, ACCOUNT_TRANSACTION
+--
+-- 서비스 내부 참조에는 FK를 사용한다.
+-- user_id와 platform_id는 다른 서비스 소유 키이므로 FK 없이 논리 참조와 인덱스만 둔다.
+-- FIN-004, FIN-005, FIN-007, FIN-008의 누적 결과가 반영되어 있으므로
+-- 신규 환경은 이 파일만 실행한다.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
@@ -17,22 +20,6 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
     UNIQUE KEY uk_codef_connection_user_provider (user_id, provider)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
-
--- 이미 CODEF_CONNECTION이 생성되어 있는 기존 로컬 DB라면 위 컬럼이 반영되지 않으므로 아래 ALTER를 한 번 수동 실행한다.
--- (이 스키마 파일은 마이그레이션 도구 없이 수동 적용하는 방식이라 IF NOT EXISTS ADD COLUMN 같은 자동 가드는 넣지 않는다)
--- ALTER TABLE CODEF_CONNECTION
---     ADD COLUMN registered_institution_keys JSON NULL
---         COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용'
---         AFTER connected_id;
-
--- 이슈 #35 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
--- services/account-service/src/main/resources/db/migration/FIN-004-add-connection-provider.sql
--- 이슈 #46의 desc1 원본 필드와 소득-일자리 논리 참조를 추가하려면 아래 마이그레이션을 한 번 실행한다.
--- services/account-service/src/main/resources/db/migration/FIN-005-add-transaction-job-id.sql
--- 이슈 #38 이전에 생성된 DB는 아래 마이그레이션을 한 번 실행한다.
--- services/account-service/src/main/resources/db/migration/FIN-007-add-codef-product-transactions.sql
--- 미사용 계좌·거래 컬럼 정리 이전 DB는 아래 마이그레이션을 이어서 실행한다.
--- services/account-service/src/main/resources/db/migration/FIN-008-remove-unused-account-columns.sql
 
 -- CODEF OAuth2 accessToken 캐시. client_credentials 방식이라 사용자 단위가 아닌 클라이언트(서비스) 단위로 존재.
 -- 지금은 DB로만 캐싱하고, 추후 Redis 도입 시 CodefTokenStore의 Redis 구현체로 대체 예정 (DEVLOG 참고).
@@ -70,6 +57,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash),
+    INDEX ix_account_user (user_id),
     CONSTRAINT fk_account_codef_connection FOREIGN KEY (codef_connection_id) REFERENCES CODEF_CONNECTION (id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
@@ -79,7 +67,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.id 참조',
-    job_id        BIGINT        NULL COMMENT 'work-service JOB.job_id 논리 참조 (크로스 도메인 FK 없음)',
+    platform_id   BIGINT        NULL COMMENT 'work-service PLATFORM.platform_id 논리 참조 (크로스 도메인 FK 없음)',
     fingerprint   CHAR(64)      NOT NULL COMMENT '계좌·거래일시·상품별 금액·상세 기반 SHA-256',
     transaction_category VARCHAR(20) NOT NULL DEFAULT 'ORDINARY' COMMENT 'ORDINARY, INSTALLMENT, LOAN',
     tran_date     DATE          NULL COMMENT 'resAccountTrDate',
@@ -94,7 +82,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
-    INDEX ix_account_transaction_job (job_id),
+    INDEX ix_account_transaction_platform (platform_id),
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;

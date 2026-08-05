@@ -61,12 +61,12 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                     """));
-            assertEquals(10, count(jdbc, """
-                    SELECT COUNT(DISTINCT transaction_row.job_id)
+            assertEquals(11, count(jdbc, """
+                    SELECT COUNT(DISTINCT transaction_row.platform_id)
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
-                      AND transaction_row.job_id IS NOT NULL
+                      AND transaction_row.platform_id IS NOT NULL
                     """));
             assertEquals(0, count(jdbc, """
                     SELECT COUNT(*) FROM (
@@ -91,7 +91,7 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND account_row.organization_code = '0003'
-                      AND transaction_row.job_id IS NOT NULL
+                      AND transaction_row.platform_id IS NOT NULL
                       AND transaction_row.desc1 IS NOT NULL
                     """));
             assertEquals(225, count(jdbc, """
@@ -117,7 +117,7 @@ class VirtualFinancialDataManualVerificationTest {
 
             System.out.println("VIRTUAL_FINANCIAL_USERS=" + first.users());
             System.out.println("VIRTUAL_FINANCIAL_ACCOUNTS=" + first.accounts());
-            System.out.println("VIRTUAL_FINANCIAL_LOGICAL_JOBS=" + first.logicalJobs());
+            System.out.println("VIRTUAL_FINANCIAL_PLATFORMS=" + first.platforms());
             System.out.println("VIRTUAL_FINANCIAL_TRANSACTIONS=" + first.transactions());
         }
     }
