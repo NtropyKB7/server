@@ -2,6 +2,7 @@ package com.ntropy.config;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -13,6 +14,10 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMappi
 import springfox.documentation.builders.PathSelectors;
 import springfox.documentation.builders.RequestHandlerSelectors;
 import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.service.ApiKey;
+import springfox.documentation.service.AuthorizationScope;
+import springfox.documentation.service.SecurityReference;
+import springfox.documentation.spi.service.contexts.SecurityContext;
 import springfox.documentation.spring.web.plugins.Docket;
 import springfox.documentation.spring.web.plugins.WebMvcRequestHandlerProvider;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
@@ -38,6 +43,23 @@ public class SwaggerConfig {
                 .select()
                 .apis(RequestHandlerSelectors.basePackage("com.ntropy"))
                 .paths(PathSelectors.any())
+                .build()
+                .securitySchemes(Collections.singletonList(bearerAuth()))
+                .securityContexts(Collections.singletonList(financialApiSecurityContext()));
+    }
+
+    private ApiKey bearerAuth() {
+        return new ApiKey("Bearer", "Authorization", "header");
+    }
+
+    private SecurityContext financialApiSecurityContext() {
+        return SecurityContext.builder()
+                .securityReferences(Collections.singletonList(
+                        new SecurityReference("Bearer", new AuthorizationScope[] {
+                                new AuthorizationScope("global", "금융 API 접근")
+                        })
+                ))
+                .forPaths(PathSelectors.regex("/api/(accounts.*|mydata.*)"))
                 .build();
     }
 
