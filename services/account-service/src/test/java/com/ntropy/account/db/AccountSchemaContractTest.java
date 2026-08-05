@@ -122,7 +122,8 @@ class AccountSchemaContractTest {
         try (InputStream input = AccountSchemaContractTest.class.getClassLoader()
                 .getResourceAsStream(resourcePath)) {
             assertNotNull(input, resourcePath + "가 테스트 classpath에 있어야 합니다");
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n");
         }
     }
 
