@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.FinancialDataQueryMapper">
+
+    <sql id="accountColumns">
+        account_id AS id, codef_connection_id AS codefConnectionId, user_id AS userId,
+        organization_code AS organizationCode, account_group AS accountGroup,
+        deposit_type_code AS depositTypeCode, account_no_masked AS accountNoMasked,
+        account_no_hash AS accountNoHash, account_name AS accountName, balance,
+        currency_code AS currencyCode, account_start_date AS accountStartDate,
+        last_tran_date AS lastTranDate, overdraft_yn AS overdraftYn,
+        next_payment_date AS nextPaymentDate, created_at AS createdAt, updated_at AS updatedAt
+    </sql>
+
+    <select id="findAccountsByUserId" resultType="com.ntropy.account.domain.entity.Account">
+        SELECT <include refid="accountColumns"/>
+        FROM ACCOUNT
+        WHERE user_id = #{userId}
+        ORDER BY account_id
+    </select>
+
+    <select id="findAccountByIdAndUserId" resultType="com.ntropy.account.domain.entity.Account">
+        SELECT <include refid="accountColumns"/>
+        FROM ACCOUNT
+        WHERE account_id = #{accountId}
+          AND user_id = #{userId}
+    </select>
+
+    <!-- ACCOUNT에서 시작해 소유 계좌는 거래가 없어도 한 행을 반환한다. -->
+    <select id="findTransactionsByAccountIdAndUserId"
+            resultType="com.ntropy.account.mapper.projection.OwnedAccountTransactionRow">
+        SELECT account_row.account_id                  AS ownedAccountId,
+               transaction_row.account_transaction_id AS transactionId,
+               transaction_row.transaction_category   AS transactionCategory,
+               transaction_row.tran_date              AS transactionDate,
+               transaction_row.tran_time              AS transactionTime,
+               transaction_row.out_amount             AS outAmount,
+               transaction_row.in_amount              AS inAmount,
+               transaction_row.after_balance          AS afterBalance,
+               transaction_row.desc1,
+               transaction_row.desc2,
+               transaction_row.desc3,
+               transaction_row.desc4
+        FROM ACCOUNT account_row
+                 LEFT JOIN ACCOUNT_TRANSACTION transaction_row
+                           ON transaction_row.account_id = account_row.account_id
+        WHERE account_row.account_id = #{accountId}
+          AND account_row.user_id = #{userId}
+        ORDER BY transaction_row.tran_date,
+                 transaction_row.tran_time,
+                 transaction_row.account_transaction_id
+    </select>
+
+</mapper>

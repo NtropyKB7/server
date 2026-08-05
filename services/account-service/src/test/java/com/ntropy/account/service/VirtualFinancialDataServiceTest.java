@@ -112,8 +112,10 @@ class VirtualFinancialDataServiceTest {
         }
 
         @Override
-        public Account findByIdAndProvider(Long id, String provider) {
-            return store.values().stream().filter(account -> id.equals(account.getId())).findFirst().orElse(null);
+        public Account findByIdAndUserIdAndProvider(Long id, Long userId, String provider) {
+            return store.values().stream()
+                    .filter(account -> id.equals(account.getId()) && userId.equals(account.getUserId()))
+                    .findFirst().orElse(null);
         }
 
         @Override

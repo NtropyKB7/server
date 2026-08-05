@@ -53,7 +53,7 @@
           AND account_no_hash = #{accountNoHash}
     </select>
 
-    <select id="findByIdAndProvider" resultType="com.ntropy.account.domain.entity.Account">
+    <select id="findByIdAndUserIdAndProvider" resultType="com.ntropy.account.domain.entity.Account">
         SELECT account_id          AS id,
                codef_connection_id AS codefConnectionId,
                user_id             AS userId,
@@ -73,6 +73,7 @@
                updated_at          AS updatedAt
         FROM ACCOUNT
         WHERE account_id = #{id}
+          AND user_id = #{userId}
           AND codef_connection_id IN (
               SELECT codef_connection_id
               FROM CODEF_CONNECTION

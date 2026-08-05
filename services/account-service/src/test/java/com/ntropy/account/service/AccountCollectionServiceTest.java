@@ -476,8 +476,10 @@ class AccountCollectionServiceTest {
         }
 
         @Override
-        public Account findByIdAndProvider(Long id, String provider) {
-            return store.values().stream().filter(a -> id.equals(a.getId())).findFirst().orElse(null);
+        public Account findByIdAndUserIdAndProvider(Long id, Long userId, String provider) {
+            return store.values().stream()
+                    .filter(a -> id.equals(a.getId()) && userId.equals(a.getUserId()))
+                    .findFirst().orElse(null);
         }
 
         @Override

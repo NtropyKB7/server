@@ -16,7 +16,9 @@ public interface AccountMapper {
     Account findByConnectionIdAndAccountNoHash(@Param("codefConnectionId") Long codefConnectionId,
                                                @Param("accountNoHash") String accountNoHash);
 
-    Account findByIdAndProvider(@Param("id") Long id, @Param("provider") String provider);
+    Account findByIdAndUserIdAndProvider(@Param("id") Long id,
+                                         @Param("userId") Long userId,
+                                         @Param("provider") String provider);
 
     List<Account> findByUserIdAndProvider(@Param("userId") Long userId, @Param("provider") String provider);
 }
