@@ -29,7 +29,7 @@ public class DefenseModeResponse {
     private Long dailyExpense;
     @JsonProperty("dDay")
     private Integer dDay;
-    private String calculationStatus;
+    private DefenseCalculationStatus calculationStatus;
     private String status;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
@@ -43,11 +43,15 @@ public class DefenseModeResponse {
                 summary.getDefenseId(), summary.getUserId(), summary.getCauseCode(), summary.getCauseName(),
                 summary.getUnavailableStartDate(), summary.getExpectedReturnDate(), summary.getReturnDate(),
                 summary.getAvailableAssetsSnapshot(), summary.getAverageMonthlyExpense(),
-                summary.getDailyExpense(), summary.getDDay(), summary.getCalculationStatus(),
+                summary.getDailyExpense(), summary.getDDay(), toCalculationStatus(summary.getCalculationStatus()),
                 summary.getStatus(), summary.getCreatedAt(),
                 summary.getChecklist().stream().map(DefenseChecklistResponse::from).collect(Collectors.toList()),
                 FixedExpenseCheckResponse.from(summary.getFixedExpenseCheck()),
                 ExpectedIncomeLossResponse.from(summary.getExpectedIncomeLoss()),
                 GrowthModeResponse.from(summary.getGrowthMode()));
+    }
+
+    private static DefenseCalculationStatus toCalculationStatus(String status) {
+        return status == null ? null : DefenseCalculationStatus.valueOf(status);
     }
 }

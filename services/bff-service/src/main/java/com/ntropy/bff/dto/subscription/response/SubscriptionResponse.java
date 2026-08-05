@@ -26,7 +26,7 @@ public class SubscriptionResponse {
 
     private Long subscriptionId;
     private String planCode;
-    private String status;
+    private SubscriptionStatus status;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime startDate;
@@ -47,7 +47,8 @@ public class SubscriptionResponse {
         SubscriptionResponse response = new SubscriptionResponse();
         response.subscriptionId = summary.getSubscriptionId();
         response.planCode = summary.getPlanCode();
-        response.status = summary.getStatus();
+        response.status = summary.getStatus() == null
+                ? null : SubscriptionStatus.valueOf(summary.getStatus());
         response.startDate = summary.getStartDate();
         response.endDate = summary.getEndDate();
         response.autoRenewYn = summary.getAutoRenewYn();
