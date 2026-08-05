@@ -8,6 +8,7 @@ import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseSummary;
+import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
 import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
@@ -233,6 +234,7 @@ public class DefenseModeService {
             dDayReduction = Math.max(defenseMode.getDDay() - dDayAfter, 0);
         }
 
+        FixedExpenseMaintainStatus maintainStatus = maintainStatus(commitment.getExpenseType());
         return new FixedExpenseSummary(
                 commitment.getCommitmentId(),
                 commitment.getAccountId(),
@@ -247,7 +249,20 @@ public class DefenseModeService {
                 defenseMode.getDDay(),
                 dDayAfter,
                 dDayReduction,
-                "UNDETERMINED");
+                maintainStatus);
+    }
+
+    private FixedExpenseMaintainStatus maintainStatus(String expenseType) {
+        if ("LOAN_REPAYMENT".equals(expenseType)) {
+            return FixedExpenseMaintainStatus.NORMAL;
+        }
+        if ("INSURANCE_PREMIUM".equals(expenseType)) {
+            return FixedExpenseMaintainStatus.DIFFICULT;
+        }
+        if ("SAVING_PAYMENT".equals(expenseType)) {
+            return FixedExpenseMaintainStatus.REVIEW_SUSPENSION;
+        }
+        return FixedExpenseMaintainStatus.UNDETERMINED;
     }
 
     private String expenseName(String expenseType) {

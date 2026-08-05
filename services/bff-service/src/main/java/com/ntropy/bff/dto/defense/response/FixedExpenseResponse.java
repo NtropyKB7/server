@@ -3,6 +3,7 @@ package com.ntropy.bff.dto.defense.response;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ntropy.common.dto.defense.summary.FixedExpenseSummary;
+import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -28,7 +29,7 @@ public class FixedExpenseResponse {
     private Integer dDayAfter;
     @JsonProperty("dDayReduction")
     private Integer dDayReduction;
-    private String maintainStatus;
+    private FixedExpenseMaintainStatus maintainStatus;
 
     public static FixedExpenseResponse from(FixedExpenseSummary summary) {
         return new FixedExpenseResponse(

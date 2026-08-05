@@ -5,6 +5,7 @@ import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
 import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
 import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
+import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
 import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.common.exception.ServiceException;
@@ -88,19 +89,28 @@ class DefenseModeServiceTest {
                                 500_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "ESTIMATED"),
                         new FinancialCommitmentSummary(
                                 2L, 20L, "LOAN_REPAYMENT", "신한 직장인 대출", 12_500_000L,
-                                null, null, "INSUFFICIENT", "INSUFFICIENT")),
+                                null, null, "INSUFFICIENT", "INSUFFICIENT"),
+                        new FinancialCommitmentSummary(
+                                3L, 30L, "INSURANCE_PREMIUM", "실비 보험", null,
+                                100_000L, LocalDate.of(2026, 8, 7), "CONFIRMED", "CONFIRMED")),
                 (userId, fromDate, toDate) -> Collections.emptyList());
         DefenseMode entered = fixedExpenseService.enter(new DefenseModeEnterCommand(
                 1L, "ACCIDENT_INJURY", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10)));
 
         FixedExpenseCheckSummary result = fixedExpenseService.getFixedExpenseCheck(entered);
 
-        assertEquals(500_000L, result.getTotalExpectedAmount());
-        assertEquals(2, result.getExpenses().size());
+        assertEquals(600_000L, result.getTotalExpectedAmount());
+        assertEquals(3, result.getExpenses().size());
         assertEquals(38, result.getExpenses().get(0).getDDayAfter());
         assertEquals(4, result.getExpenses().get(0).getDDayReduction());
+        assertEquals(FixedExpenseMaintainStatus.REVIEW_SUSPENSION,
+                result.getExpenses().get(0).getMaintainStatus());
         assertEquals(null, result.getExpenses().get(1).getDDayAfter());
         assertEquals(12_500_000L, result.getExpenses().get(1).getOutstandingBalance());
+        assertEquals(FixedExpenseMaintainStatus.NORMAL,
+                result.getExpenses().get(1).getMaintainStatus());
+        assertEquals(FixedExpenseMaintainStatus.DIFFICULT,
+                result.getExpenses().get(2).getMaintainStatus());
     }
 
     @Test
