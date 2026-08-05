@@ -38,17 +38,12 @@ class VirtualFinancialDataServiceTest {
 
         assertEquals(50, first.users());
         assertEquals(100, first.accounts());
-        assertEquals(11, first.platforms());
+        assertEquals(11, first.incomeCounterparties());
         assertEquals(15_000, first.transactions());
         assertEquals(first, second);
         assertEquals(50, connectionMapper.store.size());
         assertEquals(100, accountMapper.store.size());
         assertEquals(15_000, transactionMapper.store.size());
-        assertEquals(11, transactionMapper.store.values().stream()
-                .map(AccountTransaction::getPlatformId)
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .count());
     }
 
     private static class InMemoryCodefConnectionMapper implements CodefConnectionMapper {
@@ -134,7 +129,6 @@ class VirtualFinancialDataServiceTest {
     private static class InMemoryAccountTransactionMapper implements AccountTransactionMapper {
 
         private final Map<String, AccountTransaction> store = new LinkedHashMap<>();
-
         @Override
         public void insertAll(List<AccountTransaction> transactions) {
             for (AccountTransaction transaction : transactions) {
@@ -143,7 +137,7 @@ class VirtualFinancialDataServiceTest {
                 if (existing == null) {
                     store.put(key, transaction);
                 } else {
-                    existing.setPlatformId(transaction.getPlatformId());
+                    existing.setDesc1(existing.getDesc1() != null ? existing.getDesc1() : transaction.getDesc1());
                 }
             }
         }
@@ -161,5 +155,6 @@ class VirtualFinancialDataServiceTest {
             }
             return result;
         }
+
     }
 }

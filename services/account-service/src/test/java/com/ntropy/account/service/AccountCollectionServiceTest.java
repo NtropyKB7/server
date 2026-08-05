@@ -66,7 +66,8 @@ class AccountCollectionServiceTest {
                     "resAccountTrDate": "20260110",
                     "resAccountOut": "0",
                     "resAccountIn": "10000",
-                    "resAfterTranBalance": "10000"
+                    "resAfterTranBalance": "10000",
+                    "resAccountDesc3": "쿠팡 이츠"
                   }
                 ]
               }
@@ -505,5 +506,6 @@ class AccountCollectionServiceTest {
                             && !transaction.getTranDate().isAfter(endDate))
                     .toList();
         }
+
     }
 }

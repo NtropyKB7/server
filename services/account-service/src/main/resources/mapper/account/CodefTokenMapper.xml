@@ -3,13 +3,13 @@
 <mapper namespace="com.ntropy.account.mapper.CodefTokenMapper">
 
     <insert id="insert" parameterType="com.ntropy.account.domain.entity.CodefToken"
-            useGeneratedKeys="true" keyProperty="id">
+            useGeneratedKeys="true" keyProperty="id" keyColumn="codef_token_id">
         INSERT INTO CODEF_TOKEN (service_type, client_id, access_token, expires_at)
         VALUES (#{serviceType}, #{clientId}, #{accessToken}, #{expiresAt})
     </insert>
 
     <select id="findLatest" resultType="com.ntropy.account.domain.entity.CodefToken">
-        SELECT id,
+        SELECT codef_token_id AS id,
                service_type AS serviceType,
                client_id    AS clientId,
                access_token AS accessToken,
@@ -18,7 +18,7 @@
         FROM CODEF_TOKEN
         WHERE service_type = #{serviceType}
           AND client_id = #{clientId}
-        ORDER BY id DESC
+        ORDER BY codef_token_id DESC
         LIMIT 1
     </select>
 

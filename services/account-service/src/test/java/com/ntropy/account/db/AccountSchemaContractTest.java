@@ -58,21 +58,24 @@ class AccountSchemaContractTest {
     @Test
     void schemaDeclaresFinalKeysAndIndexes() {
         assertTrue(schema.contains("UNIQUE KEY uk_codef_connection_user_provider (user_id, provider)"));
-        assertTrue(schema.contains("INDEX ix_codef_token_lookup (service_type, client_id, id)"));
+        assertTrue(schema.contains(
+                "INDEX ix_codef_token_lookup (service_type, client_id, codef_token_id)"));
         assertTrue(schema.contains(
                 "UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash)"));
         assertTrue(schema.contains("INDEX ix_account_user (user_id)"));
         assertTrue(schema.contains(
                 "UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint)"));
         assertTrue(schema.contains("INDEX ix_account_transaction_account_date (account_id, tran_date)"));
-        assertTrue(schema.contains("INDEX ix_account_transaction_platform (platform_id)"));
+        assertFalse(schema.contains("platform_id"));
+        assertFalse(schema.contains("platform_match_status"));
     }
 
     @Test
     void schemaUsesForeignKeysOnlyInsideAccountService() {
         assertTrue(schema.contains(
-                "FOREIGN KEY (codef_connection_id) REFERENCES CODEF_CONNECTION (id)"));
-        assertTrue(schema.contains("FOREIGN KEY (account_id) REFERENCES ACCOUNT (id)"));
+                "FOREIGN KEY (codef_connection_id)\n        REFERENCES CODEF_CONNECTION (codef_connection_id)"));
+        assertTrue(schema.contains(
+                "FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)"));
         assertFalse(schema.contains("FOREIGN KEY (user_id)"));
         assertFalse(schema.contains("FOREIGN KEY (platform_id)"));
     }
@@ -80,8 +83,9 @@ class AccountSchemaContractTest {
     private static void assertEntityColumns(String tableName, Class<?> entityType) {
         Set<String> expectedColumns = Stream.of(entityType.getDeclaredFields())
                 .filter(field -> !Modifier.isStatic(field.getModifiers()))
-                .map(Field::getName)
-                .map(AccountSchemaContractTest::toSnakeCase)
+                .map(field -> field.getName().equals("id")
+                        ? tableName.toLowerCase() + "_id"
+                        : toSnakeCase(field.getName()))
                 .collect(Collectors.toSet());
         assertEquals(expectedColumns, columns(tableName), tableName + " 컬럼이 엔티티 계약과 다릅니다");
     }
