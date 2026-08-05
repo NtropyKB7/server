@@ -24,6 +24,8 @@ public class DefenseModeResponse {
     private LocalDate expectedReturnDate;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate returnDate;
+    private Long reserveAmountSnapshot;
+    private Long safeAssetAmountSnapshot;
     private Long availableAssetsSnapshot;
     private Long averageMonthlyExpense;
     private Long dailyExpense;
@@ -42,6 +44,7 @@ public class DefenseModeResponse {
         return new DefenseModeResponse(
                 summary.getDefenseId(), summary.getUserId(), summary.getCauseCode(), summary.getCauseName(),
                 summary.getUnavailableStartDate(), summary.getExpectedReturnDate(), summary.getReturnDate(),
+                summary.getReserveAmountSnapshot(), summary.getSafeAssetAmountSnapshot(),
                 summary.getAvailableAssetsSnapshot(), summary.getAverageMonthlyExpense(),
                 summary.getDailyExpense(), summary.getDDay(), toCalculationStatus(summary.getCalculationStatus()),
                 summary.getStatus(), summary.getCreatedAt(),

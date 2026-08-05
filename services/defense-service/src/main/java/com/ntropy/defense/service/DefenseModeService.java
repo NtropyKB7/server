@@ -193,13 +193,17 @@ public class DefenseModeService {
     }
 
     private void applyDiagnosisSnapshot(DefenseMode defenseMode, DiagnosisDefenseSnapshot snapshot) {
-        Long liquidAssets = snapshot == null ? null : snapshot.getLiquidAssets();
+        Long reserveAmount = snapshot == null ? null : snapshot.getReserveAmount();
+        Long safeAssetAmount = snapshot == null ? null : snapshot.getSafeAssetAmount();
+        Long availableAssets = sumNullable(reserveAmount, safeAssetAmount);
         Long averageMonthlyExpense = snapshot == null ? null : snapshot.getAverageMonthlyExpense();
 
-        defenseMode.setAvailableAssetsSnapshot(liquidAssets);
+        defenseMode.setReserveAmountSnapshot(reserveAmount);
+        defenseMode.setSafeAssetAmountSnapshot(safeAssetAmount);
+        defenseMode.setAvailableAssetsSnapshot(availableAssets);
         defenseMode.setAverageMonthlyExpense(averageMonthlyExpense);
 
-        if (liquidAssets == null) {
+        if (availableAssets == null) {
             defenseMode.setCalculationStatus(DefenseCalculationStatus.DIAGNOSIS_REQUIRED);
             return;
         }
@@ -209,10 +213,17 @@ public class DefenseModeService {
         }
 
         long dailyExpense = (long) Math.ceil(averageMonthlyExpense / 30.0);
-        long calculatedDays = liquidAssets / dailyExpense;
+        long calculatedDays = availableAssets / dailyExpense;
         defenseMode.setDailyExpense(dailyExpense);
         defenseMode.setDDay(calculatedDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculatedDays);
         defenseMode.setCalculationStatus(DefenseCalculationStatus.CALCULATED);
+    }
+
+    private Long sumNullable(Long first, Long second) {
+        if (first == null && second == null) {
+            return null;
+        }
+        return (first == null ? 0L : first) + (second == null ? 0L : second);
     }
 
     private FixedExpenseSummary toFixedExpense(

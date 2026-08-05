@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS DEFENSE_MODE
     unavailable_start_date DATE       NOT NULL COMMENT '근무불가 시작일',
     expected_return_date  DATE        NOT NULL COMMENT '예상 복귀일',
     return_date           DATE        NULL COMMENT '사용자가 선언한 실제 복귀일',
+    reserve_amount_snapshot BIGINT    NULL COMMENT '진입 시점 리저브 금액',
+    safe_asset_amount_snapshot BIGINT NULL COMMENT '진입 시점 안전자산 금액',
     available_assets_snapshot BIGINT  NULL COMMENT '진입 시점 최근 재무진단의 유동자산',
     average_monthly_expense BIGINT     NULL COMMENT '최근 최대 3개월 총지출 평균',
     daily_expense         BIGINT      NULL COMMENT '월평균 지출을 30일로 나눈 올림값',

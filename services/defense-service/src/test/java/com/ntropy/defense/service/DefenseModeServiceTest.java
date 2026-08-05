@@ -28,7 +28,7 @@ class DefenseModeServiceTest {
     private final MemoryMapper mapper = new MemoryMapper();
     private final DefenseModeService service = new DefenseModeService(
             mapper,
-            userId -> new DiagnosisDefenseSnapshot(4_680_000L, 3_300_000L),
+            userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
             (userId, fromDate, toDate) -> Collections.emptyList(),
             (userId, fromDate, toDate) -> Collections.emptyList());
 
@@ -38,6 +38,8 @@ class DefenseModeServiceTest {
                 1L, "ACCIDENT_INJURY", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10)));
 
         assertEquals(DefenseModeStatus.ACTIVE, entered.getStatus());
+        assertEquals(1_280_000L, entered.getReserveAmountSnapshot());
+        assertEquals(3_400_000L, entered.getSafeAssetAmountSnapshot());
         assertEquals(4_680_000L, entered.getAvailableAssetsSnapshot());
         assertEquals(110_000L, entered.getDailyExpense());
         assertEquals(42, entered.getDDay());
@@ -67,7 +69,7 @@ class DefenseModeServiceTest {
     void allowsEntryWithoutDiagnosisAndMarksCalculationUnavailable() {
         DefenseModeService serviceWithoutDiagnosis = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(null, null),
+                userId -> new DiagnosisDefenseSnapshot(null, null, null),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Collections.emptyList());
 
@@ -82,7 +84,7 @@ class DefenseModeServiceTest {
     void calculatesFixedExpenseImpactAndKeepsUnknownLoanAmountUncalculated() {
         DefenseModeService fixedExpenseService = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(4_680_000L, 3_300_000L),
+                userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
                 (userId, fromDate, toDate) -> Arrays.asList(
                         new FinancialCommitmentSummary(
                                 1L, 10L, "SAVING_PAYMENT", "청년희망적금", null,
@@ -120,7 +122,7 @@ class DefenseModeServiceTest {
         LocalDate endDate = today.withDayOfMonth(today.lengthOfMonth());
         DefenseModeService incomeLossService = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(4_680_000L, 3_300_000L),
+                userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Arrays.asList(
                         new JobExpectedIncomeLossSummary(101L, "대리운전", 150_000L),
