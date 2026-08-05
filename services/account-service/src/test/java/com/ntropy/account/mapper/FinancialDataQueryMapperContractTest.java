@@ -15,22 +15,26 @@ class FinancialDataQueryMapperContractTest {
     void scopesAccountListAndDetailByUserId() throws IOException {
         String mapper = readMapper();
 
-        assertTrue(mapper.contains("WHERE user_id = #{userId}"));
-        assertTrue(mapper.contains("WHERE account_id = #{accountId}"));
-        assertTrue(mapper.contains("AND user_id = #{userId}"));
+        assertTrue(mapper.contains("WHERE account_row.user_id = #{userId}"));
+        assertTrue(mapper.contains("WHERE account_row.account_id = #{accountId}"));
+        assertTrue(mapper.contains("AND account_row.user_id = #{userId}"));
+        assertTrue(mapper.contains("AND account_row.status = 'ACTIVE'"));
     }
 
     @Test
-    void verifiesTransactionOwnershipInSingleJoinQuery() throws IOException {
-        String query = selectBody(readMapper(), "findTransactionsByAccountIdAndUserId");
+    void verifiesTransactionOwnershipBeforePagedQuery() throws IOException {
+        String countQuery = selectBody(readMapper(), "countTransactionsByAccountIdAndUserId");
+        String pageQuery = selectBody(readMapper(), "findTransactionsByAccountIdAndUserId");
 
-        assertTrue(query.contains("FROM ACCOUNT account_row"));
-        assertTrue(query.contains("LEFT JOIN ACCOUNT_TRANSACTION transaction_row"));
-        assertTrue(query.contains("transaction_row.account_id = account_row.account_id"));
-        assertTrue(query.contains("account_row.account_id = #{accountId}"));
-        assertTrue(query.contains("account_row.user_id = #{userId}"));
-        assertFalse(query.contains("SELECT COUNT"));
-        assertFalse(query.contains("EXISTS"));
+        assertTrue(countQuery.contains("FROM ACCOUNT account_row"));
+        assertTrue(countQuery.contains("LEFT JOIN ACCOUNT_TRANSACTION transaction_row"));
+        assertTrue(countQuery.contains("COUNT(transaction_row.account_transaction_id)"));
+        assertTrue(countQuery.contains("account_row.account_id = #{accountId}"));
+        assertTrue(countQuery.contains("account_row.user_id = #{userId}"));
+        assertTrue(pageQuery.contains("INNER JOIN ACCOUNT_TRANSACTION transaction_row"));
+        assertTrue(pageQuery.contains("ORDER BY transaction_row.tran_date DESC"));
+        assertTrue(pageQuery.contains("LIMIT #{limit} OFFSET #{offset}"));
+        assertFalse(pageQuery.contains("EXISTS"));
     }
 
     private static String selectBody(String mapper, String selectId) {

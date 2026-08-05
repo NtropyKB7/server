@@ -62,7 +62,7 @@ class AccountSchemaContractTest {
                 "INDEX ix_codef_token_lookup (service_type, client_id, codef_token_id)"));
         assertTrue(schema.contains(
                 "UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash)"));
-        assertTrue(schema.contains("INDEX ix_account_user (user_id)"));
+        assertTrue(schema.contains("INDEX ix_account_user_status (user_id, status)"));
         assertTrue(schema.contains(
                 "UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint)"));
         assertTrue(schema.contains("INDEX ix_account_transaction_account_date (account_id, tran_date)"));
@@ -83,6 +83,7 @@ class AccountSchemaContractTest {
     private static void assertEntityColumns(String tableName, Class<?> entityType) {
         Set<String> expectedColumns = Stream.of(entityType.getDeclaredFields())
                 .filter(field -> !Modifier.isStatic(field.getModifiers()))
+                .filter(field -> !Modifier.isTransient(field.getModifiers()))
                 .map(field -> field.getName().equals("id")
                         ? tableName.toLowerCase() + "_id"
                         : toSnakeCase(field.getName()))

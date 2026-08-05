@@ -3,30 +3,58 @@
 <mapper namespace="com.ntropy.account.mapper.FinancialDataQueryMapper">
 
     <sql id="accountColumns">
-        account_id AS id, codef_connection_id AS codefConnectionId, user_id AS userId,
-        organization_code AS organizationCode, account_group AS accountGroup,
-        deposit_type_code AS depositTypeCode, account_no_masked AS accountNoMasked,
-        account_no_hash AS accountNoHash, account_name AS accountName, balance,
-        currency_code AS currencyCode, account_start_date AS accountStartDate,
-        last_tran_date AS lastTranDate, overdraft_yn AS overdraftYn,
-        next_payment_date AS nextPaymentDate, created_at AS createdAt, updated_at AS updatedAt
+        account_row.account_id AS id, account_row.codef_connection_id AS codefConnectionId,
+        account_row.user_id AS userId, connection_row.provider AS connectionProvider,
+        account_row.organization_code AS organizationCode, account_row.account_group AS accountGroup,
+        account_row.deposit_type_code AS depositTypeCode, account_row.account_no_masked AS accountNoMasked,
+        account_row.account_no_hash AS accountNoHash, account_row.account_name AS accountName,
+        account_row.balance, account_row.currency_code AS currencyCode,
+        account_row.account_start_date AS accountStartDate, account_row.last_tran_date AS lastTranDate,
+        account_row.overdraft_yn AS overdraftYn, account_row.next_payment_date AS nextPaymentDate,
+        account_row.status, account_row.deactivated_at AS deactivatedAt,
+        account_row.created_at AS createdAt, account_row.updated_at AS updatedAt
     </sql>
 
     <select id="findAccountsByUserId" resultType="com.ntropy.account.domain.entity.Account">
         SELECT <include refid="accountColumns"/>
-        FROM ACCOUNT
-        WHERE user_id = #{userId}
-        ORDER BY account_id
+        FROM ACCOUNT account_row
+                 INNER JOIN CODEF_CONNECTION connection_row
+                            ON connection_row.codef_connection_id = account_row.codef_connection_id
+        WHERE account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+        ORDER BY account_row.account_id
     </select>
 
     <select id="findAccountByIdAndUserId" resultType="com.ntropy.account.domain.entity.Account">
         SELECT <include refid="accountColumns"/>
-        FROM ACCOUNT
-        WHERE account_id = #{accountId}
-          AND user_id = #{userId}
+        FROM ACCOUNT account_row
+                 INNER JOIN CODEF_CONNECTION connection_row
+                            ON connection_row.codef_connection_id = account_row.codef_connection_id
+        WHERE account_row.account_id = #{accountId}
+          AND account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
     </select>
 
-    <!-- ACCOUNT에서 시작해 소유 계좌는 거래가 없어도 한 행을 반환한다. -->
+    <!-- 소유 계좌가 있으면 거래가 0건이어도 집계 행 하나를 반환한다. -->
+    <select id="countTransactionsByAccountIdAndUserId"
+            resultType="com.ntropy.account.mapper.projection.OwnedTransactionCountRow">
+        SELECT account_row.account_id AS ownedAccountId,
+               COUNT(transaction_row.account_transaction_id) AS totalElements
+        FROM ACCOUNT account_row
+                 LEFT JOIN ACCOUNT_TRANSACTION transaction_row
+                           ON transaction_row.account_id = account_row.account_id
+                           <if test="startDate != null">
+                               AND transaction_row.tran_date &gt;= #{startDate}
+                           </if>
+                           <if test="endDate != null">
+                               AND transaction_row.tran_date &lt;= #{endDate}
+                           </if>
+        WHERE account_row.account_id = #{accountId}
+          AND account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+        GROUP BY account_row.account_id
+    </select>
+
     <select id="findTransactionsByAccountIdAndUserId"
             resultType="com.ntropy.account.mapper.projection.OwnedAccountTransactionRow">
         SELECT account_row.account_id                  AS ownedAccountId,
@@ -42,13 +70,21 @@
                transaction_row.desc3,
                transaction_row.desc4
         FROM ACCOUNT account_row
-                 LEFT JOIN ACCOUNT_TRANSACTION transaction_row
+                 INNER JOIN ACCOUNT_TRANSACTION transaction_row
                            ON transaction_row.account_id = account_row.account_id
         WHERE account_row.account_id = #{accountId}
           AND account_row.user_id = #{userId}
-        ORDER BY transaction_row.tran_date,
-                 transaction_row.tran_time,
-                 transaction_row.account_transaction_id
+          AND account_row.status = 'ACTIVE'
+        <if test="startDate != null">
+          AND transaction_row.tran_date &gt;= #{startDate}
+        </if>
+        <if test="endDate != null">
+          AND transaction_row.tran_date &lt;= #{endDate}
+        </if>
+        ORDER BY transaction_row.tran_date DESC,
+                 transaction_row.tran_time DESC,
+                 transaction_row.account_transaction_id DESC
+        LIMIT #{limit} OFFSET #{offset}
     </select>
 
 </mapper>

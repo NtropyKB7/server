@@ -54,10 +54,12 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     last_tran_date      DATE          NULL COMMENT 'resLastTranDate',
     overdraft_yn        BOOLEAN       NULL COMMENT 'resOverdraftAcctYN (예금/신탁)',
     next_payment_date   DATE          NULL COMMENT '다음 적금 납입일 또는 대출 상환일(resDatePayment/추정)',
+    status              VARCHAR(10)   NOT NULL DEFAULT 'ACTIVE' COMMENT '계좌 상태: ACTIVE, INACTIVE',
+    deactivated_at      DATETIME      NULL COMMENT '계좌 비활성화 시각',
     created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash),
-    INDEX ix_account_user (user_id),
+    INDEX ix_account_user_status (user_id, status),
     CONSTRAINT fk_account_codef_connection FOREIGN KEY (codef_connection_id)
         REFERENCES CODEF_CONNECTION (codef_connection_id)
 ) ENGINE = InnoDB

@@ -1,16 +1,21 @@
 package com.ntropy.account.client;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
 
 import com.ntropy.account.domain.entity.Account;
+import com.ntropy.account.domain.ConnectionProvider;
+import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialDataQueryMapper;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
+import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
 import com.ntropy.common.client.AccountQueryClient;
 import com.ntropy.common.dto.account.AccountSummary;
 import com.ntropy.common.dto.account.AccountTransactionSummary;
+import com.ntropy.common.dto.account.PageSummary;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
@@ -42,27 +47,47 @@ public class LocalAccountQueryClient implements AccountQueryClient {
     }
 
     @Override
-    public List<AccountTransactionSummary> findTransactions(Long userId, Long accountId) {
+    public PageSummary<AccountTransactionSummary> findTransactions(Long userId, Long accountId,
+                                                                    LocalDate startDate, LocalDate endDate,
+                                                                    int page, int size) {
         requirePositive(userId, "userId");
         requirePositive(accountId, "accountId");
+        requirePage(page, size);
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ServiceException(AccountErrorCode.INVALID_REQUEST, "startDate는 endDate보다 늦을 수 없습니다.");
+        }
 
-        List<OwnedAccountTransactionRow> rows =
-                financialDataQueryMapper.findTransactionsByAccountIdAndUserId(accountId, userId);
-        if (rows.isEmpty()) {
+        OwnedTransactionCountRow count = financialDataQueryMapper.countTransactionsByAccountIdAndUserId(
+                accountId, userId, startDate, endDate
+        );
+        if (count == null) {
             throw new ServiceException(AccountErrorCode.ACCOUNT_NOT_FOUND);
         }
-        return rows.stream()
-                .filter(row -> row.getTransactionId() != null)
+
+        long offset = (long) page * size;
+        if (count.getTotalElements() == 0 || offset >= count.getTotalElements()) {
+            return PageSummary.of(List.of(), page, size, count.getTotalElements());
+        }
+        if (offset > Integer.MAX_VALUE) {
+            throw new ServiceException(AccountErrorCode.INVALID_REQUEST, "요청 가능한 페이지 범위를 초과했습니다.");
+        }
+
+        List<AccountTransactionSummary> content = financialDataQueryMapper.findTransactionsByAccountIdAndUserId(
+                        accountId, userId, startDate, endDate, size, (int) offset
+                ).stream()
                 .map(LocalAccountQueryClient::toSummary)
                 .toList();
+        return PageSummary.of(content, page, size, count.getTotalElements());
     }
 
     private static AccountSummary toSummary(Account account) {
         return new AccountSummary(
-                account.getId(), account.getOrganizationCode(), account.getAccountGroup().name(),
+                account.getId(), connectionType(account.getConnectionProvider()), account.getOrganizationCode(),
+                bankName(account.getOrganizationCode()), account.getAccountGroup().name(),
                 account.getDepositTypeCode(), account.getAccountNoMasked(), account.getAccountName(),
                 account.getBalance(), account.getCurrencyCode(), account.getAccountStartDate(),
-                account.getLastTranDate(), account.getOverdraftYn(), account.getNextPaymentDate()
+                account.getLastTranDate(), account.getOverdraftYn(), account.getNextPaymentDate(),
+                account.getStatus() == null ? "ACTIVE" : account.getStatus().name()
         );
     }
 
@@ -77,6 +102,27 @@ public class LocalAccountQueryClient implements AccountQueryClient {
     private static void requirePositive(Long value, String fieldName) {
         if (value == null || value <= 0) {
             throw new ServiceException(AccountErrorCode.INVALID_REQUEST, fieldName + "는 양수여야 합니다.");
+        }
+    }
+
+    private static void requirePage(int page, int size) {
+        if (page < 0) {
+            throw new ServiceException(AccountErrorCode.INVALID_REQUEST, "page는 0 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            throw new ServiceException(AccountErrorCode.INVALID_REQUEST, "size는 1 이상 100 이하여야 합니다.");
+        }
+    }
+
+    private static String connectionType(String provider) {
+        return ConnectionProvider.NTROPY.name().equals(provider) ? "VIRTUAL" : "CODEF";
+    }
+
+    private static String bankName(String organizationCode) {
+        try {
+            return PersonalBank.fromOrganizationCode(organizationCode).getDisplayName();
+        } catch (IllegalArgumentException ignored) {
+            return organizationCode;
         }
     }
 }

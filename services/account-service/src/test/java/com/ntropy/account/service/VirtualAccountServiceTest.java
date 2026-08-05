@@ -26,7 +26,7 @@ class VirtualAccountServiceTest {
     void createsVirtualAccountWithMaskedNumberAndZeroBalance() {
         VirtualAccountService service = newService();
 
-        Account account = service.createVirtualAccount(1L, "0004", "bank-id", "bank-password");
+        Account account = service.createVirtualAccount(1L, "0004");
 
         assertNotNull(account.getId());
         assertEquals("0004", account.getOrganizationCode());
@@ -39,8 +39,8 @@ class VirtualAccountServiceTest {
     void reusesExistingAccountForSameConnectionAndInstitution() {
         VirtualAccountService service = newService();
 
-        Account first = service.createVirtualAccount(1L, "0004", "bank-id", "bank-password");
-        Account second = service.createVirtualAccount(1L, "0004", "bank-id", "bank-password");
+        Account first = service.createVirtualAccount(1L, "0004");
+        Account second = service.createVirtualAccount(1L, "0004");
 
         assertEquals(first.getId(), second.getId());
         assertEquals(first.getAccountNoHash(), second.getAccountNoHash());
@@ -52,30 +52,25 @@ class VirtualAccountServiceTest {
 
         ServiceException exception = assertThrows(
                 ServiceException.class,
-                () -> service.createVirtualAccount(1L, "9999", "bank-id", "bank-password")
+                () -> service.createVirtualAccount(1L, "9999")
         );
         assertEquals(AccountErrorCode.UNSUPPORTED_BANK.getStatusCode(), exception.getStatusCode());
     }
 
     @Test
-    void rejectsBlankBankCredentials() {
+    void createsVirtualAccountWithoutBankCredentials() {
         VirtualAccountService service = newService();
 
-        assertThrows(
-                ServiceException.class,
-                () -> service.createVirtualAccount(1L, "0004", "", "bank-password")
-        );
-        assertThrows(
-                ServiceException.class,
-                () -> service.createVirtualAccount(1L, "0004", "bank-id", " ")
-        );
+        Account account = service.createVirtualAccount(1L, "0004");
+
+        assertNotNull(account.getId());
     }
 
     @Test
     void listsOnlyAccountsForRequestedUser() {
         VirtualAccountService service = newService();
-        service.createVirtualAccount(1L, "0004", "bank-id", "bank-password");
-        service.createVirtualAccount(2L, "0088", "bank-id", "bank-password");
+        service.createVirtualAccount(1L, "0004");
+        service.createVirtualAccount(2L, "0088");
 
         List<Account> accounts = service.listAccounts(1L);
 
@@ -88,7 +83,7 @@ class VirtualAccountServiceTest {
         InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
         VirtualConnectionService connectionService = new VirtualConnectionService(new InMemoryCodefConnectionMapper());
         VirtualAccountService service = new VirtualAccountService(connectionService, accountMapper);
-        Account created = service.createVirtualAccount(1L, "0004", "bank-id", "bank-password");
+        Account created = service.createVirtualAccount(1L, "0004");
 
         service.listAccounts(1L);
         service.getAccountDetail(1L, created.getId());
@@ -101,7 +96,7 @@ class VirtualAccountServiceTest {
     @Test
     void rejectsDetailAccessByNonOwner() {
         VirtualAccountService service = newService();
-        Account created = service.createVirtualAccount(1L, "0004", "bank-id", "bank-password");
+        Account created = service.createVirtualAccount(1L, "0004");
 
         ServiceException exception = assertThrows(
                 ServiceException.class,

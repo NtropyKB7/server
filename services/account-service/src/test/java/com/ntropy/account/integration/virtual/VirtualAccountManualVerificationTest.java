@@ -50,12 +50,8 @@ class VirtualAccountManualVerificationTest {
                      new AnnotationConfigApplicationContext(TestConfig.class)) {
             VirtualAccountService service = context.getBean(VirtualAccountService.class);
 
-            Account first = service.createVirtualAccount(
-                    TEST_USER_ID, TEST_ORGANIZATION_CODE, "virtual-test-id", "virtual-test-password"
-            );
-            Account second = service.createVirtualAccount(
-                    TEST_USER_ID, TEST_ORGANIZATION_CODE, "virtual-test-id", "virtual-test-password"
-            );
+            Account first = service.createVirtualAccount(TEST_USER_ID, TEST_ORGANIZATION_CODE);
+            Account second = service.createVirtualAccount(TEST_USER_ID, TEST_ORGANIZATION_CODE);
 
             assertNotNull(first.getId());
             assertEquals(first.getId(), second.getId(), "동일 요청으로 계좌가 중복 생성됨");

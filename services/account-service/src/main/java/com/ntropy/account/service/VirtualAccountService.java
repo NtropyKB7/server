@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * 실제 CODEF 계정 등록 없이 MVP용 가상계좌를 생성/조회한다 (이슈 #35).
- * 은행 로그인 ID·비밀번호는 요청 처리에만 쓰고 어떤 필드에도 저장하거나 로그에 남기지 않는다.
+ * 가상 연결은 은행 로그인 정보가 필요하지 않다.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,11 +37,9 @@ public class VirtualAccountService {
     private final AccountMapper accountMapper;
 
     @Transactional
-    public Account createVirtualAccount(Long userId, String organizationCode, String bankId, String bankPassword) {
+    public Account createVirtualAccount(Long userId, String organizationCode) {
         requireUserId(userId);
         PersonalBank bank = resolveBank(organizationCode);
-        requireNonBlank(bankId, bank.getDisplayName() + " 로그인 ID");
-        requireNonBlank(bankPassword, bank.getDisplayName() + " 로그인 비밀번호");
 
         CodefConnection connection = virtualConnectionService.getOrCreateConnection(userId);
         virtualConnectionService.registerInstitution(connection, bank.getOrganizationCode());
@@ -111,9 +109,4 @@ public class VirtualAccountService {
         }
     }
 
-    private static void requireNonBlank(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new ServiceException(AccountErrorCode.INVALID_REQUEST, fieldName + "가 필요합니다.");
-        }
-    }
 }
