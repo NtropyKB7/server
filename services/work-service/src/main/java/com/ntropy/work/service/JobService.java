@@ -68,6 +68,10 @@ public class JobService {
         return jobMapper.findByUserId(userId);
     }
 
+    public List<JobSchedule> findSchedulesByJobId(Long jobId) {
+        return jobScheduleMapper.findByJobId(jobId);
+    }
+
     @Transactional
     public Job updateJob(Job job) {
         Job existing = findById(job.getJobId());
