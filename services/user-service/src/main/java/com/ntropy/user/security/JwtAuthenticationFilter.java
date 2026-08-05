@@ -1,9 +1,9 @@
-/*
 package com.ntropy.user.security;
 
 import com.ntropy.auth.security.JwtProvider;
 import com.ntropy.user.model.AccessLog;
-import com.ntropy.user.service.AccessLogService;
+//import com.ntropy.user.service.AccessLogService;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,11 +31,10 @@ import java.util.stream.Stream;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
-    private final AccessLogService accessLogService;
-    private final HttpServletRequest request;
+//    private final AccessLogService accessLogService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         String ipAddress = request.getRemoteAddr();
@@ -60,38 +59,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     log.debug("Security Context에 '{}' 인증 정보를 저장했습니다, uri: {}", authentication.getName(), requestUri);
 
-                    accessLogService.saveAccessLog(AccessLog.builder()
-                            .userId(Long.parseLong(userId))
-                            .ipAddress(ipAddress)
-                            .userAgent(userAgent)
-                            .requestUri(requestUri)
-                            .eventType("JWT_AUTHENTICATION_SUCCESS")
-                            .detail("JWT 토큰 유효성 검증 성공")
-                            .success(true)
-                            .build());
+//                    accessLogService.saveAccessLog(AccessLog.builder()
+//                            .userId(Long.parseLong(userId))
+//                            .ipAddress(ipAddress)
+//                            .userAgent(userAgent)
+//                            .requestUri(requestUri)
+//                            .eventType("JWT_AUTHENTICATION_SUCCESS")
+//                            .detail("JWT 토큰 유효성 검증 성공")
+//                            .success(true)
+//                            .build());
 
                 } else {
-                    accessLogService.saveAccessLog(AccessLog.builder()
-                            .ipAddress(ipAddress)
-                            .userAgent(userAgent)
-                            .requestUri(requestUri)
-                            .eventType("JWT_AUTHENTICATION_FAILURE")
-                            .detail("유효하지 않은 JWT 토큰")
-                            .success(false)
-                            .build());
-                    log.warn("유효하지 않은 JWT 토큰이 감지되었습니다. URI: {}", requestUri);
+//                    accessLogService.saveAccessLog(AccessLog.builder()
+//                            .ipAddress(ipAddress)
+//                            .userAgent(userAgent)
+//                            .requestUri(requestUri)
+//                            .eventType("JWT_AUTHENTICATION_FAILURE")
+//                            .detail("유효하지 않은 JWT 토큰")
+//                            .success(false)
+//                            .build());
+//                    log.warn("유효하지 않은 JWT 토큰이 감지되었습니다. URI: {}", requestUri);
                 }
             }
         } catch (Exception e) {
             log.error("JWT 인증 설정에 실패했습니다: {}", e.getMessage());
-            accessLogService.saveAccessLog(AccessLog.builder()
-                    .ipAddress(ipAddress)
-                    .userAgent(userAgent)
-                    .requestUri(requestUri)
-                    .eventType("JWT_AUTHENTICATION_ERROR")
-                    .detail("JWT 인증 처리 중 예외 발생: " + e.getMessage())
-                    .success(false)
-                    .build());
+//            accessLogService.saveAccessLog(AccessLog.builder()
+//                    .ipAddress(ipAddress)
+//                    .userAgent(userAgent)
+//                    .requestUri(requestUri)
+//                    .eventType("JWT_AUTHENTICATION_ERROR")
+//                    .detail("JWT 인증 처리 중 예외 발생: " + e.getMessage())
+//                    .success(false)
+//                    .build());
         }
 
         filterChain.doFilter(request, response);
@@ -105,4 +104,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 }
-*/

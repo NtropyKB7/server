@@ -1,4 +1,3 @@
-/*
 package com.ntropy.user.security;
 
 import com.ntropy.auth.security.JwtProvider;
@@ -13,7 +12,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@Configuration
+@Configuration("userServiceSecurityConfig")
 @EnableWebSecurity
 @RequiredArgsConstructor
 @Import({JwtAuthenticationFilter.class, JwtProvider.class})
@@ -42,4 +41,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-*/

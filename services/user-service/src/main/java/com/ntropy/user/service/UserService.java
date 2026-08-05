@@ -26,7 +26,7 @@ public class UserService {
     private final KakaoOAuthClient kakaoOAuthClient;
     private final GoogleOAuthClient googleOAuthClient;
     private final JwtProvider jwtProvider;
-    private final AccessLogService accessLogService;
+//    private final AccessLogService accessLogService;
     private final HttpServletRequest request;
 
     @Transactional
@@ -70,16 +70,16 @@ public class UserService {
                 log.info("기존 회원 로그인 처리: userId={}", user.getUserId());
 
                 if (!"ACTIVE".equals(user.getStatus())) {
-                    accessLogService.saveAccessLog(AccessLog.builder()
-                            .userId(user.getUserId())
-                            .email(user.getEmail())
-                            .ipAddress(ipAddress)
-                            .userAgent(userAgent)
-                            .requestUri(requestUri)
-                            .eventType("LOGIN_FAILURE")
-                            .detail("비활성 계정 로그인 시도: " + user.getStatus())
-                            .success(false)
-                            .build());
+//                    accessLogService.saveAccessLog(AccessLog.builder()
+//                            .userId(user.getUserId())
+//                            .email(user.getEmail())
+//                            .ipAddress(ipAddress)
+//                            .userAgent(userAgent)
+//                            .requestUri(requestUri)
+//                            .eventType("LOGIN_FAILURE")
+//                            .detail("비활성 계정 로그인 시도: " + user.getStatus())
+//                            .success(false)
+//                            .build());
                     throw new IllegalStateException("로그인할 수 없는 회원 상태입니다: " + user.getStatus());
                 }
 
@@ -90,16 +90,16 @@ public class UserService {
                 user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
                 userMapper.updateLoginInfo(user);
 
-                accessLogService.saveAccessLog(AccessLog.builder()
-                        .userId(user.getUserId())
-                        .email(user.getEmail())
-                        .ipAddress(ipAddress)
-                        .userAgent(userAgent)
-                        .requestUri(requestUri)
-                        .eventType("LOGIN_SUCCESS")
-                        .detail("기존 회원 로그인 성공")
-                        .success(true)
-                        .build());
+//                accessLogService.saveAccessLog(AccessLog.builder()
+//                        .userId(user.getUserId())
+//                        .email(user.getEmail())
+//                        .ipAddress(ipAddress)
+//                        .userAgent(userAgent)
+//                        .requestUri(requestUri)
+//                        .eventType("LOGIN_SUCCESS")
+//                        .detail("기존 회원 로그인 성공")
+//                        .success(true)
+//                        .build());
 
             } else {
                 user = oauthUserParam;
@@ -116,16 +116,16 @@ public class UserService {
 
                 userMapper.insertUser(user);
 
-                accessLogService.saveAccessLog(AccessLog.builder()
-                        .userId(user.getUserId())
-                        .email(user.getEmail())
-                        .ipAddress(ipAddress)
-                        .userAgent(userAgent)
-                        .requestUri(requestUri)
-                        .eventType("SIGNUP_SUCCESS")
-                        .detail("신규 회원가입 및 로그인 성공")
-                        .success(true)
-                        .build());
+//                accessLogService.saveAccessLog(AccessLog.builder()
+//                        .userId(user.getUserId())
+//                        .email(user.getEmail())
+//                        .ipAddress(ipAddress)
+//                        .userAgent(userAgent)
+//                        .requestUri(requestUri)
+//                        .eventType("SIGNUP_SUCCESS")
+//                        .detail("신규 회원가입 및 로그인 성공")
+//                        .success(true)
+//                        .build());
             }
 
             return OAuthLoginResponse.builder()
@@ -140,15 +140,15 @@ public class UserService {
         } catch (Exception e) {
             // 중복 로그 방지 로직 추가
             if (!(e instanceof IllegalStateException && e.getMessage().contains("로그인할 수 없는 회원 상태입니다"))) {
-                accessLogService.saveAccessLog(AccessLog.builder()
-                        .email(oauthUserParam.getEmail())
-                        .ipAddress(ipAddress)
-                        .userAgent(userAgent)
-                        .requestUri(requestUri)
-                        .eventType("LOGIN_FAILURE")
-                        .detail("로그인/회원가입 처리 중 오류: " + e.getMessage())
-                        .success(false)
-                        .build());
+//                accessLogService.saveAccessLog(AccessLog.builder()
+//                        .email(oauthUserParam.getEmail())
+//                        .ipAddress(ipAddress)
+//                        .userAgent(userAgent)
+//                        .requestUri(requestUri)
+//                        .eventType("LOGIN_FAILURE")
+//                        .detail("로그인/회원가입 처리 중 오류: " + e.getMessage())
+//                        .success(false)
+//                        .build());
             }
             throw e;
         }
@@ -168,30 +168,30 @@ public class UserService {
     @Transactional
     public void deleteUser(Long userId) {
         userMapper.deleteUser(userId);
-        accessLogService.saveAccessLog(AccessLog.builder()
-                .userId(userId)
-                .ipAddress(request.getRemoteAddr())
-                .userAgent(request.getHeader("User-Agent"))
-                .requestUri(request.getRequestURI())
-                .eventType("USER_DEACTIVATION")
-                .detail("회원 탈퇴 처리")
-                .success(true)
-                .build());
+//        accessLogService.saveAccessLog(AccessLog.builder()
+//                .userId(userId)
+//                .ipAddress(request.getRemoteAddr())
+//                .userAgent(request.getHeader("User-Agent"))
+//                .requestUri(request.getRequestURI())
+//                .eventType("USER_DEACTIVATION")
+//                .detail("회원 탈퇴 처리")
+//                .success(true)
+//                .build());
     }
 
     @Transactional
     public void logout(Long userId) {
         userMapper.invalidateRefreshToken(userId);
         log.info("사용자 로그아웃: userId={}의 Refresh Token을 폐기했습니다.", userId);
-        accessLogService.saveAccessLog(AccessLog.builder()
-                .userId(userId)
-                .ipAddress(request.getRemoteAddr())
-                .userAgent(request.getHeader("User-Agent"))
-                .requestUri(request.getRequestURI())
-                .eventType("LOGOUT_SUCCESS")
-                .detail("로그아웃 성공")
-                .success(true)
-                .build());
+//        accessLogService.saveAccessLog(AccessLog.builder()
+//                .userId(userId)
+//                .ipAddress(request.getRemoteAddr())
+//                .userAgent(request.getHeader("User-Agent"))
+//                .requestUri(request.getRequestURI())
+//                .eventType("LOGOUT_SUCCESS")
+//                .detail("로그아웃 성공")
+//                .success(true)
+//                .build());
     }
 
     @Transactional
@@ -202,27 +202,27 @@ public class UserService {
 
         try {
             if (!jwtProvider.validateToken(refreshToken)) {
-                accessLogService.saveAccessLog(AccessLog.builder()
-                        .ipAddress(ipAddress)
-                        .userAgent(userAgent)
-                        .requestUri(requestUri)
-                        .eventType("TOKEN_REFRESH_FAILURE")
-                        .detail("유효하지 않은 Refresh Token")
-                        .success(false)
-                        .build());
+//                accessLogService.saveAccessLog(AccessLog.builder()
+//                        .ipAddress(ipAddress)
+//                        .userAgent(userAgent)
+//                        .requestUri(requestUri)
+//                        .eventType("TOKEN_REFRESH_FAILURE")
+//                        .detail("유효하지 않은 Refresh Token")
+//                        .success(false)
+//                        .build());
                 throw new SecurityException("유효하지 않은 Refresh Token입니다.");
             }
 
             User user = userMapper.findByRefreshToken(refreshToken)
                     .orElseThrow(() -> {
-                        accessLogService.saveAccessLog(AccessLog.builder()
-                                .ipAddress(ipAddress)
-                                .userAgent(userAgent)
-                                .requestUri(requestUri)
-                                .eventType("TOKEN_REFRESH_FAILURE")
-                                .detail("DB에서 Refresh Token에 해당하는 사용자 없음")
-                                .success(false)
-                                .build());
+//                        accessLogService.saveAccessLog(AccessLog.builder()
+//                                .ipAddress(ipAddress)
+//                                .userAgent(userAgent)
+//                                .requestUri(requestUri)
+//                                .eventType("TOKEN_REFRESH_FAILURE")
+//                                .detail("DB에서 Refresh Token에 해당하는 사용자 없음")
+//                                .success(false)
+//                                .build());
                         return new SecurityException("Refresh Token에 해당하는 사용자를 찾을 수 없습니다.");
                     });
 
@@ -234,28 +234,28 @@ public class UserService {
             userMapper.updateLoginInfo(user);
 
             log.info("Access Token 재발급 및 Refresh Token 회전 완료: userId={}", user.getUserId());
-            accessLogService.saveAccessLog(AccessLog.builder()
-                    .userId(user.getUserId())
-                    .email(user.getEmail())
-                    .ipAddress(ipAddress)
-                    .userAgent(userAgent)
-                    .requestUri(requestUri)
-                    .eventType("TOKEN_REFRESH_SUCCESS")
-                    .detail("Access Token 재발급 성공")
-                    .success(true)
-                    .build());
+//            accessLogService.saveAccessLog(AccessLog.builder()
+//                    .userId(user.getUserId())
+//                    .email(user.getEmail())
+//                    .ipAddress(ipAddress)
+//                    .userAgent(userAgent)
+//                    .requestUri(requestUri)
+//                    .eventType("TOKEN_REFRESH_SUCCESS")
+//                    .detail("Access Token 재발급 성공")
+//                    .success(true)
+//                    .build());
 
             return new TokenRefreshResponseDto(newAccessToken, newRefreshToken);
         } catch (Exception e) {
             if (!(e instanceof SecurityException && e.getMessage().contains("유효하지 않은 Refresh Token입니다."))) {
-                accessLogService.saveAccessLog(AccessLog.builder()
-                        .ipAddress(ipAddress)
-                        .userAgent(userAgent)
-                        .requestUri(requestUri)
-                        .eventType("TOKEN_REFRESH_FAILURE")
-                        .detail("Access Token 재발급 중 오류: " + e.getMessage())
-                        .success(false)
-                        .build());
+//                accessLogService.saveAccessLog(AccessLog.builder()
+//                        .ipAddress(ipAddress)
+//                        .userAgent(userAgent)
+//                        .requestUri(requestUri)
+//                        .eventType("TOKEN_REFRESH_FAILURE")
+//                        .detail("Access Token 재발급 중 오류: " + e.getMessage())
+//                        .success(false)
+//                        .build());
             }
             throw e;
         }

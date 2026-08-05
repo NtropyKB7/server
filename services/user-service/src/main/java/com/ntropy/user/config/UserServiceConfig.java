@@ -2,10 +2,14 @@ package com.ntropy.user.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
+@PropertySource("classpath:user-local.properties")
+@ComponentScan("com.ntropy.user")
 public class UserServiceConfig {
 
     @Bean

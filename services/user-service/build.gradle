@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-    id 'war' // WAR 파일 생성을 위한 플러그인
 }
 
 group = 'com.ntropy'
@@ -35,7 +34,7 @@ dependencies {
     implementation "org.springframework.security:spring-security-config:${springSecurityVersion}"
 
     // 3. Servlet API
-    providedCompile 'javax.servlet:javax.servlet-api:4.0.1'
+    compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
 
     // 4. 데이터베이스 (MyBatis, MySQL)
     implementation "org.mybatis:mybatis:${mybatisVersion}"
@@ -49,9 +48,6 @@ dependencies {
     runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
 
-    // 6. Swagger
-    implementation "io.springfox:springfox-swagger2:${springfoxVersion}"
-    implementation "io.springfox:springfox-swagger-ui:${springfoxVersion}"
 
     // 7. Lombok
     compileOnly "org.projectlombok:lombok:${lombokVersion}"

@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS USERS;
 
-CREATE TABLE users (
+CREATE TABLE USERS (
                        user_id BIGINT AUTO_INCREMENT PRIMARY KEY,          -- 회원 고유 번호
                        email VARCHAR(100),                                 -- 이메일
                        name VARCHAR(50),                                   -- 이름 (또는 닉네임)
