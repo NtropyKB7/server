@@ -17,7 +17,7 @@
     </insert>
 
     <select id="findByAccountIdAndDateRange" resultType="com.ntropy.account.domain.entity.AccountTransaction">
-        SELECT id,
+        SELECT account_transaction_id AS id,
                account_id           AS accountId,
                platform_id          AS platformId,
                fingerprint,
@@ -35,7 +35,7 @@
         FROM ACCOUNT_TRANSACTION
         WHERE account_id = #{accountId}
           AND tran_date BETWEEN #{startDate} AND #{endDate}
-        ORDER BY tran_date, tran_time, id
+        ORDER BY tran_date, tran_time, account_transaction_id
     </select>
 
 </mapper>

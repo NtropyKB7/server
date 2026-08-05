@@ -27,11 +27,11 @@
         SET account_start_date = COALESCE(#{accountStartDate}, account_start_date),
             balance = COALESCE(#{balance}, balance),
             next_payment_date = #{nextPaymentDate}
-        WHERE id = #{id}
+        WHERE account_id = #{id}
     </update>
 
     <select id="findByConnectionIdAndAccountNoHash" resultType="com.ntropy.account.domain.entity.Account">
-        SELECT id,
+        SELECT account_id          AS id,
                codef_connection_id AS codefConnectionId,
                user_id             AS userId,
                organization_code   AS organizationCode,
@@ -54,7 +54,7 @@
     </select>
 
     <select id="findByIdAndProvider" resultType="com.ntropy.account.domain.entity.Account">
-        SELECT id,
+        SELECT account_id          AS id,
                codef_connection_id AS codefConnectionId,
                user_id             AS userId,
                organization_code   AS organizationCode,
@@ -72,16 +72,16 @@
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
-        WHERE id = #{id}
+        WHERE account_id = #{id}
           AND codef_connection_id IN (
-              SELECT id
+              SELECT codef_connection_id
               FROM CODEF_CONNECTION
               WHERE provider = #{provider}
           )
     </select>
 
     <select id="findByUserIdAndProvider" resultType="com.ntropy.account.domain.entity.Account">
-        SELECT id,
+        SELECT account_id          AS id,
                codef_connection_id AS codefConnectionId,
                user_id             AS userId,
                organization_code   AS organizationCode,
@@ -101,11 +101,11 @@
         FROM ACCOUNT
         WHERE user_id = #{userId}
           AND codef_connection_id IN (
-              SELECT id
+              SELECT codef_connection_id
               FROM CODEF_CONNECTION
               WHERE provider = #{provider}
           )
-        ORDER BY id
+        ORDER BY account_id
     </select>
 
 </mapper>

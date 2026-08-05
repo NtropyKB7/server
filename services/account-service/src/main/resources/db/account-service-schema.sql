@@ -10,7 +10,7 @@
 
 CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 (
-    id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    codef_connection_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id                     BIGINT       NOT NULL COMMENT 'user-service USER.id 참조 (크로스 도메인 FK 없음)',
     provider                    VARCHAR(10)  NOT NULL DEFAULT 'CODEF' COMMENT '연결 제공자: CODEF(실제 CODEF 연동), NTROPY(가상 연결, 이슈 #35)',
     connected_id                VARCHAR(100) NOT NULL COMMENT 'CODEF 커넥티드 아이디 (실연결은 계정 등록 API 응답값, 가상연결은 서버에서 발급한 NTROPY-{UUID})',
@@ -25,13 +25,13 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
 -- 지금은 DB로만 캐싱하고, 추후 Redis 도입 시 CodefTokenStore의 Redis 구현체로 대체 예정 (DEVLOG 참고).
 CREATE TABLE IF NOT EXISTS CODEF_TOKEN
 (
-    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    codef_token_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     service_type VARCHAR(20)   NOT NULL COMMENT 'SANDBOX, DEMO, API',
     client_id    VARCHAR(100)  NOT NULL COMMENT '토큰을 발급받은 CODEF OAuth 클라이언트 식별자',
     access_token VARCHAR(2000) NOT NULL,
     expires_at   DATETIME      NOT NULL COMMENT 'accessToken 만료 시각 (발급 시각 + expires_in)',
     created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX ix_codef_token_lookup (service_type, client_id, id)
+    INDEX ix_codef_token_lookup (service_type, client_id, codef_token_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS CODEF_TOKEN
 -- 계좌번호 원문은 저장하지 않고 표시용 마스킹 값과 중복 판별용 해시만 저장한다.
 CREATE TABLE IF NOT EXISTS ACCOUNT
 (
-    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
-    codef_connection_id BIGINT        NOT NULL COMMENT 'CODEF_CONNECTION.id 참조',
+    account_id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    codef_connection_id BIGINT        NOT NULL COMMENT 'CODEF_CONNECTION.codef_connection_id 참조',
     user_id             BIGINT        NOT NULL COMMENT 'user-service USER.id 참조 (크로스 도메인 FK 없음), 조회 편의를 위한 비정규화',
     organization_code   VARCHAR(10)   NOT NULL COMMENT 'CODEF 기관코드',
     account_group       VARCHAR(20)   NOT NULL COMMENT 'DEPOSIT_TRUST, FOREIGN_CURRENCY, FUND, LOAN, INSURANCE',
@@ -58,15 +58,16 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash),
     INDEX ix_account_user (user_id),
-    CONSTRAINT fk_account_codef_connection FOREIGN KEY (codef_connection_id) REFERENCES CODEF_CONNECTION (id)
+    CONSTRAINT fk_account_codef_connection FOREIGN KEY (codef_connection_id)
+        REFERENCES CODEF_CONNECTION (codef_connection_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
 -- CODEF 수시입출 거래내역(transaction-list) 응답을 저장. fingerprint로 동일 거래의 반복 저장을 막는다.
 CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
 (
-    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.id 참조',
+    account_transaction_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.account_id 참조',
     platform_id   BIGINT        NULL COMMENT 'work-service PLATFORM.platform_id 논리 참조 (크로스 도메인 FK 없음)',
     fingerprint   CHAR(64)      NOT NULL COMMENT '계좌·거래일시·상품별 금액·상세 기반 SHA-256',
     transaction_category VARCHAR(20) NOT NULL DEFAULT 'ORDINARY' COMMENT 'ORDINARY, INSTALLMENT, LOAN',
@@ -83,6 +84,6 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
     INDEX ix_account_transaction_platform (platform_id),
-    CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (id)
+    CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;

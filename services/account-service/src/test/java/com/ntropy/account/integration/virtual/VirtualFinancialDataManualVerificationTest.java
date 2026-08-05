@@ -58,13 +58,13 @@ class VirtualFinancialDataManualVerificationTest {
             assertEquals(15_000, count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                     """));
             assertEquals(11, count(jdbc, """
                     SELECT COUNT(DISTINCT transaction_row.platform_id)
                     FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND transaction_row.platform_id IS NOT NULL
                     """));
@@ -72,7 +72,7 @@ class VirtualFinancialDataManualVerificationTest {
                     SELECT COUNT(*) FROM (
                         SELECT transaction_row.account_id, transaction_row.fingerprint
                         FROM ACCOUNT_TRANSACTION transaction_row
-                        JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                        JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                         WHERE account_row.user_id BETWEEN ? AND ?
                         GROUP BY transaction_row.account_id, transaction_row.fingerprint
                         HAVING COUNT(*) > 1
@@ -81,14 +81,14 @@ class VirtualFinancialDataManualVerificationTest {
             assertEquals(0, count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND transaction_row.desc2 IN ('입금', '출금')
                     """));
             assertEquals(180, count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND account_row.organization_code = '0003'
                       AND transaction_row.platform_id IS NOT NULL
@@ -97,7 +97,7 @@ class VirtualFinancialDataManualVerificationTest {
             assertEquals(225, count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND REPLACE(transaction_row.desc3, '홈)', '') IN (
                           '삼성생명 실손보험', '현대해상 건강보험', 'DB손해보험 운전자보험',
@@ -107,7 +107,7 @@ class VirtualFinancialDataManualVerificationTest {
             assertEquals(6, count(jdbc, """
                     SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
                     FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.id = transaction_row.account_id
+                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND REPLACE(transaction_row.desc3, '홈)', '') IN (
                           '삼성생명 실손보험', '현대해상 건강보험', 'DB손해보험 운전자보험',
