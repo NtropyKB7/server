@@ -9,8 +9,7 @@ public enum AccountErrorCode implements ServiceErrorCode {
 
     UNSUPPORTED_BANK(400, "지원하지 않는 은행 기관코드입니다."),
     INVALID_REQUEST(400, "요청 값이 올바르지 않습니다."),
-    ACCOUNT_NOT_FOUND(404, "계좌를 찾을 수 없습니다."),
-    FORBIDDEN(403, "본인의 계좌만 조회할 수 있습니다.");
+    ACCOUNT_NOT_FOUND(404, "계좌를 찾을 수 없습니다.");
 
     private final int statusCode;
     private final String message;
