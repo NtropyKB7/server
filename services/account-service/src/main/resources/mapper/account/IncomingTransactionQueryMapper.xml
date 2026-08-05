@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.IncomingTransactionQueryMapper">
+
+    <select id="findByUserIdAndDateRange"
+            resultType="com.ntropy.account.mapper.projection.IncomingTransactionRow">
+        SELECT transaction_row.account_transaction_id AS transactionId,
+               account_row.organization_code          AS organizationCode,
+               transaction_row.tran_date               AS transactionDate,
+               transaction_row.tran_time               AS transactionTime,
+               transaction_row.in_amount               AS amount,
+               transaction_row.desc1,
+               transaction_row.desc2,
+               transaction_row.desc3,
+               transaction_row.desc4
+        FROM ACCOUNT_TRANSACTION transaction_row
+                 INNER JOIN ACCOUNT account_row
+                            ON account_row.account_id = transaction_row.account_id
+        WHERE account_row.user_id = #{userId}
+          AND transaction_row.transaction_category = 'ORDINARY'
+          AND transaction_row.in_amount &gt; 0
+          AND transaction_row.tran_date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY transaction_row.tran_date,
+                 transaction_row.tran_time,
+                 transaction_row.account_transaction_id
+    </select>
+
+</mapper>
