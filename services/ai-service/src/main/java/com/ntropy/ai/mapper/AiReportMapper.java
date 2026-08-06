@@ -4,11 +4,13 @@ import com.ntropy.ai.domain.AiReport;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * AI_REPORT 테이블 접근을 위한 MyBatis Mapper 인터페이스
  * 메서드 이름과 AiReportMapper.xml의 id 값이 1:1로 매핑됨
  */
+@Mapper
 public interface AiReportMapper {
 
     /**

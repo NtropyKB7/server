@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS `AI_REPORT` (
     CONSTRAINT `PK_AI_REPORT` PRIMARY KEY (`report_id`)
     );
 
--- 2. 인덱스 생성 (조회 성능 최적화)
--- 모듈 간 경계 준수를 위해 user_id에 물리적 FK 제약조건은 걸지 않되,
--- (user_id, year_month) 조건의 초고속 조회를 위해 복합 인덱스(Index) 생성
-CREATE INDEX `IDX_AI_REPORT_USER_YM` ON `AI_REPORT` (`user_id`, `year_month`);
+-- 2. 유니크 인덱스 생성
+-- 사용자별 월간 AI 리포트는 한 건만 저장되도록
+-- (user_id, year_month) 복합 유니크 인덱스를 생성합니다.
+CREATE UNIQUE INDEX `UK_AI_REPORT_USER_YM`
+    ON `AI_REPORT` (`user_id`, `year_month`);

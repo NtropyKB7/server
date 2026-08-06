@@ -16,42 +16,45 @@
 
     <!-- 공통으로 사용할 SELECT 컬럼 리스트 조각 -->
     <sql id="aiReportColumns">
-        report_id, user_id, year_month, financial_summary_json, recommendation_json, created_at
+        `report_id`, `user_id`, `year_month`,
+    `financial_summary_json`, `recommendation_json`, `created_at`
     </sql>
 
-    <!-- 1. AI 리포트 데이터 신규 저장 (insert) -->
-    <!-- useGeneratedKeys="true"로 지정하여 DB에서 AUTO_INCREMENT 된 report_id를 객체에 자동 채움 -->
+    <!-- 1. AI 리포트 데이터 신규 저장 -->
     <insert id="insert" parameterType="com.ntropy.ai.domain.AiReport"
             useGeneratedKeys="true" keyProperty="reportId" keyColumn="report_id">
-        INSERT INTO AI_REPORT (
-            user_id, year_month, financial_summary_json, recommendation_json
+        INSERT INTO `AI_REPORT` (
+            `user_id`, `year_month`,
+            `financial_summary_json`, `recommendation_json`
         ) VALUES (
-                     #{userId}, #{yearMonth}, #{financialSummaryJson}, #{recommendationJson}
+                     #{userId}, #{yearMonth},
+                     #{financialSummaryJson}, #{recommendationJson}
                  )
     </insert>
 
-    <!-- 2. PK(report_id) 기준 단건 조회 (findById) -->
+    <!-- 2. PK(report_id) 기준 단건 조회 -->
     <select id="findById" resultMap="aiReportResultMap">
         SELECT <include refid="aiReportColumns"/>
-        FROM AI_REPORT
-        WHERE report_id = #{reportId}
+        FROM `AI_REPORT`
+        WHERE `report_id` = #{reportId}
     </select>
 
-    <!-- 3. 특정 유저의 해당 연월(user_id, year_month) 리포트 조회 (findByUserIdAndYearMonth) -->
-    <!-- IDX_AI_REPORT_USER_YM 복합 인덱스를 타고 빠르게 조회됨 -->
+    <!-- 3. 특정 유저의 해당 연월 리포트 조회 -->
+    <!-- UK_AI_REPORT_USER_YM 복합 유니크 인덱스를 사용합니다. -->
     <select id="findByUserIdAndYearMonth" resultMap="aiReportResultMap">
         SELECT <include refid="aiReportColumns"/>
-        FROM AI_REPORT
-        WHERE user_id = #{userId} AND year_month = #{yearMonth}
+        FROM `AI_REPORT`
+        WHERE `user_id` = #{userId}
+        AND `year_month` = #{yearMonth}
         LIMIT 1
     </select>
 
-    <!-- 4. 특정 유저의 전체 리포트 히스토리 최신순 조회 (findAllByUserId) -->
+    <!-- 4. 특정 유저의 전체 리포트 히스토리 최신순 조회 -->
     <select id="findAllByUserId" resultMap="aiReportResultMap">
         SELECT <include refid="aiReportColumns"/>
-        FROM AI_REPORT
-        WHERE user_id = #{userId}
-        ORDER BY year_month DESC
+        FROM `AI_REPORT`
+        WHERE `user_id` = #{userId}
+        ORDER BY `year_month` DESC
     </select>
 
 </mapper>
