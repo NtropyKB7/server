@@ -8,6 +8,7 @@ import com.ntropy.ai.mapper.AiReportMapper;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 
 /**
  * AI_REPORT 조회와 관련된 비즈니스 로직을 담당하는 Service입니다.
@@ -61,5 +62,28 @@ public class AiReportService {
         }
 
         return aiReport;
+    }
+
+    /**
+     * 특정 사용자의 전체 AI 리포트 목록을 최신 연월순으로 조회합니다.
+     *
+     * AI 리포트가 아직 없는 신규 사용자는 예외를 발생시키지 않고
+     * 빈 목록을 반환합니다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 최신 연월순으로 정렬된 AI 리포트 목록
+     */
+    public List<AiReport> findAllByUserId(Long userId) {
+        // userId가 없거나 0 이하이면 잘못된 요청으로 처리합니다.
+        if (userId == null || userId <= 0) {
+            throw new ServiceException(
+                    AiReportErrorCode.INVALID_REQUEST,
+                    "userId는 1 이상의 값이어야 합니다."
+            );
+        }
+
+        // Mapper XML의 ORDER BY year_month DESC 쿼리를 실행합니다.
+        // 조회 결과가 없으면 MyBatis는 빈 List를 반환합니다.
+        return aiReportMapper.findAllByUserId(userId);
     }
 }
