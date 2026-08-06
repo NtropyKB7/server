@@ -4,6 +4,10 @@ package com.ntropy.common.dto.user;
 public record UserSummary(
         Long userId,
         String name,
-        String email
+        String email,
+        String provider,
+        Boolean alarmAgree,
+        Boolean locationAgree,
+        Boolean onboardingCompleted
 ) {
 }

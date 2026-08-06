@@ -20,6 +20,14 @@ public class LocalUserQueryClient implements UserQueryClient {
         if (user == null) {
             return null;
         }
-        return new UserSummary(user.getUserId(), user.getName(), user.getEmail());
+        return new UserSummary(
+                user.getUserId(),
+                user.getName(),
+                user.getEmail(),
+                user.getProvider(),
+                user.getAlarmAgree(),
+                user.getLocationAgree(),
+                user.getOnboardingCompleted()
+        );
     }
 }
