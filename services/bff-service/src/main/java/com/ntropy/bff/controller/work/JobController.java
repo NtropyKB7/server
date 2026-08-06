@@ -13,11 +13,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ntropy.bff.dto.work.request.JobCreateRequest;
+import com.ntropy.bff.dto.work.response.JobCandidatesResponse;
 import com.ntropy.bff.dto.work.response.JobCreateResponse;
 import com.ntropy.bff.dto.work.response.JobResponse;
 import com.ntropy.bff.dto.work.request.JobUpdateRequest;
 import com.ntropy.bff.dto.work.response.JobsResponse;
 import com.ntropy.bff.dto.common.ApiResponse;
+import com.ntropy.common.client.JobCandidateQueryClient;
 import com.ntropy.common.client.JobCommandClient;
 import com.ntropy.common.client.JobQueryClient;
 
@@ -30,6 +32,7 @@ public class JobController {
 
     private final JobQueryClient jobQueryClient;
     private final JobCommandClient jobCommandClient;
+    private final JobCandidateQueryClient jobCandidateQueryClient;
 
     @GetMapping("/{jobId}")
     public ApiResponse<JobResponse> getJob(@PathVariable Long jobId) {
@@ -39,6 +42,11 @@ public class JobController {
     @GetMapping
     public ApiResponse<JobsResponse> getJobs(@RequestParam Long userId) {
         return ApiResponse.success(JobsResponse.from(jobQueryClient.getJobsByUserId(userId)));
+    }
+
+    @GetMapping("/candidates")
+    public ApiResponse<JobCandidatesResponse> getJobCandidates(@RequestParam Long userId) {
+        return ApiResponse.success(JobCandidatesResponse.from(jobCandidateQueryClient.getJobCandidates(userId)));
     }
 
     @PostMapping
