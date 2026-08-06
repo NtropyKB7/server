@@ -66,7 +66,7 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .baseFatigue(command.getBaseFatigue())
                 .build();
 
-        jobService.updateJob(job);
+        jobService.updateJob(job, toSchedules(command.getSchedules()));
     }
 
     @Override

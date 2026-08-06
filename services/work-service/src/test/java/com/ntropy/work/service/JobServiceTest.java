@@ -179,7 +179,7 @@ class JobServiceTest {
         Job job = jobService.registerJob(baseJob().build(), null);
         Job patch = baseJob().jobId(job.getJobId()).hourlyWage(null).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch));
+        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, null));
     }
 
     @Test
@@ -187,7 +187,7 @@ class JobServiceTest {
     void updateJob_notFound_throws() {
         Job patch = baseJob().jobId(999L).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch));
+        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, null));
     }
 
     @Test
@@ -266,8 +266,62 @@ class JobServiceTest {
                 List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(23, 0))));
 
         Job patch = baseJob().jobId(job.getJobId()).isRegular(true).hourlyWage(15000).build();
-        Job result = jobService.updateJob(patch);
+        Job result = jobService.updateJob(patch,
+                List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(23, 0))));
 
         assertEquals(Math.round(5 * (30.0 / 7.0) * 15000), result.getMonthlyExpectedIncome());
+    }
+
+    @Test
+    @DisplayName("정기잡을 스케줄 없이 수정하면 실패한다")
+    void updateJob_regularWithoutSchedule_throws() {
+        Job job = jobService.registerJob(baseJob().isRegular(true).build(),
+                List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0))));
+        Job patch = baseJob().jobId(job.getJobId()).isRegular(true).build();
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, null));
+    }
+
+    @Test
+    @DisplayName("잡을 수정하면 기존 스케줄이 새 스케줄로 통째로 교체된다")
+    void updateJob_replacesSchedulesEntirely() {
+        Job job = jobService.registerJob(baseJob().isRegular(true).build(),
+                List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0))));
+
+        Job patch = baseJob().jobId(job.getJobId()).isRegular(true).build();
+        List<JobSchedule> newSchedules = List.of(scheduleOf("TUE", LocalTime.of(9, 0), LocalTime.of(13, 0)));
+        jobService.updateJob(patch, newSchedules);
+
+        List<JobSchedule> saved = jobScheduleMapper.findByJobId(job.getJobId());
+        assertEquals(1, saved.size());
+        assertEquals("TUE", saved.get(0).getDayOfWeek());
+    }
+
+    @Test
+    @DisplayName("수정 시 자기 자신의 기존 스케줄과 같은 시간대를 다시 넣어도 겹침으로 실패하지 않는다")
+    void updateJob_sameScheduleAsBefore_doesNotThrowOverlap() {
+        Job job = jobService.registerJob(baseJob().isRegular(true).build(),
+                List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0))));
+
+        Job patch = baseJob().jobId(job.getJobId()).isRegular(true).build();
+        List<JobSchedule> sameSchedule = List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0)));
+
+        Job result = jobService.updateJob(patch, sameSchedule);
+
+        assertEquals(1, jobScheduleMapper.findByJobId(result.getJobId()).size());
+    }
+
+    @Test
+    @DisplayName("수정 시 다른 잡의 스케줄과 겹치면 실패한다")
+    void updateJob_overlapsWithAnotherJob_throws() {
+        jobService.registerJob(baseJob().isRegular(true).build(),
+                List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0))));
+        Job secondJob = jobService.registerJob(baseJob().jobName("쿠팡이츠 배달").isRegular(true).build(),
+                List.of(scheduleOf("TUE", LocalTime.of(18, 0), LocalTime.of(22, 0))));
+
+        Job patch = baseJob().jobId(secondJob.getJobId()).jobName("쿠팡이츠 배달").isRegular(true).build();
+        List<JobSchedule> overlapping = List.of(scheduleOf("MON", LocalTime.of(19, 0), LocalTime.of(21, 0)));
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, overlapping));
     }
 }

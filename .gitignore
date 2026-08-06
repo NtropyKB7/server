@@ -13,11 +13,15 @@ application-*.properties
 codef-local.properties
 portone-local.properties
 weather-local.properties
+user-local.properties
 
 ### 개인 문서/도구 ###
 CLAUDE.local.md
 DEVLOG.md
 .ai/
+
+### mock 데이터 ###
+services/work-service/src/main/resources/db/work-service-mock-data.sql
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

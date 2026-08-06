@@ -46,4 +46,9 @@ public class InMemoryJobScheduleMapper implements JobScheduleMapper {
     public void deleteById(Long scheduleId) {
         store.remove(scheduleId);
     }
+
+    @Override
+    public void deleteByJobId(Long jobId) {
+        store.values().removeIf(schedule -> jobId.equals(schedule.getJobId()));
+    }
 }

@@ -6,11 +6,12 @@
         INSERT INTO ACCOUNT (
             codef_connection_id, user_id, organization_code, account_group, deposit_type_code,
             account_no_masked, account_no_hash, account_name, balance, currency_code,
-            account_start_date, last_tran_date, overdraft_yn
+            account_start_date, last_tran_date, overdraft_yn, next_payment_date, status, deactivated_at
         ) VALUES (
             #{codefConnectionId}, #{userId}, #{organizationCode}, #{accountGroup}, #{depositTypeCode},
             #{accountNoMasked}, #{accountNoHash}, #{accountName}, #{balance}, #{currencyCode},
-            #{accountStartDate}, #{lastTranDate}, #{overdraftYn}
+            #{accountStartDate}, #{lastTranDate}, #{overdraftYn}, #{nextPaymentDate},
+            COALESCE(#{status}, 'ACTIVE'), #{deactivatedAt}
         )
         ON DUPLICATE KEY UPDATE
             account_no_masked = VALUES(account_no_masked),
@@ -19,7 +20,10 @@
             currency_code = VALUES(currency_code),
             account_start_date = VALUES(account_start_date),
             last_tran_date = VALUES(last_tran_date),
-            overdraft_yn = VALUES(overdraft_yn)
+            overdraft_yn = VALUES(overdraft_yn),
+            next_payment_date = VALUES(next_payment_date),
+            status = 'ACTIVE',
+            deactivated_at = NULL
     </insert>
 
     <update id="updateAccountDetails" parameterType="com.ntropy.account.domain.entity.Account">
@@ -46,6 +50,8 @@
                last_tran_date      AS lastTranDate,
                overdraft_yn        AS overdraftYn,
                next_payment_date   AS nextPaymentDate,
+               status,
+               deactivated_at      AS deactivatedAt,
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
@@ -69,6 +75,8 @@
                last_tran_date      AS lastTranDate,
                overdraft_yn        AS overdraftYn,
                next_payment_date   AS nextPaymentDate,
+               status,
+               deactivated_at      AS deactivatedAt,
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
@@ -79,6 +87,7 @@
               FROM CODEF_CONNECTION
               WHERE provider = #{provider}
           )
+          AND status = 'ACTIVE'
     </select>
 
     <select id="findByUserIdAndProvider" resultType="com.ntropy.account.domain.entity.Account">
@@ -97,6 +106,8 @@
                last_tran_date      AS lastTranDate,
                overdraft_yn        AS overdraftYn,
                next_payment_date   AS nextPaymentDate,
+               status,
+               deactivated_at      AS deactivatedAt,
                created_at          AS createdAt,
                updated_at          AS updatedAt
         FROM ACCOUNT
@@ -106,6 +117,7 @@
               FROM CODEF_CONNECTION
               WHERE provider = #{provider}
           )
+          AND status = 'ACTIVE'
         ORDER BY account_id
     </select>
 

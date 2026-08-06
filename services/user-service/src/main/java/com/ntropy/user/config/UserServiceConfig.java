@@ -8,7 +8,7 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
-@PropertySource("classpath:user-local.properties")
+@PropertySource(value = "classpath:user-local.properties", ignoreResourceNotFound = true)
 @ComponentScan("com.ntropy.user")
 public class UserServiceConfig {
 

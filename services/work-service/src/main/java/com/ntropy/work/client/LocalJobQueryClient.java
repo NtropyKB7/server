@@ -6,8 +6,10 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.JobQueryClient;
+import com.ntropy.common.dto.work.summary.JobScheduleSummary;
 import com.ntropy.common.dto.work.summary.JobSummary;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.JobSchedule;
 import com.ntropy.work.service.JobService;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,17 @@ public class LocalJobQueryClient implements JobQueryClient {
                 .isRegular(job.getIsRegular())
                 .baseFatigue(job.getBaseFatigue())
                 .isActive(job.getIsActive())
+                .schedules(toScheduleSummaries(jobService.findSchedulesByJobId(job.getJobId())))
                 .build();
+    }
+
+    private List<JobScheduleSummary> toScheduleSummaries(List<JobSchedule> schedules) {
+        return schedules.stream()
+                .map(s -> JobScheduleSummary.builder()
+                        .dayOfWeek(s.getDayOfWeek())
+                        .startTime(s.getStartTime())
+                        .endTime(s.getEndTime())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

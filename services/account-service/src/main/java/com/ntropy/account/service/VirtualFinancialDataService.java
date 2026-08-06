@@ -50,26 +50,9 @@ public class VirtualFinancialDataService {
         for (int userOrdinal = 1; userOrdinal <= USER_COUNT; userOrdinal++) {
             Long userId = LOGICAL_USER_ID_BASE + userOrdinal;
             PersonalBank bank = banks[(userOrdinal - 1) % banks.length];
-            CodefConnection connection = virtualConnectionService.getOrCreateConnection(userId);
-            virtualConnectionService.registerInstitution(connection, bank.getOrganizationCode());
-
-            Account ordinaryAccount = saveAccount(buildOrdinaryAccount(userOrdinal, userId, connection, bank));
-            Account secondaryAccount = saveAccount(buildSecondaryAccount(userOrdinal, userId, connection, bank));
-            generatedAccounts += 2;
-
-            GeneratedTransactions generated = transactionGenerator.generate(
-                    userOrdinal, bank, ordinaryAccount, secondaryAccount
-            );
-            generatedTransactions += generated.transactions().size();
-
-            ordinaryAccount.setBalance(generated.finalBalances().get(ordinaryAccount.getId()));
-            secondaryAccount.setBalance(generated.finalBalances().get(secondaryAccount.getId()));
-            accountMapper.upsert(ordinaryAccount);
-            accountMapper.upsert(secondaryAccount);
-
-            insertInBatches(generated.transactions());
-            validateStoredBalance(ordinaryAccount);
-            validateStoredBalance(secondaryAccount);
+            UserGenerationResult result = generateForUser(userId, bank, userOrdinal, false);
+            generatedAccounts += result.accounts();
+            generatedTransactions += result.transactions();
         }
 
         if (generatedTransactions != EXPECTED_TRANSACTION_COUNT) {
@@ -84,6 +67,54 @@ public class VirtualFinancialDataService {
                 VirtualFinancialTransactionGenerator.START_DATE,
                 VirtualFinancialTransactionGenerator.END_DATE
         );
+    }
+
+    /** 로그인 사용자 한 명에게 선택 은행의 가상계좌 2개와 목 거래를 멱등 생성한다. */
+    @Transactional
+    public GenerationSummary generateForUser(Long userId, PersonalBank bank) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("사용자 ID는 양수여야 합니다");
+        }
+        if (bank == null) {
+            throw new IllegalArgumentException("은행이 필요합니다");
+        }
+        int ordinal = stableUserOrdinal(userId);
+        UserGenerationResult result = generateForUser(userId, bank, ordinal, true);
+        return new GenerationSummary(
+                1, result.accounts(), result.incomeCounterparties(), result.transactions(),
+                VirtualFinancialTransactionGenerator.START_DATE,
+                VirtualFinancialTransactionGenerator.END_DATE
+        );
+    }
+
+    private UserGenerationResult generateForUser(Long userId, PersonalBank bank, int userOrdinal,
+                                                  boolean useUserIdProfile) {
+        CodefConnection connection = virtualConnectionService.getOrCreateConnection(userId);
+        virtualConnectionService.registerInstitution(connection, bank.getOrganizationCode());
+
+        Account ordinaryAccount = saveAccount(buildOrdinaryAccount(userOrdinal, userId, connection, bank));
+        Account secondaryAccount = saveAccount(buildSecondaryAccount(userOrdinal, userId, connection, bank));
+        GeneratedTransactions generated = useUserIdProfile
+                ? transactionGenerator.generateForUser(userId, bank, ordinaryAccount, secondaryAccount)
+                : transactionGenerator.generate(userOrdinal, bank, ordinaryAccount, secondaryAccount);
+
+        ordinaryAccount.setBalance(generated.finalBalances().get(ordinaryAccount.getId()));
+        secondaryAccount.setBalance(generated.finalBalances().get(secondaryAccount.getId()));
+        accountMapper.upsert(ordinaryAccount);
+        accountMapper.upsert(secondaryAccount);
+
+        insertInBatches(generated.transactions());
+        validateStoredBalance(ordinaryAccount);
+        validateStoredBalance(secondaryAccount);
+        return new UserGenerationResult(2, generated.transactions().size(), generated.userIncomeCounterpartyCount());
+    }
+
+    private static int stableUserOrdinal(Long userId) {
+        int profileCount = VirtualFinancialTransactionGenerator.ConsumerProfile.values().length;
+        int hash = Long.hashCode(userId);
+        int profileIndex = Math.floorMod(hash, profileCount);
+        int variation = Math.floorMod(hash / profileCount, 12);
+        return 1 + profileIndex + profileCount * variation;
     }
 
     private Account saveAccount(Account account) {
@@ -162,5 +193,8 @@ public class VirtualFinancialDataService {
             LocalDate startDate,
             LocalDate endDate
     ) {
+    }
+
+    private record UserGenerationResult(int accounts, int transactions, int incomeCounterparties) {
     }
 }

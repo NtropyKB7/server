@@ -150,6 +150,17 @@ class VirtualFinancialTransactionGeneratorTest {
     }
 
     @Test
+    void assignsLoggedInUserProfileByStableUserIdHash() {
+        for (long userId = 1; userId <= 20; userId++) {
+            int expectedIndex = Math.floorMod(Long.hashCode(userId), 4);
+            assertEquals(
+                    VirtualFinancialTransactionGenerator.ConsumerProfile.values()[expectedIndex],
+                    VirtualFinancialTransactionGenerator.consumerProfileForUser(userId)
+            );
+        }
+    }
+
+    @Test
     void assignsOneOrTwoInsuranceProductsAndPreservesBankDescriptions() {
         GeneratedTransactions oddUser = generator.generate(
                 1, PersonalBank.IBK_INDUSTRIAL_BANK,

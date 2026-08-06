@@ -1,5 +1,6 @@
 package com.ntropy.account.mapper;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -7,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
+import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
 
 @Mapper
 public interface FinancialDataQueryMapper {
@@ -16,8 +18,19 @@ public interface FinancialDataQueryMapper {
     Account findAccountByIdAndUserId(@Param("accountId") Long accountId,
                                      @Param("userId") Long userId);
 
+    OwnedTransactionCountRow countTransactionsByAccountIdAndUserId(
+            @Param("accountId") Long accountId,
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     List<OwnedAccountTransactionRow> findTransactionsByAccountIdAndUserId(
             @Param("accountId") Long accountId,
-            @Param("userId") Long userId
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("limit") int limit,
+            @Param("offset") int offset
     );
 }

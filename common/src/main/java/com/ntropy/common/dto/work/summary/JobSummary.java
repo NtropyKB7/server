@@ -1,5 +1,7 @@
 package com.ntropy.common.dto.work.summary;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,4 +29,5 @@ public class JobSummary {
     private Boolean isRegular;
     private Integer baseFatigue;
     private Boolean isActive;
+    private List<JobScheduleSummary> schedules;
 }

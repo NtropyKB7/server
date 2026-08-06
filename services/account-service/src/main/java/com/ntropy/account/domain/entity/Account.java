@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.ntropy.account.domain.AccountGroup;
+import com.ntropy.account.domain.AccountStatus;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,6 +23,8 @@ public class Account {
     private Long id;
     private Long codefConnectionId;
     private Long userId;
+    /** CODEF_CONNECTION.provider 조회 결과. ACCOUNT 테이블에는 저장하지 않는다. */
+    private transient String connectionProvider;
     private String organizationCode;
     private AccountGroup accountGroup;
     private String depositTypeCode;
@@ -38,6 +41,9 @@ public class Account {
 
     // 다음 적금 납입일 또는 대출 상환일
     private LocalDate nextPaymentDate;
+
+    private AccountStatus status;
+    private LocalDateTime deactivatedAt;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

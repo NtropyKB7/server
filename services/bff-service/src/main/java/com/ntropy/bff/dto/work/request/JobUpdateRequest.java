@@ -1,5 +1,9 @@
 package com.ntropy.bff.dto.work.request;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import com.ntropy.common.dto.work.command.JobUpdateCommand;
 
 import lombok.Getter;
@@ -18,11 +22,16 @@ public class JobUpdateRequest {
     private Float taskPerHour;
     private Boolean isRegular;
     private Integer baseFatigue;
+    private List<JobScheduleRequest> schedules;
 
     public JobUpdateCommand toCommand() {
+        List<JobScheduleRequest> safeSchedules = schedules == null ? Collections.emptyList() : schedules;
         return new JobUpdateCommand(
                 categoryId, jobName, settlementType, hourlyWage,
-                monthlyWage, perTaskWage, taskPerHour, isRegular, baseFatigue
+                monthlyWage, perTaskWage, taskPerHour, isRegular, baseFatigue,
+                safeSchedules.stream()
+                        .map(JobScheduleRequest::toCommand)
+                        .collect(Collectors.toList())
         );
     }
 }

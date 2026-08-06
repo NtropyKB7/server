@@ -41,4 +41,9 @@
         WHERE schedule_id = #{scheduleId}
     </delete>
 
+    <delete id="deleteByJobId" parameterType="long">
+        DELETE FROM JOB_SCHEDULE
+        WHERE job_id = #{jobId}
+    </delete>
+
 </mapper>

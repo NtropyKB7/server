@@ -23,12 +23,13 @@ class LocalSubscriptionQueryClientTest {
         when(properties.getChannelKey(PaymentMethod.TOSSPAY)).thenReturn("toss-channel");
         LocalSubscriptionQueryClient client = new LocalSubscriptionQueryClient(subscriptionService, properties);
 
-        PaymentConfigSummary result = client.getPaymentConfig();
+        PaymentConfigSummary result = client.getPaymentConfig(37L);
 
         assertEquals("store-id", result.getStoreId());
         assertEquals("card-channel", result.getChannels().get("CARD"));
         assertEquals("kakao-channel", result.getChannels().get("KAKAOPAY"));
         assertEquals("toss-channel", result.getChannels().get("TOSSPAY"));
+        assertEquals("user-37", result.getCustomerId());
         assertEquals(3, result.getChannels().size());
         assertFalse(result.getChannels().containsKey("apiSecret"));
         assertFalse(result.getChannels().containsKey("webhookSecret"));
