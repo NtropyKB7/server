@@ -17,8 +17,10 @@ import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialDataQueryMapper;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
+import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
 import com.ntropy.common.dto.account.AccountSummary;
 import com.ntropy.common.dto.account.AccountTransactionSummary;
+import com.ntropy.common.dto.account.PageSummary;
 import com.ntropy.common.exception.ServiceException;
 
 class LocalAccountQueryClientTest {
@@ -73,11 +75,13 @@ class LocalAccountQueryClientTest {
         mapper.transactions.add(transaction(101L, 10L));
         LocalAccountQueryClient client = new LocalAccountQueryClient(mapper);
 
-        List<AccountTransactionSummary> result = client.findTransactions(1L, 10L);
+        PageSummary<AccountTransactionSummary> result =
+                client.findTransactions(1L, 10L, null, null, 0, 30);
 
-        assertEquals(1, result.size());
-        assertEquals(101L, result.get(0).transactionId());
-        assertEquals(10L, result.get(0).accountId());
+        assertEquals(1, result.content().size());
+        assertEquals(101L, result.content().get(0).transactionId());
+        assertEquals(10L, result.content().get(0).accountId());
+        assertEquals(1, result.totalElements());
         assertEquals(1L, mapper.lastUserId);
         assertEquals(10L, mapper.lastAccountId);
     }
@@ -88,11 +92,12 @@ class LocalAccountQueryClientTest {
         mapper.accounts.add(account(10L, 1L));
         LocalAccountQueryClient client = new LocalAccountQueryClient(mapper);
 
-        List<AccountTransactionSummary> result = client.findTransactions(1L, 10L);
+        PageSummary<AccountTransactionSummary> result =
+                client.findTransactions(1L, 10L, null, null, 0, 30);
 
-        assertEquals(List.of(), result);
+        assertEquals(List.of(), result.content());
         assertEquals(0, mapper.accountDetailQueryCalls);
-        assertEquals(1, mapper.transactionQueryCalls);
+        assertEquals(0, mapper.transactionQueryCalls);
     }
 
     @Test
@@ -103,15 +108,15 @@ class LocalAccountQueryClientTest {
         LocalAccountQueryClient client = new LocalAccountQueryClient(mapper);
 
         ServiceException otherOwner = assertThrows(
-                ServiceException.class, () -> client.findTransactions(2L, 10L)
+                ServiceException.class, () -> client.findTransactions(2L, 10L, null, null, 0, 30)
         );
         ServiceException missing = assertThrows(
-                ServiceException.class, () -> client.findTransactions(2L, 999L)
+                ServiceException.class, () -> client.findTransactions(2L, 999L, null, null, 0, 30)
         );
 
         assertSameNotFoundResponse(otherOwner, missing);
         assertEquals(0, mapper.accountDetailQueryCalls);
-        assertEquals(2, mapper.transactionQueryCalls);
+        assertEquals(2, mapper.transactionCountQueryCalls);
     }
 
     private static void assertSameNotFoundResponse(ServiceException first, ServiceException second) {
@@ -155,6 +160,7 @@ class LocalAccountQueryClientTest {
         private Long lastAccountId;
         private int accountDetailQueryCalls;
         private int transactionQueryCalls;
+        private int transactionCountQueryCalls;
 
         @Override
         public List<Account> findAccountsByUserId(Long userId) {
@@ -173,26 +179,37 @@ class LocalAccountQueryClientTest {
         }
 
         @Override
-        public List<OwnedAccountTransactionRow> findTransactionsByAccountIdAndUserId(
-                Long accountId, Long userId
+        public OwnedTransactionCountRow countTransactionsByAccountIdAndUserId(
+                Long accountId, Long userId, LocalDate startDate, LocalDate endDate
         ) {
-            transactionQueryCalls++;
+            transactionCountQueryCalls++;
             lastAccountId = accountId;
             lastUserId = userId;
             boolean owned = accounts.stream()
                     .anyMatch(account -> accountId.equals(account.getId()) && userId.equals(account.getUserId()));
             if (!owned) {
-                return List.of();
+                return null;
             }
+            long count = transactions.stream()
+                    .filter(row -> accountId.equals(row.getOwnedAccountId()))
+                    .count();
+            OwnedTransactionCountRow row = new OwnedTransactionCountRow();
+            row.setOwnedAccountId(accountId);
+            row.setTotalElements(count);
+            return row;
+        }
+
+        @Override
+        public List<OwnedAccountTransactionRow> findTransactionsByAccountIdAndUserId(
+                Long accountId, Long userId, LocalDate startDate, LocalDate endDate, int limit, int offset
+        ) {
+            transactionQueryCalls++;
             List<OwnedAccountTransactionRow> rows = transactions.stream()
                     .filter(row -> accountId.equals(row.getOwnedAccountId()))
                     .toList();
-            if (!rows.isEmpty()) {
-                return rows;
-            }
-            OwnedAccountTransactionRow empty = new OwnedAccountTransactionRow();
-            empty.setOwnedAccountId(accountId);
-            return List.of(empty);
+            int from = Math.min(offset, rows.size());
+            int to = Math.min(from + limit, rows.size());
+            return rows.subList(from, to);
         }
     }
 }

@@ -1,9 +1,10 @@
 package com.ntropy.bff.dto.common;
 
 import lombok.Getter;
+import com.ntropy.common.exception.ServiceErrorCode;
 
 @Getter
-public enum ErrorCode {
+public enum ErrorCode implements ServiceErrorCode {
 
     UNAUTHORIZED(401, "인증 정보가 없습니다."),
     BAD_REQUEST(400, "잘못된 요청입니다."),

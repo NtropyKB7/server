@@ -110,6 +110,25 @@ public class VirtualFinancialTransactionGenerator {
 
     public GeneratedTransactions generate(int userOrdinal, PersonalBank bank,
                                           Account ordinaryAccount, Account secondaryAccount) {
+        return generate(userOrdinal, consumerProfileFor(userOrdinal), bank, ordinaryAccount, secondaryAccount);
+    }
+
+    /** 실제 로그인 사용자는 userId 해시로 네 소비 유형 중 하나에 안정적으로 배정한다. */
+    public GeneratedTransactions generateForUser(Long userId, PersonalBank bank,
+                                                  Account ordinaryAccount, Account secondaryAccount) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("사용자 ID는 양수여야 합니다");
+        }
+        int hash = Long.hashCode(userId);
+        ConsumerProfile profile = consumerProfileForUser(userId);
+        ConsumerProfile[] profiles = ConsumerProfile.values();
+        int variation = Math.floorMod(hash / profiles.length, 12);
+        int stableUserOrdinal = 1 + profile.ordinal() + profiles.length * variation;
+        return generate(stableUserOrdinal, profile, bank, ordinaryAccount, secondaryAccount);
+    }
+
+    private GeneratedTransactions generate(int userOrdinal, ConsumerProfile consumerProfile, PersonalBank bank,
+                                            Account ordinaryAccount, Account secondaryAccount) {
         requireAccountId(ordinaryAccount);
         requireAccountId(secondaryAccount);
         if (userOrdinal < 1 || userOrdinal > VirtualFinancialDataService.USER_COUNT) {
@@ -128,7 +147,7 @@ public class VirtualFinancialTransactionGenerator {
             YearMonth month = YearMonth.from(START_DATE).plusMonths(monthOffset);
             addIncomePlans(ordinaryPlans, userOrdinal, monthOffset, month, incomeCounterparties);
             addFixedExpensePlans(ordinaryPlans, userOrdinal, monthOffset, month);
-            addConsumptionPlans(ordinaryPlans, userOrdinal, monthOffset, month);
+            addConsumptionPlans(ordinaryPlans, userOrdinal, monthOffset, month, consumerProfile);
             addSecondaryTransferPlans(
                     ordinaryPlans, secondaryPlans, userOrdinal, monthOffset, month, installment
             );
@@ -244,8 +263,7 @@ public class VirtualFinancialTransactionGenerator {
     }
 
     private static void addConsumptionPlans(List<PlannedTransaction> plans, int userOrdinal,
-                                             int monthOffset, YearMonth month) {
-        ConsumerProfile profile = consumerProfileFor(userOrdinal);
+                                             int monthOffset, YearMonth month, ConsumerProfile profile) {
         for (int i = 0; i < 74; i++) {
             int day = 1 + i % 28;
             int hour = 10 + (i / 28) * 4 + (i % 3);
@@ -494,6 +512,14 @@ public class VirtualFinancialTransactionGenerator {
     static ConsumerProfile consumerProfileFor(int userOrdinal) {
         ConsumerProfile[] profiles = ConsumerProfile.values();
         return profiles[Math.floorMod(userOrdinal - 1, profiles.length)];
+    }
+
+    static ConsumerProfile consumerProfileForUser(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("사용자 ID는 양수여야 합니다");
+        }
+        ConsumerProfile[] profiles = ConsumerProfile.values();
+        return profiles[Math.floorMod(Long.hashCode(userId), profiles.length)];
     }
 
     private static ConsumptionTemplate consumptionTemplate(ConsumerProfile profile, int index) {
