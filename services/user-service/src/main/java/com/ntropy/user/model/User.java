@@ -1,6 +1,7 @@
 package com.ntropy.user.model;
 
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
@@ -19,9 +20,11 @@ public class User {
     private String email;                 // email
     private String name;                  // name
     private String providerId;            // provider_id
+    @JsonIgnore
     private String refreshTokenHash;      // refresh_token_hash
     private Boolean alarmAgree;           // alarm_agree
     private Boolean locationAgree;        // location_agree
+    @JsonIgnore
     private LocalDateTime refreshTokenExpireAt; // refresh_token_expire_at
     private String provider;              // provider (KAKAO, GOOGLE 등)
     private String status;                // status

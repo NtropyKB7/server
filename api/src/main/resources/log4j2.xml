@@ -5,18 +5,6 @@
         <Console name="console" target="SYSTEM_OUT">
             <PatternLayout charset="UTF-8" pattern=" %-5level %c(%M:%L) - %m%n"/>
         </Console>
-
-        <!-- <<<--- 인증 로그 파일 설정 추가 --- START --->>>
-        <RollingFile name="authLog" fileName="logs/auth.log" filePattern="logs/auth-%d{yyyy-MM-dd}.log">
-            <PatternLayout>
-                <pattern>%d{HH:mm:ss.SSS} %m%n</pattern>
-            </PatternLayout>
-            <Policies>
-                <TimeBasedTriggeringPolicy />
-            </Policies>
-        </RollingFile>
-        <!-- <<<--- 인증 로그 파일 설정 추가 --- END --->>>
-
     </Appenders>
     <!-- Logger 설정 -->
     <Loggers>
@@ -29,12 +17,5 @@
         <Logger name="org.springframework.web.servlet.DispatcherServlet" level="DEBUG" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
-
-        <!-- <<<--- 인증 로거 설정 추가 --- START --->>>
-        <Logger name="AUTH_LOG" level="INFO" additivity="false">
-            <AppenderRef ref="authLog"/>
-        </Logger>
-        <!-- <<<--- 인증 로거 설정 추가 --- END --->>>
-
     </Loggers>
 </Configuration>

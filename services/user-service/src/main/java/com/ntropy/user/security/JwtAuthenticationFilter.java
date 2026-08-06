@@ -1,7 +1,6 @@
 package com.ntropy.user.security;
 
 import com.ntropy.auth.security.JwtProvider;
-import com.ntropy.user.service.AccessLogService;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +30,6 @@ import java.util.stream.Stream;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
-    private final AccessLogService accessLogService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
@@ -40,31 +38,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String token = parseBearerToken(request);
 
-            if (token != null) {
-                if (jwtProvider.validateToken(token)) {
-                    String userId = jwtProvider.getUserId(token);
-                    String role = jwtProvider.getRole(token);
+            if (token != null && jwtProvider.validateToken(token)) {
+                String userId = jwtProvider.getUserId(token);
+                String role = jwtProvider.getRole(token);
 
-                    List<GrantedAuthority> authorities = role != null ?
-                            Stream.of(role).map(SimpleGrantedAuthority::new).collect(Collectors.toList()) :
-                            Collections.emptyList();
+                List<GrantedAuthority> authorities = role != null ?
+                        Stream.of(role).map(SimpleGrantedAuthority::new).collect(Collectors.toList()) :
+                        Collections.emptyList();
 
-                    UserDetails userDetails = new User(userId, "", authorities);
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities()
-                    );
-                    
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    log.debug("Security Context에 '{}' 인증 정보를 저장했습니다, uri: {}", authentication.getName(), request.getRequestURI());
-
-                } else {
-                    accessLogService.logActivity(request, null, "JWT_AUTHENTICATION_FAILURE", "유효하지 않은 JWT 토큰", false);
-                    log.warn("유효하지 않은 JWT 토큰이 감지되었습니다. URI: {}", request.getRequestURI());
-                }
+                UserDetails userDetails = new User(userId, "", authorities);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities()
+                );
+                
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.debug("Security Context에 '{}' 인증 정보를 저장했습니다, uri: {}", authentication.getName(), request.getRequestURI());
             }
         } catch (Exception e) {
             log.error("JWT 인증 설정에 실패했습니다: {}", e.getMessage());
-            accessLogService.logActivity(request, null, "JWT_AUTHENTICATION_ERROR", "JWT 인증 처리 중 예외 발생: " + e.getMessage(), false);
         }
 
         filterChain.doFilter(request, response);

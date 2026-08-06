@@ -25,7 +25,6 @@ public class UserService {
     private final KakaoOAuthClient kakaoOAuthClient;
     private final GoogleOAuthClient googleOAuthClient;
     private final JwtProvider jwtProvider;
-    private final AccessLogService accessLogService;
 
     @Transactional
     public OAuthLoginResponse processOAuthLoginWithCode(String provider, String code, HttpServletRequest request) {
@@ -48,66 +47,53 @@ public class UserService {
 
     @Transactional
     public OAuthLoginResponse processOAuthLogin(User oauthUserParam, HttpServletRequest request) {
-        try {
-            Optional<User> optionalUser = userMapper.findByProviderAndProviderId(
-                    oauthUserParam.getProvider(),
-                    oauthUserParam.getProviderId()
-            );
+        Optional<User> optionalUser = userMapper.findByProviderAndProviderId(
+                oauthUserParam.getProvider(),
+                oauthUserParam.getProviderId()
+        );
 
-            User user;
-            String accessToken;
-            String refreshToken;
+        User user;
+        String accessToken;
+        String refreshToken;
 
-            if (optionalUser.isPresent()) {
-                user = optionalUser.get();
-                log.info("기존 회원 로그인 처리: userId={}", user.getUserId());
+        if (optionalUser.isPresent()) {
+            user = optionalUser.get();
+            log.info("기존 회원 로그인 처리: userId={}", user.getUserId());
 
-                if (!"ACTIVE".equals(user.getStatus())) {
-                    accessLogService.logLoginFailure(request, user.getEmail(), "LOGIN_FAILURE", "비활성 계정 로그인 시도: " + user.getStatus());
-                    throw new IllegalStateException("로그인할 수 없는 회원 상태입니다: " + user.getStatus());
-                }
-
-                accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
-                refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
-
-                user.setRefreshTokenHash(refreshToken);
-                user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
-                userMapper.updateLoginInfo(user);
-
-                accessLogService.logLoginSuccess(request, user, "LOGIN_SUCCESS", "기존 회원 로그인 성공");
-
-            } else {
-                user = oauthUserParam;
-                log.info("신규 회원가입 처리: provider={}, email={}", user.getProvider(), user.getEmail());
-                user.setStatus("ACTIVE");
-                user.setRole("ROLE_USER");
-                user.setTermsAgreed(true);
-
-                accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
-                refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
-
-                user.setRefreshTokenHash(refreshToken);
-                user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
-                userMapper.insertUser(user);
-
-                accessLogService.logLoginSuccess(request, user, "SIGNUP_SUCCESS", "신규 회원가입 및 로그인 성공");
+            if (!"ACTIVE".equals(user.getStatus())) {
+                throw new IllegalStateException("로그인할 수 없는 회원 상태입니다: " + user.getStatus());
             }
 
-            return OAuthLoginResponse.builder()
-                    .accessToken(accessToken)
-                    .refreshToken(refreshToken)
-                    .userId(user.getUserId())
-                    .name(user.getName())
-                    .email(user.getEmail())
-                    .onboardingCompleted(user.getOnboardingCompleted())
-                    .build();
+            accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
+            refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
 
-        } catch (Exception e) {
-            if (!(e instanceof IllegalStateException && e.getMessage().contains("로그인할 수 없는 회원 상태입니다"))) {
-                accessLogService.logLoginFailure(request, oauthUserParam.getEmail(), "LOGIN_FAILURE", "로그인/회원가입 처리 중 오류: " + e.getMessage());
-            }
-            throw e;
+            user.setRefreshTokenHash(refreshToken);
+            user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
+            userMapper.updateLoginInfo(user);
+
+        } else {
+            user = oauthUserParam;
+            log.info("신규 회원가입 처리: provider={}, email={}", user.getProvider(), user.getEmail());
+            user.setStatus("ACTIVE");
+            user.setRole("ROLE_USER");
+            user.setTermsAgreed(true);
+
+            accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
+            refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
+
+            user.setRefreshTokenHash(refreshToken);
+            user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
+            userMapper.insertUser(user);
         }
+
+        return OAuthLoginResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .userId(user.getUserId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .onboardingCompleted(user.getOnboardingCompleted())
+                .build();
     }
 
     public User getUserById(Long userId) {
@@ -122,46 +108,32 @@ public class UserService {
     @Transactional
     public void deleteUser(Long userId, HttpServletRequest request) {
         userMapper.deleteUser(userId);
-        accessLogService.logActivity(request, userId, "USER_DEACTIVATION", "회원 탈퇴 처리", true);
     }
 
     @Transactional
     public void logout(Long userId, HttpServletRequest request) {
         userMapper.invalidateRefreshToken(userId);
         log.info("사용자 로그아웃: userId={}의 Refresh Token을 폐기했습니다.", userId);
-        accessLogService.logActivity(request, userId, "LOGOUT_SUCCESS", "로그아웃 성공", true);
     }
 
     @Transactional
     public TokenRefreshResponseDto refreshAccessToken(String refreshToken, HttpServletRequest request) {
-        try {
-            if (!jwtProvider.validateToken(refreshToken)) {
-                accessLogService.logActivity(request, null, "TOKEN_REFRESH_FAILURE", "유효하지 않은 Refresh Token", false);
-                throw new SecurityException("유효하지 않은 Refresh Token입니다.");
-            }
-
-            User user = userMapper.findByRefreshToken(refreshToken)
-                    .orElseThrow(() -> {
-                        accessLogService.logActivity(request, null, "TOKEN_REFRESH_FAILURE", "DB에서 Refresh Token에 해당하는 사용자 없음", false);
-                        return new SecurityException("Refresh Token에 해당하는 사용자를 찾을 수 없습니다.");
-                    });
-
-            String newAccessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
-            String newRefreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
-
-            user.setRefreshTokenHash(newRefreshToken);
-            user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
-            userMapper.updateLoginInfo(user);
-
-            log.info("Access Token 재발급 및 Refresh Token 회전 완료: userId={}", user.getUserId());
-            accessLogService.logActivity(request, user.getUserId(), "TOKEN_REFRESH_SUCCESS", "Access Token 재발급 성공", true);
-
-            return new TokenRefreshResponseDto(newAccessToken, newRefreshToken);
-        } catch (Exception e) {
-            if (!(e instanceof SecurityException)) {
-                accessLogService.logActivity(request, null, "TOKEN_REFRESH_FAILURE", "Access Token 재발급 중 오류: " + e.getMessage(), false);
-            }
-            throw e;
+        if (!jwtProvider.validateToken(refreshToken)) {
+            throw new SecurityException("유효하지 않은 Refresh Token입니다.");
         }
+
+        User user = userMapper.findByRefreshToken(refreshToken)
+                .orElseThrow(() -> new SecurityException("Refresh Token에 해당하는 사용자를 찾을 수 없습니다."));
+
+        String newAccessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
+        String newRefreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
+
+        user.setRefreshTokenHash(newRefreshToken);
+        user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
+        userMapper.updateLoginInfo(user);
+
+        log.info("Access Token 재발급 및 Refresh Token 회전 완료: userId={}", user.getUserId());
+
+        return new TokenRefreshResponseDto(newAccessToken, newRefreshToken);
     }
 }
