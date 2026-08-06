@@ -33,13 +33,43 @@ class IncomingCounterpartyNameExtractorTest {
     }
 
     @Test
-    void preservesBankPrefixAndComparisonCharactersForWorkService() {
+    void removesJeonbukPrefixAndPreservesComparisonCharacters() {
         String result = IncomingCounterpartyNameExtractor.extract(
                 PersonalBank.JEONBUK_BANK.getOrganizationCode(),
                 null, null, "홈) Ｃｏｕｐａｎｇ-Ｅａｔｓ ", null
         );
 
-        assertEquals("홈) Ｃｏｕｐａｎｇ-Ｅａｔｓ ", result);
+        assertEquals("Ｃｏｕｐａｎｇ-Ｅａｔｓ ", result);
+    }
+
+    @Test
+    void preservesJeonbukTextWhenPrefixIsNotAtTheBeginning() {
+        String result = IncomingCounterpartyNameExtractor.extract(
+                PersonalBank.JEONBUK_BANK.getOrganizationCode(),
+                null, null, "쿠팡홈)서비스", null
+        );
+
+        assertEquals("쿠팡홈)서비스", result);
+    }
+
+    @Test
+    void preservesSamePrefixForOtherBanks() {
+        String result = IncomingCounterpartyNameExtractor.extract(
+                PersonalBank.SHINHAN_BANK.getOrganizationCode(),
+                null, null, "홈)쿠팡이츠", null
+        );
+
+        assertEquals("홈)쿠팡이츠", result);
+    }
+
+    @Test
+    void returnsNullWhenJeonbukCounterpartyContainsOnlyPrefixAndSpaces() {
+        String result = IncomingCounterpartyNameExtractor.extract(
+                PersonalBank.JEONBUK_BANK.getOrganizationCode(),
+                null, null, "홈)   ", null
+        );
+
+        assertNull(result);
     }
 
     @Test

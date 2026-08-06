@@ -12,7 +12,7 @@ public interface SubscriptionQueryClient {
 
     List<PlanSummary> getPlans();
 
-    PaymentConfigSummary getPaymentConfig();
+    PaymentConfigSummary getPaymentConfig(Long userId);
 
     SubscriptionSummary getMySubscription(Long userId);
 

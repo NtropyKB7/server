@@ -18,7 +18,7 @@ import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 class LocalIncomingTransactionQueryClientTest {
 
     @Test
-    void returnsNormalizedStructureWithoutChangingCounterpartyText() {
+    void returnsNormalizedStructureWithBankSpecificCounterpartyPrefixRemoved() {
         StubIncomingTransactionQueryMapper mapper = new StubIncomingTransactionQueryMapper(List.of(
                 row(101L, PersonalBank.IBK_INDUSTRIAL_BANK, LocalDate.of(2026, 8, 1),
                         LocalTime.of(9, 10), "우아한형제들", "무시", new BigDecimal("350000")),
@@ -40,7 +40,7 @@ class LocalIncomingTransactionQueryClientTest {
         ), result.get(0));
         assertEquals(new NormalizedIncomingTransaction(
                 102L, LocalDate.of(2026, 8, 2), null,
-                "홈)쿠팡 이츠", new BigDecimal("180000")
+                "쿠팡 이츠", new BigDecimal("180000")
         ), result.get(1));
     }
 

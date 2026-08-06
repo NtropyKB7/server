@@ -42,12 +42,12 @@ public class LocalSubscriptionQueryClient implements SubscriptionQueryClient, Su
     }
 
     @Override
-    public PaymentConfigSummary getPaymentConfig() {
+    public PaymentConfigSummary getPaymentConfig(Long userId) {
         Map<String, String> channels = new LinkedHashMap<>();
         channels.put(PaymentMethod.CARD.name(), portOneProperties.getChannelKey(PaymentMethod.CARD));
         channels.put(PaymentMethod.KAKAOPAY.name(), portOneProperties.getChannelKey(PaymentMethod.KAKAOPAY));
         channels.put(PaymentMethod.TOSSPAY.name(), portOneProperties.getChannelKey(PaymentMethod.TOSSPAY));
-        return new PaymentConfigSummary(portOneProperties.getStoreId(), channels);
+        return new PaymentConfigSummary(portOneProperties.getStoreId(), channels, "user-" + userId);
     }
 
     @Override
