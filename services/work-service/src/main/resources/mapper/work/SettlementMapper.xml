@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.SettlementMapper">
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Settlement"
+            useGeneratedKeys="true" keyProperty="settlementId">
+        INSERT INTO SETTLEMENT
+            (job_id, period_start, period_end, expected_amount, actual_amount,
+             account_transaction_id, matched_at)
+        VALUES
+            (#{jobId}, #{periodStart}, #{periodEnd}, #{expectedAmount}, #{actualAmount},
+             #{accountTransactionId}, #{matchedAt})
+    </insert>
+
+    <select id="existsByJobIdAndPeriod" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM SETTLEMENT
+        WHERE job_id = #{jobId}
+          AND period_start = #{periodStart}
+          AND period_end = #{periodEnd}
+    </select>
+
+</mapper>
