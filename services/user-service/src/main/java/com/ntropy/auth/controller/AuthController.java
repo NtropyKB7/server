@@ -10,6 +10,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+
 // 소셜 로그인 및 인증 관련 API를 처리
 @RestController
 @RequestMapping("/api/auth")
@@ -23,11 +25,12 @@ public class AuthController {
     @GetMapping("/oauth/{provider}")
     public ResponseEntity<OAuthLoginResponse> oauthLogin(
             @PathVariable String provider,
-            @RequestParam("code") String code) {
+            @RequestParam("code") String code,
+            HttpServletRequest request) {
 
         log.info("소셜 로그인 요청 수신: provider={}, code={}", provider, code);
 
-        OAuthLoginResponse responseDto = userService.processOAuthLoginWithCode(provider, code);
+        OAuthLoginResponse responseDto = userService.processOAuthLoginWithCode(provider, code, request);
 
         return ResponseEntity.ok(responseDto);
     }
