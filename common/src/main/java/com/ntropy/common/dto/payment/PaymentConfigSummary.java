@@ -13,4 +13,5 @@ public class PaymentConfigSummary {
 
     private String storeId;
     private Map<String, String> channels;
+    private String customerId;
 }

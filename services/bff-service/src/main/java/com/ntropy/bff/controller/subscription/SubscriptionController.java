@@ -9,14 +9,13 @@ import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.dto.payment.PlanSummary;
 import com.ntropy.common.dto.payment.PaymentConfigSummary;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.time.Duration;
 import java.util.stream.Collectors;
-import org.springframework.http.CacheControl;
 
 @RestController
 @RequestMapping("/api/subscriptions")
@@ -39,10 +38,12 @@ public class SubscriptionController {
     }
 
     @GetMapping("/config")
-    public ResponseEntity<ApiResponse<PaymentConfigSummary>> getPaymentConfig() {
-        PaymentConfigSummary config = subscriptionQueryClient.getPaymentConfig();
+    public ResponseEntity<ApiResponse<PaymentConfigSummary>> getPaymentConfig(
+            @RequestParam Long userId // TODO: AUTH 연동 후 인증 사용자 ID 사용
+    ) {
+        PaymentConfigSummary config = subscriptionQueryClient.getPaymentConfig(userId);
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(10)).cachePublic())
+                .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(config));
     }
 
