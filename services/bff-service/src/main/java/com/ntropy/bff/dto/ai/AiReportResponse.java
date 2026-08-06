@@ -2,6 +2,7 @@ package com.ntropy.bff.dto.ai;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ntropy.common.dto.ai.AiReportSummary;
 
@@ -31,6 +32,10 @@ public class AiReportResponse {
     private JsonNode recommendation;
 
     // AI 리포트 생성 시각
+    @JsonFormat(
+            shape = JsonFormat.Shape.STRING,
+            pattern = "yyyy-MM-dd'T'HH:mm:ss"
+    )
     private LocalDateTime createdAt;
 
     /**
