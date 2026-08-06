@@ -18,4 +18,6 @@ public interface JobScheduleMapper {
     void update(JobSchedule jobSchedule);
 
     void deleteById(Long scheduleId);
+
+    void deleteByJobId(Long jobId);
 }

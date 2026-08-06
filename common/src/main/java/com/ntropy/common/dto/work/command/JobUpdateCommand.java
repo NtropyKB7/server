@@ -1,11 +1,14 @@
 package com.ntropy.common.dto.work.command;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 잡 수정 요청. userId(소유자 변경 불가)와 스케줄(#3에서 별도 처리 예정)은 포함하지 않음.
+ * 잡 수정 요청. userId(소유자 변경 불가)는 포함하지 않음.
+ * schedules는 부분 수정이 아니라 전체 교체(넘어온 리스트로 기존 것을 다 갈아끼움).
  */
 @Getter
 @NoArgsConstructor
@@ -21,4 +24,5 @@ public class JobUpdateCommand {
     private Float taskPerHour;
     private Boolean isRegular;
     private Integer baseFatigue;
+    private List<JobScheduleCommand> schedules;
 }

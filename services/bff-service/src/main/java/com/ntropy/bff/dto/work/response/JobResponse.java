@@ -1,5 +1,8 @@
 package com.ntropy.bff.dto.work.response;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import com.ntropy.common.dto.work.summary.JobSummary;
 
 import lombok.Getter;
@@ -25,6 +28,7 @@ public class JobResponse {
     private Boolean isRegular;
     private Integer baseFatigue;
     private Boolean isActive;
+    private List<JobScheduleResponse> schedules;
 
     public static JobResponse from(JobSummary summary) {
         JobResponse response = new JobResponse();
@@ -39,6 +43,11 @@ public class JobResponse {
         response.isRegular = summary.getIsRegular();
         response.baseFatigue = summary.getBaseFatigue();
         response.isActive = summary.getIsActive();
+        response.schedules = summary.getSchedules() == null
+                ? List.of()
+                : summary.getSchedules().stream()
+                        .map(JobScheduleResponse::from)
+                        .collect(Collectors.toList());
         return response;
     }
 }
