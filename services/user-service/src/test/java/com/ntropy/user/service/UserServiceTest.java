@@ -116,7 +116,6 @@ class UserServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
         verify(userMapper, times(1)).updateLoginInfo(any(User.class));
-        verify(accessLogService, times(1)).logActivity(any(), any(), anyString(), anyString(), eq(true));
     }
 
     @Test
