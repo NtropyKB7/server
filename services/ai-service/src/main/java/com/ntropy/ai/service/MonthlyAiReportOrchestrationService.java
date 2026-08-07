@@ -1,28 +1,38 @@
 package com.ntropy.ai.service;
 
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.ai.client.fastapi.FastApiTransactionClassificationClient;
+import com.ntropy.ai.dto.fastapi.TransactionClassificationResponse;
+import com.ntropy.ai.dto.fastapi.TransactionForClassification;
+
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import java.time.ZoneId;
 
 /**
  * 월간 AI 리포트 생성 파이프라인 전체를 조정하는 서비스입니다.
  *
- * 현재는 account-service, diagnosis-service, FastAPI 연동 계약이
- * 확정되지 않았으므로 안전한 실행 뼈대와 로그만 구현합니다.
+ * 현재는 account-service, diagnosis-service 연동 계약이 일부 확정되지 않았으므로
+ * 배치 대상 사용자 조회와 거래 조회는 안전한 빈 목록으로 유지합니다.
  *
- * 계약 확정 후 processSingleUser() 내부의 TODO를 실제 Client 호출로 교체합니다.
+ * FastAPI 소비 분류 API 호출 구조만 먼저 연결해두고,
+ * 계약 확정 후 processSingleUser() 내부 TODO를 실제 Client 호출로 교체합니다.
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class MonthlyAiReportOrchestrationService {
 
+    // FastAPI 소비 분류 API 호출 Client입니다.
+    private final FastApiTransactionClassificationClient classificationClient;
+
     /**
-     * 매월 1일에 호출됩니다.
+     * 매월 1일 스케줄러에서 호출됩니다.
      *
      * 예를 들어 2026년 8월 1일에 실행되면
      * 2026년 7월 리포트를 생성 대상으로 처리합니다.
@@ -106,7 +116,11 @@ public class MonthlyAiReportOrchestrationService {
     /**
      * 사용자 한 명의 월간 AI 리포트를 생성합니다.
      *
-     * 아래 순서는 최종 구현 예정 파이프라인입니다.
+     * 현재는 account-service 거래 조회 계약이 확정되지 않았으므로
+     * 분류 대상 거래 목록은 빈 목록으로 둡니다.
+     *
+     * 이후 account-service 거래 조회 Client가 생기면
+     * transactions 변수에 실제 분류 대상 출금 거래를 넣으면 됩니다.
      */
     private void processSingleUser(
             Long userId,
@@ -121,8 +135,43 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * TODO 1. account-service에서 분류 대상 거래 조회
          *
+         * 현재는 거래 조회 Client 계약이 없으므로 빈 목록으로 둡니다.
+         */
+        List<TransactionForClassification> transactions = List.of();
+
+        if (transactions.isEmpty()) {
+            log.info(
+                    "[AI 리포트 배치] 분류 대상 거래 없음 - userId: {}, yearMonth: {}",
+                    userId,
+                    yearMonth
+            );
+            return;
+        }
+
+        /*
          * TODO 2. FastAPI에 소비 내역 분류 요청
-         *
+         */
+        TransactionClassificationResponse classificationResponse =
+                classificationClient.classifyTransactions(transactions);
+
+        if (
+                classificationResponse == null
+                        || !Boolean.TRUE.equals(classificationResponse.getSuccess())
+                        || classificationResponse.getData() == null
+        ) {
+            throw new IllegalStateException(
+                    "FastAPI 소비 분류 응답이 올바르지 않습니다."
+            );
+        }
+
+        log.info(
+                "[AI 리포트 배치] 소비 분류 완료 - userId: {}, yearMonth: {}, resultCount: {}",
+                userId,
+                yearMonth,
+                classificationResponse.getData().getResults().size()
+        );
+
+        /*
          * TODO 3. account-service에 TXN_ANALYSIS 저장 요청
          *
          * TODO 4. diagnosis-service에 재무진단 생성 요청

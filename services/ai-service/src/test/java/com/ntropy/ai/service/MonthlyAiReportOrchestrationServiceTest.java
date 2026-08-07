@@ -21,7 +21,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     void runBatch_whenTargetUserListIsEmpty_completesWithoutException() {
         // 현재 오케스트레이터는 외부 Client 의존성이 없는 뼈대 상태입니다.
         MonthlyAiReportOrchestrationService orchestrationService =
-                new MonthlyAiReportOrchestrationService();
+                new MonthlyAiReportOrchestrationService(null);
 
         // 테스트에서 원하는 리포트 대상 연월을 직접 전달합니다.
         YearMonth targetYearMonth = YearMonth.of(2026, 7);
