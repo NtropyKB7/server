@@ -164,7 +164,8 @@ class AccountCollectionServiceTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
         );
 
-        assertEquals(2, savedAccounts.size());
+        // resFund 영역은 전용 ACCOUNT 행을 만들지 않고 파싱 단계에서 건너뛴다.
+        assertEquals(1, savedAccounts.size());
         assertEquals(1, transactionClient.calls.size());
         assertEquals("110123456789", transactionClient.calls.get(0).account());
         assertEquals(1, transactionMapper.insertedBatches);

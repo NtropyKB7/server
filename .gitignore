@@ -16,8 +16,7 @@ weather-local.properties
 user-local.properties
 
 ### 개인 문서/도구 ###
-CLAUDE.local.md
-DEVLOG.md
+docs/
 .ai/
 
 ### mock 데이터 ###

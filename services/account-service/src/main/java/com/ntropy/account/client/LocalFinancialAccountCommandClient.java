@@ -15,7 +15,6 @@ import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.AccountCollectionService;
-import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.common.client.FinancialAccountCommandClient;
 import com.ntropy.common.client.UserBirthDateQueryClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
@@ -33,7 +32,6 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
 
     private static final int DEFAULT_COLLECTION_DAYS = 90;
 
-    private final VirtualFinancialDataService virtualFinancialDataService;
     private final AccountCollectionService accountCollectionService;
     private final AccountLifecycleMapper accountLifecycleMapper;
     private final CodefConnectionMapper codefConnectionMapper;
@@ -73,9 +71,9 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         String connectionType = normalizeConnectionType(command.connectionType());
 
         if ("VIRTUAL".equals(connectionType)) {
-            VirtualFinancialDataService.GenerationSummary summary =
-                    virtualFinancialDataService.generateForUser(userId, bank);
-            return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), summary.accounts());
+            // NTROPY 가상 금융데이터 리팩터링(이슈 #84~) 진행 중에는 VIRTUAL 등록을 차단한다.
+            // 스키마·조회 계약·생성기 전체 검증이 끝나면 이 분기를 다시 활성화한다.
+            throw new ServiceException(AccountErrorCode.VIRTUAL_REGISTRATION_BLOCKED);
         }
 
         requireNonBlank(command.bankLoginId(), bank.getDisplayName() + " 로그인 ID");

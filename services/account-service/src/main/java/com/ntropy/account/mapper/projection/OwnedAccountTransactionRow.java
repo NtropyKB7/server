@@ -23,6 +23,9 @@ public class OwnedAccountTransactionRow {
     private LocalTime transactionTime;
     private BigDecimal outAmount;
     private BigDecimal inAmount;
+    private String loanTransactionTypeName;
+    private BigDecimal loanPrincipalAmount;
+    private BigDecimal loanInterestAmount;
     private BigDecimal afterBalance;
     private String desc1;
     private String desc2;

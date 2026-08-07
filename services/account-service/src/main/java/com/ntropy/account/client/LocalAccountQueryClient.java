@@ -85,7 +85,8 @@ public class LocalAccountQueryClient implements AccountQueryClient {
                 account.getId(), connectionType(account.getConnectionProvider()), account.getOrganizationCode(),
                 bankName(account.getOrganizationCode()), account.getAccountGroup().name(),
                 account.getDepositTypeCode(), account.getAccountNoMasked(), account.getAccountName(),
-                account.getBalance(), account.getCurrencyCode(), account.getAccountStartDate(),
+                account.getBalance(), account.getLoanContractPrincipal(), account.getInterestRate(),
+                account.getCurrencyCode(), account.getAccountStartDate(), account.getMaturityDate(),
                 account.getLastTranDate(), account.getOverdraftYn(), account.getNextPaymentDate(),
                 account.getStatus() == null ? "ACTIVE" : account.getStatus().name()
         );
@@ -95,6 +96,7 @@ public class LocalAccountQueryClient implements AccountQueryClient {
         return new AccountTransactionSummary(
                 row.getTransactionId(), row.getOwnedAccountId(), row.getTransactionCategory().name(),
                 row.getTransactionDate(), row.getTransactionTime(), row.getOutAmount(), row.getInAmount(),
+                row.getLoanTransactionTypeName(), row.getLoanPrincipalAmount(), row.getLoanInterestAmount(),
                 row.getAfterBalance(), row.getDesc1(), row.getDesc2(), row.getDesc3(), row.getDesc4()
         );
     }

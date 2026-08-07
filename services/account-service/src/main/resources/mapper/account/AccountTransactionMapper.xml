@@ -4,34 +4,42 @@
 
     <insert id="insertAll">
         INSERT INTO ACCOUNT_TRANSACTION (
-            account_id, fingerprint, transaction_category,
-            tran_date, tran_time, out_amount, in_amount,
+            account_id, fingerprint, transaction_category, loan_transaction_type_name,
+            tran_date, tran_time, out_amount, in_amount, loan_principal_amount, loan_interest_amount,
             after_balance, desc1, desc2, desc3, desc4
         ) VALUES
         <foreach collection="list" item="tx" separator=",">
-            (#{tx.accountId}, #{tx.fingerprint}, #{tx.transactionCategory},
+            (#{tx.accountId}, #{tx.fingerprint}, #{tx.transactionCategory}, #{tx.loanTransactionTypeName},
              #{tx.tranDate}, #{tx.tranTime},
-             #{tx.outAmount}, #{tx.inAmount}, #{tx.afterBalance}, #{tx.desc1}, #{tx.desc2}, #{tx.desc3}, #{tx.desc4})
+             #{tx.outAmount}, #{tx.inAmount}, #{tx.loanPrincipalAmount}, #{tx.loanInterestAmount},
+             #{tx.afterBalance}, #{tx.desc1}, #{tx.desc2}, #{tx.desc3}, #{tx.desc4})
         </foreach>
         ON DUPLICATE KEY UPDATE
-            desc1 = COALESCE(VALUES(desc1), desc1)
+            desc1 = COALESCE(VALUES(desc1), desc1),
+            loan_transaction_type_name = COALESCE(VALUES(loan_transaction_type_name), loan_transaction_type_name),
+            loan_principal_amount = COALESCE(VALUES(loan_principal_amount), loan_principal_amount),
+            loan_interest_amount = COALESCE(VALUES(loan_interest_amount), loan_interest_amount)
     </insert>
 
     <select id="findByAccountIdAndDateRange" resultType="com.ntropy.account.domain.entity.AccountTransaction">
-        SELECT account_transaction_id AS id,
-               account_id             AS accountId,
+        SELECT account_transaction_id     AS id,
+               account_id                 AS accountId,
                fingerprint,
-               transaction_category   AS transactionCategory,
-               tran_date              AS tranDate,
-               tran_time              AS tranTime,
-               out_amount             AS outAmount,
-               in_amount              AS inAmount,
-               after_balance          AS afterBalance,
+               transaction_category       AS transactionCategory,
+               loan_transaction_type_name AS loanTransactionTypeName,
+               tran_date                  AS tranDate,
+               tran_time                  AS tranTime,
+               out_amount                 AS outAmount,
+               in_amount                  AS inAmount,
+               loan_principal_amount      AS loanPrincipalAmount,
+               loan_interest_amount       AS loanInterestAmount,
+               after_balance              AS afterBalance,
                desc1,
                desc2,
                desc3,
                desc4,
-               created_at             AS createdAt
+               created_at                 AS createdAt,
+               updated_at                 AS updatedAt
         FROM ACCOUNT_TRANSACTION
         WHERE account_id = #{accountId}
           AND tran_date BETWEEN #{startDate} AND #{endDate}

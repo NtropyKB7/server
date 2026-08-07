@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS CODEF_TOKEN
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
--- CODEF 보유계좌 조회(account-list) 응답을 저장. 예금/신탁·외화·펀드·대출·보험 5개 그룹을 account_group으로 구분하는 단일 테이블.
+-- CODEF 보유계좌 조회(account-list) 응답을 저장. 예금/신탁·외화·대출 3개 그룹을 account_group으로 구분하는 단일 테이블.
+-- 펀드·보험 영역은 전용 행을 만들지 않는다(보험료는 입출금계좌 거래내역으로 분석).
 -- 계좌번호 원문은 저장하지 않고 표시용 마스킹 값과 중복 판별용 해시만 저장한다.
 CREATE TABLE IF NOT EXISTS ACCOUNT
 (
@@ -43,14 +44,17 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     codef_connection_id BIGINT        NOT NULL COMMENT 'CODEF_CONNECTION.codef_connection_id 참조',
     user_id             BIGINT        NOT NULL COMMENT 'user-service USER.id 참조 (크로스 도메인 FK 없음), 조회 편의를 위한 비정규화',
     organization_code   VARCHAR(10)   NOT NULL COMMENT 'CODEF 기관코드',
-    account_group       VARCHAR(20)   NOT NULL COMMENT 'DEPOSIT_TRUST, FOREIGN_CURRENCY, FUND, LOAN, INSURANCE',
+    account_group       VARCHAR(20)   NOT NULL COMMENT 'DEPOSIT_TRUST, FOREIGN_CURRENCY, LOAN',
     deposit_type_code   VARCHAR(2)    NOT NULL COMMENT 'resAccountDeposit 분류값 (10~99)',
     account_no_masked   VARCHAR(64)   NOT NULL COMMENT '서버 생성 표시용 마스킹 계좌번호 (끝 4자리만 노출)',
     account_no_hash     CHAR(64)      NOT NULL COMMENT 'SHA-256(기관코드+실제계좌번호) 중복 판별용 해시. 원문 계좌번호는 저장하지 않음',
     account_name        VARCHAR(100)  NULL COMMENT 'resAccountName 우선, 없으면 resAccountNickName',
     balance             DECIMAL(18,2) NULL COMMENT '자산 잔액 또는 정규화된 부채 잔액(양수)',
+    loan_contract_principal DECIMAL(18,2) NULL COMMENT '대출 거래내역 계좌 상세의 약정원금(resPrincipal)',
+    interest_rate       DECIMAL(9,4)  NULL COMMENT '적금·대출 거래내역 계좌 상세의 이율(resRate). 보유계좌 응답에는 없어 미적용·응답 누락 시 null. backfill 금지',
     currency_code       VARCHAR(3)    NOT NULL DEFAULT 'KRW' COMMENT 'resAccountCurrency (ISO 4217)',
     account_start_date  DATE          NULL COMMENT '정규화된 상품 시작일(마이너스통장은 resLoanStartDate 우선)',
+    maturity_date       DATE          NULL COMMENT '예금·적금·대출 만기일(resAccountEndDate)',
     last_tran_date      DATE          NULL COMMENT 'resLastTranDate',
     overdraft_yn        BOOLEAN       NULL COMMENT 'resOverdraftAcctYN (예금/신탁)',
     next_payment_date   DATE          NULL COMMENT '다음 적금 납입일 또는 대출 상환일(resDatePayment/추정)',
@@ -72,16 +76,20 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     account_id    BIGINT        NOT NULL COMMENT 'ACCOUNT.account_id 참조',
     fingerprint   CHAR(64)      NOT NULL COMMENT '계좌·거래일시·상품별 금액·상세 기반 SHA-256',
     transaction_category VARCHAR(20) NOT NULL DEFAULT 'ORDINARY' COMMENT 'ORDINARY, INSTALLMENT, LOAN',
+    loan_transaction_type_name VARCHAR(100) NULL COMMENT '대출 거래내역 반복부의 거래구분명(resTransTypeNm) 원문',
     tran_date     DATE          NULL COMMENT 'resAccountTrDate',
     tran_time     TIME          NULL COMMENT 'resAccountTrTime (hhmmss)',
-    out_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountOut',
+    out_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountOut, 대출은 총상환액(resTranAmount 없으면 원금+이자)',
     in_amount     DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT 'resAccountIn',
+    loan_principal_amount DECIMAL(18,2) NULL COMMENT '대출 거래내역 반복부의 원금(resPrincipal)',
+    loan_interest_amount  DECIMAL(18,2) NULL COMMENT '대출 거래내역 반복부의 이자(resInterest)',
     after_balance DECIMAL(18,2) NULL COMMENT '거래 후 잔액 또는 대출 잔액',
     desc1         VARCHAR(255)  NULL COMMENT 'resAccountDesc1, 은행별 의미가 달라 원본 필드명 유지',
     desc2         VARCHAR(255)  NULL COMMENT 'resAccountDesc2, 은행별 의미가 달라 원본 필드명 유지',
     desc3         VARCHAR(255)  NULL COMMENT 'resAccountDesc3, 은행별 의미가 달라 원본 필드명 유지',
     desc4         VARCHAR(255)  NULL COMMENT 'resAccountDesc4, 은행별 의미가 달라 원본 필드명 유지',
     created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)
