@@ -7,4 +7,6 @@ import org.apache.ibatis.annotations.Param;
 public interface AccountLifecycleMapper {
 
     int deactivateByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    int activateByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 }

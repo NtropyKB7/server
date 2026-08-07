@@ -15,6 +15,8 @@ import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.AccountCollectionService;
+import com.ntropy.account.service.VirtualAccountRegenerationService;
+import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.client.FinancialAccountCommandClient;
 import com.ntropy.common.client.UserBirthDateQueryClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
@@ -33,6 +35,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
     private static final int DEFAULT_COLLECTION_DAYS = 90;
 
     private final AccountCollectionService accountCollectionService;
+    private final VirtualAccountRegenerationService virtualAccountRegenerationService;
     private final AccountLifecycleMapper accountLifecycleMapper;
     private final CodefConnectionMapper codefConnectionMapper;
     private final ObjectProvider<UserBirthDateQueryClient> userBirthDateQueryClientProvider;
@@ -71,9 +74,8 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         String connectionType = normalizeConnectionType(command.connectionType());
 
         if ("VIRTUAL".equals(connectionType)) {
-            // NTROPY 가상 금융데이터 리팩터링(이슈 #84~) 진행 중에는 VIRTUAL 등록을 차단한다.
-            // 스키마·조회 계약·생성기 전체 검증이 끝나면 이 분기를 다시 활성화한다.
-            throw new ServiceException(AccountErrorCode.VIRTUAL_REGISTRATION_BLOCKED);
+            GenerationSummary summary = virtualAccountRegenerationService.regenerateForUser(userId, bank);
+            return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), summary.accounts());
         }
 
         requireNonBlank(command.bankLoginId(), bank.getDisplayName() + " 로그인 ID");
@@ -92,6 +94,15 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         requirePositive(userId, "userId");
         requirePositive(accountId, "accountId");
         if (accountLifecycleMapper.deactivateByIdAndUserId(accountId, userId) == 0) {
+            throw new ServiceException(AccountErrorCode.ACCOUNT_NOT_FOUND);
+        }
+    }
+
+    @Override
+    public void activateAccount(Long userId, Long accountId) {
+        requirePositive(userId, "userId");
+        requirePositive(accountId, "accountId");
+        if (accountLifecycleMapper.activateByIdAndUserId(accountId, userId) == 0) {
             throw new ServiceException(AccountErrorCode.ACCOUNT_NOT_FOUND);
         }
     }

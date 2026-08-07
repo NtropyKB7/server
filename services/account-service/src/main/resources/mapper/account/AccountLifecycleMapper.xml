@@ -10,4 +10,12 @@
           AND user_id = #{userId}
     </update>
 
+    <update id="activateByIdAndUserId">
+        UPDATE ACCOUNT
+        SET status = 'ACTIVE',
+            deactivated_at = NULL
+        WHERE account_id = #{id}
+          AND user_id = #{userId}
+    </update>
+
 </mapper>
