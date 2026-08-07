@@ -15,4 +15,6 @@ public interface AccountTransactionMapper {
     List<AccountTransaction> findByAccountIdAndDateRange(@Param("accountId") Long accountId,
                                                          @Param("startDate") LocalDate startDate,
                                                          @Param("endDate") LocalDate endDate);
+
+    void deleteByUserIdAndProvider(@Param("userId") Long userId, @Param("provider") String provider);
 }

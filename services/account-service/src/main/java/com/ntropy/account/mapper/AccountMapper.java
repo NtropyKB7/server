@@ -21,4 +21,6 @@ public interface AccountMapper {
                                          @Param("provider") String provider);
 
     List<Account> findByUserIdAndProvider(@Param("userId") Long userId, @Param("provider") String provider);
+
+    void deleteByUserIdAndProvider(@Param("userId") Long userId, @Param("provider") String provider);
 }
