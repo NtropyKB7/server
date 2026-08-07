@@ -18,7 +18,6 @@ import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.AccountCollectionService;
-import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.common.client.UserBirthDateQueryClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
 import com.ntropy.common.exception.ServiceException;
@@ -26,27 +25,29 @@ import com.ntropy.common.exception.ServiceException;
 class LocalFinancialAccountCommandClientTest {
 
     @Test
-    void registersVirtualAccountWithoutBankCredentials() {
-        StubVirtualFinancialDataService virtualService = new StubVirtualFinancialDataService();
+    void blocksVirtualRegistrationDuringRefactoring() {
+        StubAccountCollectionService collectionService = new StubAccountCollectionService();
+        StubCodefConnectionMapper connectionMapper = new StubCodefConnectionMapper();
         LocalFinancialAccountCommandClient client = newClient(
-                virtualService, new StubAccountCollectionService(), (id, userId) -> 1,
-                new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                collectionService, (id, userId) -> 1, connectionMapper, emptyBirthDateProvider()
         );
 
-        var result = client.registerAccount(
-                42L, new AccountRegistrationCommand("VIRTUAL", "0088", null, null)
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.registerAccount(
+                        42L, new AccountRegistrationCommand("VIRTUAL", "0088", null, null)
+                )
         );
 
-        assertEquals("VIRTUAL", result.connectionType());
-        assertEquals(2, result.accountCount());
-        assertEquals(42L, virtualService.userId);
-        assertEquals(PersonalBank.SHINHAN_BANK, virtualService.bank);
+        assertEquals(503, exception.getStatusCode());
+        assertTrue(collectionService.registerAndCollectCalls == 0);
+        assertTrue(connectionMapper.insertCalls == 0);
     }
 
     @Test
     void requiresCredentialsOnlyForCodef() {
         LocalFinancialAccountCommandClient client = newClient(
-                new StubVirtualFinancialDataService(), new StubAccountCollectionService(),
+                new StubAccountCollectionService(),
                 (id, userId) -> 1, new StubCodefConnectionMapper(), emptyBirthDateProvider()
         );
 
@@ -63,7 +64,7 @@ class LocalFinancialAccountCommandClientTest {
     @Test
     void requiresMemberBirthDateIntegrationForBirthDateBank() {
         LocalFinancialAccountCommandClient client = newClient(
-                new StubVirtualFinancialDataService(), new StubAccountCollectionService(),
+                new StubAccountCollectionService(),
                 (id, userId) -> 1, new StubCodefConnectionMapper(), emptyBirthDateProvider()
         );
 
@@ -81,7 +82,7 @@ class LocalFinancialAccountCommandClientTest {
     void myDataStatusUsesOnlyCodefConnection() {
         StubCodefConnectionMapper mapper = new StubCodefConnectionMapper();
         LocalFinancialAccountCommandClient client = newClient(
-                new StubVirtualFinancialDataService(), new StubAccountCollectionService(),
+                new StubAccountCollectionService(),
                 (id, userId) -> 1, mapper, emptyBirthDateProvider()
         );
 
@@ -103,7 +104,7 @@ class LocalFinancialAccountCommandClientTest {
     @Test
     void returnsSameNotFoundForDeactivationFailure() {
         LocalFinancialAccountCommandClient client = newClient(
-                new StubVirtualFinancialDataService(), new StubAccountCollectionService(),
+                new StubAccountCollectionService(),
                 (id, userId) -> 0, new StubCodefConnectionMapper(), emptyBirthDateProvider()
         );
 
@@ -114,14 +115,13 @@ class LocalFinancialAccountCommandClientTest {
     }
 
     private static LocalFinancialAccountCommandClient newClient(
-            VirtualFinancialDataService virtualService,
             AccountCollectionService collectionService,
             AccountLifecycleMapper lifecycleMapper,
             CodefConnectionMapper connectionMapper,
             org.springframework.beans.factory.ObjectProvider<UserBirthDateQueryClient> birthDateProvider
     ) {
         return new LocalFinancialAccountCommandClient(
-                virtualService, collectionService, lifecycleMapper, connectionMapper, birthDateProvider
+                collectionService, lifecycleMapper, connectionMapper, birthDateProvider
         );
     }
 
@@ -129,25 +129,9 @@ class LocalFinancialAccountCommandClientTest {
         return new DefaultListableBeanFactory().getBeanProvider(UserBirthDateQueryClient.class);
     }
 
-    private static class StubVirtualFinancialDataService extends VirtualFinancialDataService {
-        private Long userId;
-        private PersonalBank bank;
-
-        StubVirtualFinancialDataService() {
-            super(null, null, null, null);
-        }
-
-        @Override
-        public GenerationSummary generateForUser(Long userId, PersonalBank bank) {
-            this.userId = userId;
-            this.bank = bank;
-            return new GenerationSummary(
-                    1, 2, 2, 300, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30)
-            );
-        }
-    }
-
     private static class StubAccountCollectionService extends AccountCollectionService {
+        private int registerAndCollectCalls = 0;
+
         StubAccountCollectionService() {
             super(null, null, null, null, null, null, null);
         }
@@ -156,15 +140,18 @@ class LocalFinancialAccountCommandClientTest {
         public List<Account> registerAndCollect(Long userId, PersonalBank bank, String loginId,
                                                 String rawPassword, String birthDate,
                                                 LocalDate transactionStartDate, LocalDate transactionEndDate) {
+            registerAndCollectCalls++;
             return List.of(new Account());
         }
     }
 
     private static class StubCodefConnectionMapper implements CodefConnectionMapper {
         private CodefConnection connection;
+        private int insertCalls = 0;
 
         @Override
         public void insert(CodefConnection codefConnection) {
+            insertCalls++;
         }
 
         @Override
