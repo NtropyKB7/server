@@ -213,5 +213,10 @@ class VirtualAccountServiceTest {
             }
             return result;
         }
+
+        @Override
+        public void deleteByUserIdAndProvider(Long userId, String provider) {
+            store.values().removeIf(a -> userId.equals(a.getUserId()));
+        }
     }
 }

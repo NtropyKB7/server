@@ -95,6 +95,8 @@ class AccountCollectionServiceTest {
               "result": {"code": "CF-00000"},
               "data": {
                 "resAccountStatus": "정상",
+                "resRate": "2.50",
+                "resAccountEndDate": "20270101",
                 "resTrHistoryList": [
                   {
                     "resRoundNo": "13",
@@ -129,6 +131,8 @@ class AccountCollectionServiceTest {
               "result": {"code": "CF-00000"},
               "data": {
                 "resPrincipal": "120000000",
+                "resRate": "3.45",
+                "resAccountEndDate": "20300101",
                 "resLoanBalance": "95000000",
                 "resTrHistoryList": [
                   {
@@ -223,8 +227,14 @@ class AccountCollectionServiceTest {
         assertTrue(transactionClient.calls.isEmpty());
         assertEquals(1, installmentClient.calls.size());
         assertEquals("302123456789", installmentClient.calls.get(0).account());
-        assertEquals(1, accountMapper.updatedAccountDetails);
+        // 계좌 상세(이율·만기일) 갱신 1회 + 다음 납입일 추정 갱신 1회
+        assertEquals(2, accountMapper.updatedAccountDetails);
         assertEquals(1, transactionMapper.insertedTransactions.size());
+
+        Account stored = accountMapper.findByConnectionIdAndAccountNoHash(1L,
+                com.ntropy.account.domain.AccountNoHash.hash("0011", "302123456789"));
+        assertEquals(new java.math.BigDecimal("2.50"), stored.getInterestRate());
+        assertEquals(LocalDate.of(2027, 1, 1), stored.getMaturityDate());
     }
 
     @Test
@@ -282,6 +292,17 @@ class AccountCollectionServiceTest {
         assertEquals(null, loanClient.calls.get(0).loanExecutionNumber());
         assertEquals(1, accountMapper.updatedAccountDetails);
         assertEquals(1, transactionMapper.insertedTransactions.size());
+
+        Account stored = accountMapper.findByConnectionIdAndAccountNoHash(1L,
+                com.ntropy.account.domain.AccountNoHash.hash("0011", "302987654321"));
+        assertEquals(new java.math.BigDecimal("120000000"), stored.getLoanContractPrincipal());
+        assertEquals(new java.math.BigDecimal("3.45"), stored.getInterestRate());
+        assertEquals(LocalDate.of(2030, 1, 1), stored.getMaturityDate());
+
+        AccountTransaction storedTransaction = transactionMapper.insertedTransactions.get(0);
+        assertEquals("원리금상환", storedTransaction.getLoanTransactionTypeName());
+        assertEquals(new java.math.BigDecimal("900000"), storedTransaction.getLoanPrincipalAmount());
+        assertEquals(new java.math.BigDecimal("300000"), storedTransaction.getLoanInterestAmount());
     }
 
     @Test
@@ -468,7 +489,18 @@ class AccountCollectionServiceTest {
             store.values().stream()
                     .filter(existing -> existing.getId().equals(account.getId()))
                     .findFirst()
-                    .ifPresent(existing -> existing.setNextPaymentDate(account.getNextPaymentDate()));
+                    .ifPresent(existing -> {
+                        existing.setNextPaymentDate(account.getNextPaymentDate());
+                        if (account.getLoanContractPrincipal() != null) {
+                            existing.setLoanContractPrincipal(account.getLoanContractPrincipal());
+                        }
+                        if (existing.getInterestRate() == null && account.getInterestRate() != null) {
+                            existing.setInterestRate(account.getInterestRate());
+                        }
+                        if (account.getMaturityDate() != null) {
+                            existing.setMaturityDate(account.getMaturityDate());
+                        }
+                    });
         }
 
         @Override
@@ -486,6 +518,11 @@ class AccountCollectionServiceTest {
         @Override
         public List<Account> findByUserIdAndProvider(Long userId, String provider) {
             return store.values().stream().filter(a -> userId.equals(a.getUserId())).toList();
+        }
+
+        @Override
+        public void deleteByUserIdAndProvider(Long userId, String provider) {
+            store.values().removeIf(a -> userId.equals(a.getUserId()));
         }
     }
 
@@ -510,5 +547,8 @@ class AccountCollectionServiceTest {
                     .toList();
         }
 
+        @Override
+        public void deleteByUserIdAndProvider(Long userId, String provider) {
+        }
     }
 }

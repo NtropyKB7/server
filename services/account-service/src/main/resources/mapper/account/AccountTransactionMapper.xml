@@ -46,4 +46,15 @@
         ORDER BY tran_date, tran_time, account_transaction_id
     </select>
 
+    <delete id="deleteByUserIdAndProvider">
+        DELETE FROM ACCOUNT_TRANSACTION
+        WHERE account_id IN (
+            SELECT account_id FROM ACCOUNT
+            WHERE user_id = #{userId}
+              AND codef_connection_id IN (
+                  SELECT codef_connection_id FROM CODEF_CONNECTION WHERE provider = #{provider}
+              )
+        )
+    </delete>
+
 </mapper>

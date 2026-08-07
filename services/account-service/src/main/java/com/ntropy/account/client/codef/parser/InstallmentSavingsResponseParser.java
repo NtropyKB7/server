@@ -7,6 +7,7 @@ import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ntropy.account.domain.AccountTransactionCategory;
 import com.ntropy.account.domain.TransactionFingerprint;
+import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 
 /** CODEF 개인 적금 거래내역 응답을 계좌 상세와 납입내역으로 변환한다. */
@@ -15,16 +16,25 @@ public final class InstallmentSavingsResponseParser {
     private InstallmentSavingsResponseParser() {
     }
 
-    public record ParsedInstallmentSavings(List<AccountTransaction> transactions) {
+    public record ParsedInstallmentSavings(Account detail, List<AccountTransaction> transactions) {
     }
 
     public static List<ParsedInstallmentSavings> parse(JsonNode data, Long accountId) {
         List<ParsedInstallmentSavings> result = new ArrayList<>();
         for (JsonNode accountResult : CodefJsonSupport.accountResults(data)) {
             List<AccountTransaction> transactions = parseTransactions(accountResult, accountId);
-            result.add(new ParsedInstallmentSavings(transactions));
+            result.add(new ParsedInstallmentSavings(parseDetail(accountResult, accountId), transactions));
         }
         return result;
+    }
+
+    private static Account parseDetail(JsonNode node, Long accountId) {
+        Account detail = new Account();
+        detail.setId(accountId);
+        detail.setInterestRate(CodefJsonSupport.amount(node, "resRate"));
+        detail.setMaturityDate(CodefJsonSupport.date(node, "resAccountEndDate"));
+        // CODEF 적금 거래내역에는 다음 납입일 필드가 없다. nextPaymentDate는 설정하지 않고 null로 유지한다.
+        return detail;
     }
 
     private static List<AccountTransaction> parseTransactions(JsonNode accountResult, Long accountId) {

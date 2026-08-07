@@ -3,6 +3,10 @@ package com.ntropy.account.integration.virtual;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
+
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
@@ -180,14 +184,22 @@ class VirtualFinancialDataManualVerificationTest {
         }
 
         @Bean
+        Clock clock() {
+            // 월말로 고정해 "현재 월"이 항상 완결된 3개월 창이 되도록 하고, 기존 고정 건수 검증값을 그대로 유지한다.
+            ZoneId zone = ZoneId.of("Asia/Seoul");
+            return Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
+        }
+
+        @Bean
         VirtualFinancialDataService virtualFinancialDataService(
                 VirtualConnectionService connectionService,
                 AccountMapper accountMapper,
                 AccountTransactionMapper transactionMapper,
-                VirtualFinancialTransactionGenerator generator
+                VirtualFinancialTransactionGenerator generator,
+                Clock clock
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator
+                    connectionService, accountMapper, transactionMapper, generator, clock
             );
         }
     }

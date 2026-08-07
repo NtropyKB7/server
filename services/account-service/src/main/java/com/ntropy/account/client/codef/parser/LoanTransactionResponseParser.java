@@ -34,7 +34,12 @@ public final class LoanTransactionResponseParser {
         Account detail = new Account();
         detail.setId(accountId);
         detail.setAccountStartDate(CodefJsonSupport.date(node, "resAccountStartDate"));
+        detail.setMaturityDate(CodefJsonSupport.date(node, "resAccountEndDate"));
         detail.setNextPaymentDate(CodefJsonSupport.date(node, "resDatePayment"));
+        // 계좌 상세의 상위 resPrincipal은 약정원금이다. 반복부의 동명 필드(거래 원금)와 경로가 다르다.
+        detail.setLoanContractPrincipal(CodefJsonSupport.amount(node, "resPrincipal"));
+        // 계좌 상세의 상위 resRate만 계좌 약정이율로 매핑한다. 반복부 resInterestRate(거래 시점 이율)는 사용하지 않는다.
+        detail.setInterestRate(CodefJsonSupport.amount(node, "resRate"));
         var loanBalance = CodefJsonSupport.amount(node, "resLoanBalance");
         detail.setBalance(loanBalance != null ? loanBalance.abs() : null);
         return detail;
@@ -51,9 +56,13 @@ public final class LoanTransactionResponseParser {
             AccountTransaction transaction = new AccountTransaction();
             transaction.setAccountId(accountId);
             transaction.setTransactionCategory(AccountTransactionCategory.LOAN);
+            transaction.setLoanTransactionTypeName(CodefJsonSupport.text(node, "resTransTypeNm"));
             transaction.setTranDate(CodefJsonSupport.date(node, "resAccountTrDate"));
             transaction.setOutAmount(repaymentAmount(node));
             transaction.setInAmount(BigDecimal.ZERO);
+            // 반복부의 resPrincipal/resInterest는 해당 거래의 원금·이자다. 계좌 상세 상위 resPrincipal(약정원금)과 경로가 다르다.
+            transaction.setLoanPrincipalAmount(CodefJsonSupport.amount(node, "resPrincipal"));
+            transaction.setLoanInterestAmount(CodefJsonSupport.amount(node, "resInterest"));
             transaction.setAfterBalance(CodefJsonSupport.amount(node, "resLoanBalance"));
             transaction.setFingerprint(TransactionFingerprint.hash(
                     accountId, AccountTransactionCategory.LOAN,

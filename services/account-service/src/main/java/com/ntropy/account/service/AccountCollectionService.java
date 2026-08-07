@@ -162,6 +162,7 @@ public class AccountCollectionService {
         );
         List<AccountTransaction> collectedTransactions = new ArrayList<>();
         for (ParsedInstallmentSavings parsed : parsedResults) {
+            accountMapper.updateAccountDetails(parsed.detail());
             List<AccountTransaction> transactions = parsed.transactions();
             if (!transactions.isEmpty()) {
                 accountTransactionMapper.insertAll(transactions);

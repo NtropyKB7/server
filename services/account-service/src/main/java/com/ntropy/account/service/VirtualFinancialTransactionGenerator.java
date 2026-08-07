@@ -18,12 +18,14 @@ import com.ntropy.account.domain.TransactionFingerprint;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 
-/** FIN-005 가상 금융 거래를 고정된 규칙으로 생성한다. */
+/**
+ * FIN-005 가상 금융 거래를 고정된 규칙으로 생성한다.
+ * 거래 기간은 고정 날짜가 아니라 호출 시점에 주입되는 기준일(referenceDate)이 속한 현재 월과
+ * 직전 2개월이다. 현재 월은 기준일까지만 생성하고 그 이후 날짜는 만들지 않는다.
+ */
 @Component
 public class VirtualFinancialTransactionGenerator {
 
-    public static final LocalDate START_DATE = LocalDate.of(2026, 4, 1);
-    public static final LocalDate END_DATE = LocalDate.of(2026, 6, 30);
     public static final int TRANSACTIONS_PER_USER_PER_MONTH = 100;
     public static final int INCOME_COUNTERPARTY_COUNT = 11;
 
@@ -108,13 +110,15 @@ public class VirtualFinancialTransactionGenerator {
             spending("생활", 4_000L, 80_000L, "다이소", "오늘의집", "편의점택배")
     };
 
-    public GeneratedTransactions generate(int userOrdinal, PersonalBank bank,
+    public GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, PersonalBank bank,
                                           Account ordinaryAccount, Account secondaryAccount) {
-        return generate(userOrdinal, consumerProfileFor(userOrdinal), bank, ordinaryAccount, secondaryAccount);
+        return generate(
+                referenceDate, userOrdinal, consumerProfileFor(userOrdinal), bank, ordinaryAccount, secondaryAccount
+        );
     }
 
     /** 실제 로그인 사용자는 userId 해시로 네 소비 유형 중 하나에 안정적으로 배정한다. */
-    public GeneratedTransactions generateForUser(Long userId, PersonalBank bank,
+    public GeneratedTransactions generateForUser(LocalDate referenceDate, Long userId, PersonalBank bank,
                                                   Account ordinaryAccount, Account secondaryAccount) {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("사용자 ID는 양수여야 합니다");
@@ -124,13 +128,16 @@ public class VirtualFinancialTransactionGenerator {
         ConsumerProfile[] profiles = ConsumerProfile.values();
         int variation = Math.floorMod(hash / profiles.length, 12);
         int stableUserOrdinal = 1 + profile.ordinal() + profiles.length * variation;
-        return generate(stableUserOrdinal, profile, bank, ordinaryAccount, secondaryAccount);
+        return generate(referenceDate, stableUserOrdinal, profile, bank, ordinaryAccount, secondaryAccount);
     }
 
-    private GeneratedTransactions generate(int userOrdinal, ConsumerProfile consumerProfile, PersonalBank bank,
-                                            Account ordinaryAccount, Account secondaryAccount) {
+    private GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, ConsumerProfile consumerProfile,
+                                            PersonalBank bank, Account ordinaryAccount, Account secondaryAccount) {
         requireAccountId(ordinaryAccount);
         requireAccountId(secondaryAccount);
+        if (referenceDate == null) {
+            throw new IllegalArgumentException("기준일이 필요합니다");
+        }
         if (userOrdinal < 1 || userOrdinal > VirtualFinancialDataService.USER_COUNT) {
             throw new IllegalArgumentException("가상 사용자 순번이 범위를 벗어났습니다: " + userOrdinal);
         }
@@ -143,14 +150,27 @@ public class VirtualFinancialTransactionGenerator {
         List<PlannedTransaction> ordinaryPlans = new ArrayList<>();
         List<PlannedTransaction> secondaryPlans = new ArrayList<>();
 
+        YearMonth currentMonth = YearMonth.from(referenceDate);
         for (int monthOffset = 0; monthOffset < 3; monthOffset++) {
-            YearMonth month = YearMonth.from(START_DATE).plusMonths(monthOffset);
-            addIncomePlans(ordinaryPlans, userOrdinal, monthOffset, month, incomeCounterparties);
-            addFixedExpensePlans(ordinaryPlans, userOrdinal, monthOffset, month);
-            addConsumptionPlans(ordinaryPlans, userOrdinal, monthOffset, month, consumerProfile);
+            YearMonth month = currentMonth.minusMonths(2 - monthOffset);
+            boolean isCurrentMonth = monthOffset == 2;
+
+            List<PlannedTransaction> monthOrdinaryPlans = new ArrayList<>();
+            List<PlannedTransaction> monthSecondaryPlans = new ArrayList<>();
+            addIncomePlans(monthOrdinaryPlans, userOrdinal, monthOffset, month, incomeCounterparties);
+            addFixedExpensePlans(monthOrdinaryPlans, userOrdinal, monthOffset, month);
+            addConsumptionPlans(monthOrdinaryPlans, userOrdinal, monthOffset, month, consumerProfile);
             addSecondaryTransferPlans(
-                    ordinaryPlans, secondaryPlans, userOrdinal, monthOffset, month, installment
+                    monthOrdinaryPlans, monthSecondaryPlans, userOrdinal, monthOffset, month, installment
             );
+
+            if (isCurrentMonth) {
+                // 현재 월은 기준일 이후 거래를 만들지 않는다. 지난 2개월은 항상 완결된 달이라 필터가 필요 없다.
+                monthOrdinaryPlans.removeIf(plan -> plan.date().isAfter(referenceDate));
+                monthSecondaryPlans.removeIf(plan -> plan.date().isAfter(referenceDate));
+            }
+            ordinaryPlans.addAll(monthOrdinaryPlans);
+            secondaryPlans.addAll(monthSecondaryPlans);
         }
 
         List<AccountTransaction> ordinaryTransactions = materialize(
@@ -171,9 +191,13 @@ public class VirtualFinancialTransactionGenerator {
         all.addAll(ordinaryTransactions);
         all.addAll(secondaryTransactions);
 
-        int expected = TRANSACTIONS_PER_USER_PER_MONTH * 3;
-        if (all.size() != expected) {
-            throw new IllegalStateException("가상 거래 건수 불일치: expected=" + expected + ", actual=" + all.size());
+        // 지난 2개월은 완결된 달이라 항상 월 100건씩 200건이고, 현재 월은 기준일까지만 생성돼 0~100건이다.
+        int minimumExpected = TRANSACTIONS_PER_USER_PER_MONTH * 2;
+        int maximumExpected = TRANSACTIONS_PER_USER_PER_MONTH * 3;
+        if (all.size() < minimumExpected || all.size() > maximumExpected) {
+            throw new IllegalStateException(
+                    "가상 거래 건수 불일치: expected=[" + minimumExpected + "," + maximumExpected + "], actual=" + all.size()
+            );
         }
 
         Map<Long, BigDecimal> finalBalances = new LinkedHashMap<>();
@@ -331,6 +355,12 @@ public class VirtualFinancialTransactionGenerator {
             transaction.setTranTime(plan.time());
             transaction.setOutAmount(plan.outAmount());
             transaction.setInAmount(plan.inAmount());
+            if (category == AccountTransactionCategory.LOAN && plan.outAmount().signum() > 0) {
+                transaction.setLoanTransactionTypeName("원리금상환");
+                BigDecimal principal = loanPrincipalPortion(plan.outAmount());
+                transaction.setLoanPrincipalAmount(principal);
+                transaction.setLoanInterestAmount(plan.outAmount().subtract(principal));
+            }
             transaction.setAfterBalance(balance);
             transaction.setDesc1(descriptions.desc1());
             transaction.setDesc2(descriptions.desc2());
@@ -340,6 +370,12 @@ public class VirtualFinancialTransactionGenerator {
             result.add(transaction);
         }
         return result;
+    }
+
+    /** 원리금 상환액의 80%를 원금, 나머지를 이자로 결정적으로 분리한다. 둘을 더하면 항상 원상환액과 같다. */
+    private static BigDecimal loanPrincipalPortion(BigDecimal repaymentAmount) {
+        return repaymentAmount.multiply(BigDecimal.valueOf(8))
+                .divide(BigDecimal.TEN, 0, java.math.RoundingMode.HALF_UP);
     }
 
     private static String fingerprint(AccountTransaction transaction) {
