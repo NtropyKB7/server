@@ -1,0 +1,31 @@
+package com.ntropy.common.client;
+
+import java.util.List;
+
+import com.ntropy.common.dto.account.ClassificationTargetTransaction;
+import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
+
+/**
+ * AI-service가 account-service의 거래 분석 기능을 호출하기 위한 내부 Client 인터페이스입니다.
+ */
+public interface AccountTransactionAnalysisClient {
+
+    /**
+     * 특정 사용자와 연월 기준으로 AI 분류 대상 출금 거래를 조회합니다.
+     *
+     * @param userId 사용자 ID
+     * @param yearMonth 조회 대상 연월. 예: "2026-07"
+     * @return FastAPI 소비 분류 요청에 사용할 거래 목록
+     */
+    List<ClassificationTargetTransaction> findClassificationTargets(
+            Long userId,
+            String yearMonth
+    );
+
+    /**
+     * FastAPI 소비 분류 결과를 account-service의 TXN_ANALYSIS에 저장합니다.
+     *
+     * @param request 저장할 분류 결과 요청
+     */
+    void saveTransactionAnalyses(TransactionAnalysisSaveRequest request);
+}
