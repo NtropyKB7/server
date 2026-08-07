@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.account.client.codef.parser.InstallmentSavingsResponseParser.ParsedInstallmentSavings;
 import com.ntropy.account.domain.AccountTransactionCategory;
+import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 
 class InstallmentSavingsResponseParserTest {
@@ -52,6 +53,9 @@ class InstallmentSavingsResponseParserTest {
 
         assertEquals(1, parsed.size());
         ParsedInstallmentSavings result = parsed.get(0);
+        assertEquals(new BigDecimal("2.56"), result.detail().getInterestRate());
+        assertNull(result.detail().getMaturityDate(), "fixture에 resAccountEndDate가 없으면 null이어야 한다");
+        assertNull(result.detail().getNextPaymentDate(), "CODEF 적금 거래내역에는 다음 납입일 필드가 없어 항상 null이어야 한다");
         assertEquals(1, result.transactions().size());
         AccountTransaction tx = result.transactions().get(0);
         assertEquals(42L, tx.getAccountId());
@@ -61,6 +65,22 @@ class InstallmentSavingsResponseParserTest {
         assertEquals(new BigDecimal("1300000"), tx.getAfterBalance());
         assertEquals("월불입금", tx.getDesc2());
         assertNotNull(tx.getFingerprint());
+    }
+
+    @Test
+    void parsesMaturityDateWhenProvided() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "resRate": "2.56",
+                  "resAccountEndDate": "20270101",
+                  "resTrHistoryList": []
+                }
+                """);
+
+        Account detail = InstallmentSavingsResponseParser.parse(data, 42L).get(0).detail();
+
+        assertEquals(LocalDate.of(2027, 1, 1), detail.getMaturityDate());
+        assertNull(detail.getNextPaymentDate());
     }
 
     @Test
