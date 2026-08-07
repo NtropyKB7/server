@@ -33,7 +33,7 @@ public final class InstallmentSavingsResponseParser {
         detail.setId(accountId);
         detail.setInterestRate(CodefJsonSupport.amount(node, "resRate"));
         detail.setMaturityDate(CodefJsonSupport.date(node, "resAccountEndDate"));
-        // CODEF 적금 거래내역에는 다음 납입일 필드가 없다. nextPaymentDate는 설정하지 않고 null로 유지한다.
+        // CODEF 적금 거래내역에는 다음 납입일 필드가 없다. 수집 서비스가 기본 일정(다음 25일)을 적용한다.
         return detail;
     }
 

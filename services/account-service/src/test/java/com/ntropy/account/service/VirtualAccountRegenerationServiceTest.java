@@ -105,6 +105,37 @@ class VirtualAccountRegenerationServiceTest {
                 countTransactionsByUser(accountMapper, transactionMapper, OTHER_USER_ID));
     }
 
+    @Test
+    void replacesDataWithoutDuplicatesWhenRegisteringSameBankAgain() {
+        Map<Long, String> connectionProviders = new HashMap<>();
+        InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper(connectionProviders);
+        InMemoryAccountMapper accountMapper = new InMemoryAccountMapper(connectionProviders);
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper(accountMapper);
+        ZoneId zone = ZoneId.of("Asia/Seoul");
+        Clock clock = Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
+        VirtualFinancialDataService dataService = new VirtualFinancialDataService(
+                new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
+                new VirtualFinancialTransactionGenerator(), clock
+        );
+        VirtualAccountRegenerationService regenerationService =
+                new VirtualAccountRegenerationService(accountMapper, transactionMapper, dataService);
+
+        dataService.generateForUser(TARGET_USER_ID, PersonalBank.SHINHAN_BANK);
+        int firstAccountCount = accountMapper.findByUserIdAndProvider(
+                TARGET_USER_ID, ConnectionProvider.NTROPY.name()
+        ).size();
+
+        // 같은 은행으로 다시 등록해도 계좌·거래가 늘어나지 않아야 한다.
+        regenerationService.regenerateForUser(TARGET_USER_ID, PersonalBank.SHINHAN_BANK);
+        List<Account> accountsAfter = accountMapper.findByUserIdAndProvider(
+                TARGET_USER_ID, ConnectionProvider.NTROPY.name()
+        );
+
+        assertEquals(firstAccountCount, accountsAfter.size());
+        assertTrue(accountsAfter.stream()
+                .allMatch(account -> account.getOrganizationCode().equals(PersonalBank.SHINHAN_BANK.getOrganizationCode())));
+    }
+
     private static int countByUser(InMemoryAccountMapper accountMapper, Long userId) {
         return (int) accountMapper.store.values().stream()
                 .filter(account -> userId.equals(account.getUserId())).count();

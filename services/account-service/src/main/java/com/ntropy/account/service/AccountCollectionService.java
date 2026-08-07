@@ -1,9 +1,7 @@
 package com.ntropy.account.service;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -44,8 +42,6 @@ public class AccountCollectionService {
     private static final String ORDINARY_WITHDRAWAL = "11";
     private static final String REGULAR_SAVINGS = "12";
     private static final String LOAN = "40";
-    private static final int DEFAULT_SAVINGS_PAYMENT_DAY = 14;
-
     private final PersonalBankAccountService personalBankAccountService;
     private final CodefConnectionMapper codefConnectionMapper;
     private final CodefBankTransactionClient codefBankTransactionClient;
@@ -143,6 +139,9 @@ public class AccountCollectionService {
         );
         List<ParsedLoan> parsedResults = LoanTransactionResponseParser.parse(response.path("data"), account.getId());
         for (ParsedLoan parsed : parsedResults) {
+            if (parsed.detail().getNextPaymentDate() == null) {
+                parsed.detail().setNextPaymentDate(DefaultPaymentSchedule.nextAfter(endDate));
+            }
             accountMapper.updateAccountDetails(parsed.detail());
             List<AccountTransaction> transactions = parsed.transactions();
             if (!transactions.isEmpty()) {
@@ -160,22 +159,18 @@ public class AccountCollectionService {
         List<ParsedInstallmentSavings> parsedResults = InstallmentSavingsResponseParser.parse(
                 response.path("data"), account.getId()
         );
-        List<AccountTransaction> collectedTransactions = new ArrayList<>();
+        LocalDate defaultNextPaymentDate = DefaultPaymentSchedule.nextAfter(endDate);
+        if (parsedResults.isEmpty()) {
+            updateNextPaymentDate(account.getId(), defaultNextPaymentDate);
+        }
         for (ParsedInstallmentSavings parsed : parsedResults) {
+            parsed.detail().setNextPaymentDate(defaultNextPaymentDate);
             accountMapper.updateAccountDetails(parsed.detail());
             List<AccountTransaction> transactions = parsed.transactions();
             if (!transactions.isEmpty()) {
                 accountTransactionMapper.insertAll(transactions);
-                collectedTransactions.addAll(transactions);
             }
         }
-        int preferredDay = collectedTransactions.stream()
-                .map(AccountTransaction::getTranDate)
-                .filter(java.util.Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .map(LocalDate::getDayOfMonth)
-                .orElseGet(() -> paymentDay(account));
-        updateNextPaymentDate(account.getId(), nextOccurrence(endDate, preferredDay));
     }
 
     private void updateNextPaymentDate(Long accountId, LocalDate nextPaymentDate) {
@@ -183,22 +178,6 @@ public class AccountCollectionService {
         schedule.setId(accountId);
         schedule.setNextPaymentDate(nextPaymentDate);
         accountMapper.updateAccountDetails(schedule);
-    }
-
-    private static int paymentDay(Account account) {
-        return account.getAccountStartDate() != null
-                ? account.getAccountStartDate().getDayOfMonth()
-                : DEFAULT_SAVINGS_PAYMENT_DAY;
-    }
-
-    private static LocalDate nextOccurrence(LocalDate referenceDate, int preferredDay) {
-        YearMonth month = YearMonth.from(referenceDate);
-        LocalDate candidate = month.atDay(Math.min(preferredDay, month.lengthOfMonth()));
-        if (!candidate.isAfter(referenceDate)) {
-            YearMonth nextMonth = month.plusMonths(1);
-            candidate = nextMonth.atDay(Math.min(preferredDay, nextMonth.lengthOfMonth()));
-        }
-        return candidate;
     }
 
     private void collectTransactions(PersonalBank bank, String connectedId, String rawAccountNo, Long accountId,

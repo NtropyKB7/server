@@ -17,4 +17,6 @@ public interface FinancialAccountCommandClient {
     AccountRegistrationSummary registerAccount(Long userId, AccountRegistrationCommand command);
 
     void deactivateAccount(Long userId, Long accountId);
+
+    void activateAccount(Long userId, Long accountId);
 }

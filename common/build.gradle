@@ -5,4 +5,9 @@ dependencies {
 
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    // 실제 api 모듈 조립 시에는 다른 의존성이 jackson-databind를 2.15.4로 끌어올려 record가 정상 직렬화된다.
+    // common 단독 테스트도 그 실제 런타임 버전과 맞춰야 record 직렬화 계약을 의미 있게 검증할 수 있다.
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
+    testImplementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.4'
 }

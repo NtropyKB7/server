@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ntropy.bff.dto.account.request.AccountRegistrationRequest;
+import com.ntropy.bff.dto.account.response.AccountActivationResponse;
 import com.ntropy.bff.dto.account.response.AccountDeactivationResponse;
 import com.ntropy.bff.dto.account.response.AccountsResponse;
 import com.ntropy.bff.dto.account.response.BanksResponse;
@@ -107,6 +108,19 @@ public class FinancialAccountController {
         financialAccountCommandClient.deactivateAccount(userId, accountId);
         return ApiResponse.success(
                 200, "계좌가 비활성화되었습니다.", new AccountDeactivationResponse(accountId, "INACTIVE")
+        );
+    }
+
+    @ApiOperation("내 계좌 활성화")
+    @PatchMapping("/api/accounts/{accountId}/activate")
+    public ApiResponse<AccountActivationResponse> activateAccount(
+            @ApiParam(hidden = true) Authentication authentication,
+            @PathVariable Long accountId
+    ) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        financialAccountCommandClient.activateAccount(userId, accountId);
+        return ApiResponse.success(
+                200, "계좌가 활성화되었습니다.", new AccountActivationResponse(accountId, "ACTIVE")
         );
     }
 }

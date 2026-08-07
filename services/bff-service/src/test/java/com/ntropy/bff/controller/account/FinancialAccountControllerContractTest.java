@@ -36,6 +36,11 @@ class FinancialAccountControllerContractTest {
                 method("deactivateAccount", org.springframework.security.core.Authentication.class, Long.class)
                         .getAnnotation(PatchMapping.class).value()
         );
+        assertArrayEquals(
+                new String[] {"/api/accounts/{accountId}/activate"},
+                method("activateAccount", org.springframework.security.core.Authentication.class, Long.class)
+                        .getAnnotation(PatchMapping.class).value()
+        );
     }
 
     @Test

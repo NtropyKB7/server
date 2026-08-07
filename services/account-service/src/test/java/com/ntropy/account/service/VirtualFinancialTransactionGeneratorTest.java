@@ -59,6 +59,9 @@ class VirtualFinancialTransactionGeneratorTest {
 
         assertEquals(297, countCategory(generated.transactions(), AccountTransactionCategory.ORDINARY));
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.INSTALLMENT));
+        assertTrue(generated.transactions().stream()
+                .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.INSTALLMENT)
+                .allMatch(transaction -> transaction.getTranDate().getDayOfMonth() == 25));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getInAmount().signum() > 0));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getOutAmount().signum() > 0));
         List<AccountTransaction> incomeTransactions = generated.transactions().stream()
@@ -83,6 +86,9 @@ class VirtualFinancialTransactionGeneratorTest {
         assertTrue(generated.transactions().stream()
                 .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.LOAN)
                 .allMatch(transaction -> transaction.getOutAmount().signum() > 0));
+        assertTrue(generated.transactions().stream()
+                .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.LOAN)
+                .allMatch(transaction -> transaction.getTranDate().getDayOfMonth() == 25));
     }
 
     @Test
@@ -249,6 +255,76 @@ class VirtualFinancialTransactionGeneratorTest {
             assertEquals(transaction.getOutAmount(),
                     transaction.getLoanPrincipalAmount().add(transaction.getLoanInterestAmount()));
         }
+    }
+
+    @Test
+    void handlesFirstDayOfMonthAsReferenceDateWithMinimalCurrentMonthTransactions() {
+        LocalDate firstOfMonth = LocalDate.of(2026, 6, 1);
+        Account ordinary = account(90L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(91L, AccountGroup.DEPOSIT_TRUST);
+
+        GeneratedTransactions generated = generator.generate(
+                firstOfMonth, 1, PersonalBank.SHINHAN_BANK, ordinary, installment
+        );
+
+        assertTrue(generated.transactions().stream()
+                .noneMatch(transaction -> transaction.getTranDate().isAfter(firstOfMonth)));
+        long currentMonthCount = generated.transactions().stream()
+                .filter(transaction -> YearMonth.from(transaction.getTranDate()).equals(YearMonth.of(2026, 6)))
+                .count();
+        assertTrue(currentMonthCount > 0 && currentMonthCount < 10,
+                "월 1일에는 지난달 100건씩 + 이번 달 소수 건만 있어야 한다: " + currentMonthCount);
+    }
+
+    @Test
+    void handlesLeapYearFebruary29AsReferenceDate() {
+        LocalDate leapDay = LocalDate.of(2028, 2, 29);
+        Account ordinary = account(92L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(93L, AccountGroup.LOAN);
+
+        GeneratedTransactions generated = generator.generate(
+                leapDay, 26, PersonalBank.NH_BANK, ordinary, loan
+        );
+
+        assertTrue(generated.transactions().stream()
+                .noneMatch(transaction -> transaction.getTranDate().isAfter(leapDay)));
+        assertTrue(generated.transactions().size() >= 200);
+    }
+
+    @Test
+    void handlesNonLeapYearFebruary28AsReferenceDate() {
+        LocalDate lastFebDay = LocalDate.of(2027, 2, 28);
+        Account ordinary = account(94L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(95L, AccountGroup.DEPOSIT_TRUST);
+
+        GeneratedTransactions generated = generator.generate(
+                lastFebDay, 1, PersonalBank.SHINHAN_BANK, ordinary, installment
+        );
+
+        assertTrue(generated.transactions().stream()
+                .noneMatch(transaction -> transaction.getTranDate().isAfter(lastFebDay)));
+        // 2월은 완결된 달이라도 100건이 아니라 28일치 패턴 그대로다.
+        Map<YearMonth, Long> monthlyCounts = generated.transactions().stream()
+                .collect(Collectors.groupingBy(
+                        transaction -> YearMonth.from(transaction.getTranDate()),
+                        Collectors.counting()
+                ));
+        assertEquals(100L, monthlyCounts.get(YearMonth.of(2027, 2)));
+    }
+
+    @Test
+    void handlesThirtyOneDayMonthEndAsReferenceDate() {
+        LocalDate endOfJuly = LocalDate.of(2026, 7, 31);
+        Account ordinary = account(96L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(97L, AccountGroup.LOAN);
+
+        GeneratedTransactions generated = generator.generate(
+                endOfJuly, 26, PersonalBank.NH_BANK, ordinary, loan
+        );
+
+        assertTrue(generated.transactions().stream()
+                .noneMatch(transaction -> transaction.getTranDate().isAfter(endOfJuly)));
+        assertEquals(300, generated.transactions().size());
     }
 
     private static long countCategory(List<AccountTransaction> transactions,
