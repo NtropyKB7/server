@@ -1,12 +1,14 @@
 package com.ntropy.user.service;
 
-import com.ntropy.auth.dto.OAuthLoginResponse;
-import com.ntropy.auth.security.JwtProvider;
-import com.ntropy.user.client.GoogleOAuthClient;
-import com.ntropy.user.client.KakaoOAuthClient;
+import com.ntropy.user.client.oauth.GoogleOAuthClient;
+import com.ntropy.user.client.oauth.KakaoOAuthClient;
+
+import com.ntropy.user.dto.OAuthLoginResponse;
+import com.ntropy.user.security.JwtProvider;
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.user.dto.TokenRefreshResponseDto;
 import com.ntropy.user.mapper.UserMapper;
-import com.ntropy.user.model.User;
+import com.ntropy.user.domain.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.Optional;
 
@@ -39,13 +40,10 @@ class UserServiceTest {
     @Mock
     private JwtProvider jwtProvider;
 
-    private MockHttpServletRequest request;
     private User testUser;
 
     @BeforeEach
     void setUp() {
-        request = new MockHttpServletRequest();
-
         testUser = User.builder()
                 .userId(1L)
                 .email("test@example.com")
@@ -72,11 +70,14 @@ class UserServiceTest {
             return null;
         }).when(userMapper).insertUser(any(User.class));
 
-        OAuthLoginResponse response = userService.processOAuthLogin(testUser, request);
+        OAuthLoginResponse response = userService.processOAuthLogin(testUser);
 
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
+        assertThat(response.getUserId()).isEqualTo(1L);
         verify(userMapper, times(1)).insertUser(any(User.class));
+        verify(userMapper, times(1)).updateLoginInfo(any(User.class));
+        verify(jwtProvider).createAccessToken("1", testUser.getEmail(), testUser.getRole());
     }
 
     @Test
@@ -86,7 +87,7 @@ class UserServiceTest {
         when(jwtProvider.createAccessToken(anyString(), anyString(), anyString())).thenReturn("newAccessToken");
         when(jwtProvider.createRefreshToken(anyString())).thenReturn("newRefreshToken");
 
-        OAuthLoginResponse response = userService.processOAuthLogin(testUser, request);
+        OAuthLoginResponse response = userService.processOAuthLogin(testUser);
 
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
@@ -99,7 +100,9 @@ class UserServiceTest {
         testUser.setStatus("INACTIVE");
         when(userMapper.findByProviderAndProviderId(anyString(), anyString())).thenReturn(Optional.of(testUser));
 
-        assertThrows(IllegalStateException.class, () -> userService.processOAuthLogin(testUser, request));
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.processOAuthLogin(testUser));
+        assertThat(exception.getStatusCode()).isEqualTo(403);
     }
 
     @Test
@@ -111,12 +114,11 @@ class UserServiceTest {
         when(jwtProvider.createAccessToken(anyString(), anyString(), anyString())).thenReturn("newAccessToken");
         when(jwtProvider.createRefreshToken(anyString())).thenReturn("newRefreshToken");
 
-        TokenRefreshResponseDto response = userService.refreshAccessToken(oldRefreshToken, request);
+        TokenRefreshResponseDto response = userService.refreshAccessToken(oldRefreshToken);
 
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
         verify(userMapper, times(1)).updateLoginInfo(any(User.class));
-        verify(accessLogService, times(1)).logActivity(any(), any(), anyString(), anyString(), eq(true));
     }
 
     @Test
@@ -125,13 +127,23 @@ class UserServiceTest {
         String invalidRefreshToken = "invalidToken";
         when(jwtProvider.validateToken(invalidRefreshToken)).thenReturn(false);
 
-        assertThrows(SecurityException.class, () -> userService.refreshAccessToken(invalidRefreshToken, request));
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.refreshAccessToken(invalidRefreshToken));
+        assertThat(exception.getStatusCode()).isEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 소셜 제공자로 로그인 시도 시 실패")
+    void processOAuthLoginWithCode_unsupported_provider_failure() {
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.processOAuthLoginWithCode("naver", "code"));
+        assertThat(exception.getStatusCode()).isEqualTo(400);
     }
 
     @Test
     @DisplayName("로그아웃 성공")
     void logout_success() {
-        userService.logout(testUser.getUserId(), request);
+        userService.logout(testUser.getUserId());
 
         verify(userMapper, times(1)).invalidateRefreshToken(testUser.getUserId());
     }

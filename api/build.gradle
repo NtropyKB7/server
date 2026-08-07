@@ -22,6 +22,10 @@ dependencies {
     implementation "org.springframework:spring-tx:${springVersion}"
     implementation 'javax.inject:javax.inject:1'
 
+    // Spring Security (인증 필터 체인)
+    implementation "org.springframework.security:spring-security-web:${securityVersion}"
+    implementation "org.springframework.security:spring-security-config:${securityVersion}"
+
     // AOP
     implementation 'org.aspectj:aspectjrt:1.9.20'
     implementation 'org.aspectj:aspectjweaver:1.9.20'

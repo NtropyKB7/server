@@ -1,13 +1,14 @@
 package com.ntropy.user.client;
 
-import com.ntropy.user.client.common.UserQueryClient;
-import com.ntropy.user.dto.common.UserSummary;
-import com.ntropy.user.model.User;
+import com.ntropy.common.client.UserQueryClient;
+import com.ntropy.common.dto.user.UserSummary;
+import com.ntropy.user.domain.entity.User;
 import com.ntropy.user.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service // bff-service가 주입받을 수 있도록 스프링 빈으로 등록
+/** user-service가 구현하는 회원 조회 계약. */
+@Component
 @RequiredArgsConstructor
 public class LocalUserQueryClient implements UserQueryClient {
 
@@ -17,15 +18,16 @@ public class LocalUserQueryClient implements UserQueryClient {
     public UserSummary getUserSummary(Long userId) {
         User user = userService.getUserById(userId);
         if (user == null) {
-            // 또는 적절한 예외 처리
             return null;
         }
-
-        // User 모델을 UserSummary DTO로 변환하여 반환
-        return UserSummary.builder()
-                .userId(user.getUserId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .build();
+        return new UserSummary(
+                user.getUserId(),
+                user.getName(),
+                user.getEmail(),
+                user.getProvider(),
+                user.getAlarmAgree(),
+                user.getLocationAgree(),
+                user.getOnboardingCompleted()
+        );
     }
 }

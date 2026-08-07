@@ -11,7 +11,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.9.4'
 
     //auth를 위해 임시로..
-    implementation 'org.springframework.security:spring-security-core:5.8.11'
+    implementation "org.springframework.security:spring-security-core:${securityVersion}"
     compileOnly 'io.swagger:swagger-annotations:1.5.20'
     compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
 }

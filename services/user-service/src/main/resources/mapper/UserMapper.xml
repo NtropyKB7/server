@@ -3,7 +3,7 @@
 
 <mapper namespace="com.ntropy.user.mapper.UserMapper">
 
-    <resultMap id="userResultMap" type="com.ntropy.user.model.User">
+    <resultMap id="userResultMap" type="com.ntropy.user.domain.entity.User">
         <id property="userId" column="user_id"/>
         <result property="email" column="email"/>
         <result property="name" column="name"/>
@@ -30,7 +30,7 @@
     </select>
 
     <!-- 신규 소셜 회원 DB에 저장 -->
-    <insert id="insertUser" parameterType="com.ntropy.user.model.User" useGeneratedKeys="true" keyProperty="userId">
+    <insert id="insertUser" parameterType="com.ntropy.user.domain.entity.User" useGeneratedKeys="true" keyProperty="userId">
         INSERT INTO USERS (
             email, name, provider_id, refresh_token_hash,
             alarm_agree, location_agree, refresh_token_expire_at,
@@ -52,7 +52,7 @@
     </select>
 
     <!-- 로그인 유지 정보 및 마지막 접속 시간 갱신 -->
-    <update id="updateLoginInfo" parameterType="com.ntropy.user.model.User">
+    <update id="updateLoginInfo" parameterType="com.ntropy.user.domain.entity.User">
         UPDATE USERS
         SET last_login_at = NOW(),
             refresh_token_hash = #{refreshTokenHash},
@@ -61,7 +61,7 @@
     </update>
 
     <!-- 회원 정보 수정 -->
-    <update id="updateUser" parameterType="com.ntropy.user.model.User">
+    <update id="updateUser" parameterType="com.ntropy.user.domain.entity.User">
         UPDATE USERS
         SET name = #{name},
             alarm_agree = #{alarmAgree},

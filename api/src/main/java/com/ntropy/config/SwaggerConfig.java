@@ -44,22 +44,32 @@ public class SwaggerConfig {
                 .apis(RequestHandlerSelectors.basePackage("com.ntropy"))
                 .paths(PathSelectors.any())
                 .build()
+                // Authentication은 인증 필터가 채우는 파라미터라 문서/입력 대상이 아니다.
+                // @ApiParam(hidden = true)만으로는 springfox 2.9.2가 필드를 펼쳐버려서 명시적으로 무시 등록한다.
+                .ignoredParameterTypes(org.springframework.security.core.Authentication.class)
                 .securitySchemes(Collections.singletonList(bearerAuth()))
-                .securityContexts(Collections.singletonList(financialApiSecurityContext()));
+                .securityContexts(Collections.singletonList(authenticatedApiSecurityContext()));
     }
 
     private ApiKey bearerAuth() {
         return new ApiKey("Bearer", "Authorization", "header");
     }
 
-    private SecurityContext financialApiSecurityContext() {
+    /**
+     * SecurityConfig의 permitAll 경로를 제외한 모든 /api/** 에 Bearer 인증 요구를 표시한다.
+     * springfox는 각 오퍼레이션에 이 표시가 있어야 Swagger UI의 Authorize 값을
+     * 실제 요청 헤더에 자동으로 실어준다 - 표시가 없으면 Authorize를 해도 헤더가 안 붙는다.
+     */
+    private SecurityContext authenticatedApiSecurityContext() {
         return SecurityContext.builder()
                 .securityReferences(Collections.singletonList(
                         new SecurityReference("Bearer", new AuthorizationScope[] {
-                                new AuthorizationScope("global", "금융 API 접근")
+                                new AuthorizationScope("global", "인증 필요 API 접근")
                         })
                 ))
-                .forPaths(PathSelectors.regex("/api/(accounts.*|mydata.*)"))
+                .forPaths(PathSelectors.regex(
+                        "^/api/(?!auth/oauth|auth/refresh|subscriptions/webhook|subscriptions/plans).*$"
+                ))
                 .build();
     }
 

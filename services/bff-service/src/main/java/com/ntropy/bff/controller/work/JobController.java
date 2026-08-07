@@ -2,6 +2,7 @@ package com.ntropy.bff.controller.work;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,10 +20,12 @@ import com.ntropy.bff.dto.work.response.JobResponse;
 import com.ntropy.bff.dto.work.request.JobUpdateRequest;
 import com.ntropy.bff.dto.work.response.JobsResponse;
 import com.ntropy.bff.dto.common.ApiResponse;
+import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.JobCandidateQueryClient;
 import com.ntropy.common.client.JobCommandClient;
 import com.ntropy.common.client.JobQueryClient;
 
+import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -33,6 +36,7 @@ public class JobController {
     private final JobQueryClient jobQueryClient;
     private final JobCommandClient jobCommandClient;
     private final JobCandidateQueryClient jobCandidateQueryClient;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     @GetMapping("/{jobId}")
     public ApiResponse<JobResponse> getJob(@PathVariable Long jobId) {
@@ -40,12 +44,14 @@ public class JobController {
     }
 
     @GetMapping
-    public ApiResponse<JobsResponse> getJobs(@RequestParam Long userId) {
+    public ApiResponse<JobsResponse> getJobs(@ApiParam(hidden = true) Authentication authentication) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(JobsResponse.from(jobQueryClient.getJobsByUserId(userId)));
     }
 
     @GetMapping("/candidates")
-    public ApiResponse<JobCandidatesResponse> getJobCandidates(@RequestParam Long userId) {
+    public ApiResponse<JobCandidatesResponse> getJobCandidates(@ApiParam(hidden = true) Authentication authentication) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(JobCandidatesResponse.from(jobCandidateQueryClient.getJobCandidates(userId)));
     }
 

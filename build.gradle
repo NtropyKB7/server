@@ -1,5 +1,6 @@
 ext {
     springVersion = '5.3.39'
+    securityVersion = '5.8.12'
     junitVersion = '5.10.2'
     lombokVersion = '1.18.30'
 }
