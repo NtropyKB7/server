@@ -16,6 +16,7 @@ import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.enums.SettlementMatchStatus;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.JobMapper;
 import com.ntropy.work.mapper.JobPlatformMappingMapper;
@@ -29,6 +30,10 @@ import lombok.RequiredArgsConstructor;
  * 입금 거래를 PLATFORM/JOB과 매칭해 SETTLEMENT를 생성하고, 해당 기간의 확정된(CONFIRMED)
  * WORK_LOG를 COMPLETED로 갱신한다. processDate 당일의 입금 거래만 확인하므로 매일 배치로
  * 호출하는 것을 전제로 한다. 이미 매칭된 job+기간은 SETTLEMENT UNIQUE 제약으로 재처리하지 않는다.
+ *
+ * <p>매칭되지 않은(UNMATCHED) 거래도 버리지 않고, 같은 날짜에 들어온 것들을 합산해
+ * status=UNMATCHED(job_id=null) 행 하나로 저장한다. 한 플랫폼에 회원 잡이 여러 개
+ * 매핑되는 경우(AMBIGUOUS)는 없다고 가정하고 별도로 다루지 않는다.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -51,26 +56,35 @@ public class SettlementService {
         List<Platform> platforms = platformMapper.findAll();
         List<Job> jobs = jobMapper.findByUserId(userId);
 
+        long unmatchedAmount = 0;
+        int unmatchedCount = 0;
         for (NormalizedIncomingTransaction transaction : transactions) {
-            processTransaction(transaction, platforms, jobs);
+            if (!processMatchedTransaction(userId, transaction, platforms, jobs)) {
+                unmatchedAmount += transaction.amount().longValueExact();
+                unmatchedCount++;
+            }
+        }
+        if (unmatchedCount > 0) {
+            saveUnmatchedSettlement(userId, processDate, unmatchedAmount, unmatchedCount);
         }
     }
 
-    private void processTransaction(NormalizedIncomingTransaction transaction, List<Platform> platforms,
-                                     List<Job> jobs) {
+    /** 매칭에 성공해 SETTLEMENT를 만들었거나 이미 만들어져 있으면 true. */
+    private boolean processMatchedTransaction(Long userId, NormalizedIncomingTransaction transaction,
+                                               List<Platform> platforms, List<Job> jobs) {
         PlatformMatchResult result = PlatformMatcher.match(transaction.counterpartyName(), platforms);
         if (!(result instanceof PlatformMatchResult.Matched matched)) {
-            return;
+            return false;
         }
         Platform platform = matched.platform();
         Long jobId = resolveJobId(platform.getPlatformId(), jobs);
         if (jobId == null) {
-            return;
+            return false;
         }
 
         SettlementPeriod period = SettlementPeriodCalculator.calculate(platform, transaction.transactionDate());
         if (settlementMapper.existsByJobIdAndPeriod(jobId, period.start(), period.end())) {
-            return;
+            return true;
         }
 
         List<WorkLog> logsInPeriod = findConfirmedLogsInPeriod(jobId, period);
@@ -79,11 +93,15 @@ public class SettlementService {
                 .sum();
 
         Settlement settlement = Settlement.builder()
+                .userId(userId)
+                .status(SettlementMatchStatus.MATCHED)
                 .jobId(jobId)
                 .periodStart(period.start())
                 .periodEnd(period.end())
+                .depositDate(transaction.transactionDate())
                 .expectedAmount(expectedAmount)
                 .actualAmount(transaction.amount().longValueExact())
+                .transactionCount(1)
                 .accountTransactionId(transaction.transactionId())
                 .matchedAt(LocalDateTime.now())
                 .build();
@@ -93,6 +111,34 @@ public class SettlementService {
             log.setSettlementStatus(SettlementStatus.COMPLETED);
             workLogMapper.update(log);
         }
+        return true;
+    }
+
+    /**
+     * 매칭되지 않은 거래는 잡을 특정할 수 없으니 job_id=null로, 같은 날짜 것들을 합쳐
+     * 하루 단위 한 행으로 저장한다. 배치가 중복 실행돼도 같은 날짜에 두 번 쌓이지 않도록
+     * UNMATCHED는 (user_id, status, period) 기준으로 존재 여부를 확인한다.
+     */
+    private void saveUnmatchedSettlement(Long userId, LocalDate processDate, long amount, int count) {
+        if (settlementMapper.existsByUserIdAndStatusAndPeriod(
+                userId, SettlementMatchStatus.UNMATCHED, processDate, processDate)) {
+            return;
+        }
+
+        Settlement settlement = Settlement.builder()
+                .userId(userId)
+                .status(SettlementMatchStatus.UNMATCHED)
+                .jobId(null)
+                .periodStart(processDate)
+                .periodEnd(processDate)
+                .depositDate(processDate)
+                .expectedAmount(0L)
+                .actualAmount(amount)
+                .transactionCount(count)
+                .accountTransactionId(null)
+                .matchedAt(LocalDateTime.now())
+                .build();
+        settlementMapper.insert(settlement);
     }
 
     private Long resolveJobId(Long platformId, List<Job> jobs) {
