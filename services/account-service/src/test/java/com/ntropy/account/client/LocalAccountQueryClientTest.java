@@ -119,6 +119,26 @@ class LocalAccountQueryClientTest {
         assertEquals(2, mapper.transactionCountQueryCalls);
     }
 
+    @Test
+    void labelsConnectionTypeCorrectlyWhenUserHoldsBothCodefAndNtropyAccounts() {
+        InMemoryFinancialDataQueryMapper mapper = new InMemoryFinancialDataQueryMapper();
+        Account codefAccount = account(10L, 1L);
+        codefAccount.setConnectionProvider("CODEF");
+        Account ntropyAccount = account(20L, 1L);
+        ntropyAccount.setConnectionProvider("NTROPY");
+        mapper.accounts.add(codefAccount);
+        mapper.accounts.add(ntropyAccount);
+        LocalAccountQueryClient client = new LocalAccountQueryClient(mapper);
+
+        List<AccountSummary> result = client.findAccounts(1L);
+
+        assertEquals(2, result.size());
+        assertEquals("CODEF", result.stream()
+                .filter(summary -> summary.accountId().equals(10L)).findFirst().orElseThrow().connectionType());
+        assertEquals("VIRTUAL", result.stream()
+                .filter(summary -> summary.accountId().equals(20L)).findFirst().orElseThrow().connectionType());
+    }
+
     private static void assertSameNotFoundResponse(ServiceException first, ServiceException second) {
         assertEquals(AccountErrorCode.ACCOUNT_NOT_FOUND.getStatusCode(), first.getStatusCode());
         assertEquals(first.getStatusCode(), second.getStatusCode());
