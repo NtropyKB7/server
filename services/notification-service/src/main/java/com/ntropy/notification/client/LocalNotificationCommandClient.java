@@ -17,16 +17,21 @@ public class LocalNotificationCommandClient implements NotificationCommandClient
 
     private final NotificationService notificationService;
 
+    /** 알림 수신 동의가 꺼져 있으면 실제로 생성되지 않으므로 null을 반환할 수 있다. */
     @Override
     public NotificationSummary create(NotificationCreateCommand command) {
-        Notification notification = notificationService.createNotification(
-                command.userId(),
-                command.eventId(),
-                command.notificationType(),
-                command.title(),
-                command.body()
-        );
+        return notificationService.createNotification(
+                        command.userId(),
+                        command.eventId(),
+                        command.notificationType(),
+                        command.title(),
+                        command.body()
+                )
+                .map(this::toSummary)
+                .orElse(null);
+    }
 
+    private NotificationSummary toSummary(Notification notification) {
         return new NotificationSummary(
                 notification.getNotificationId(),
                 notification.getEventId(),

@@ -6,6 +6,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.common.client.UserQueryClient;
+import com.ntropy.common.dto.user.UserSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.notification.domain.entity.Notification;
 import com.ntropy.notification.exception.NotificationErrorCode;
@@ -20,13 +22,21 @@ import lombok.extern.slf4j.Slf4j;
 public class NotificationService {
 
     private final NotificationMapper notificationMapper;
+    private final UserQueryClient userQueryClient;
 
+    /** 알림 수신 동의(alarm_agree)가 꺼져 있으면 발송(=생성) 자체를 건너뛴다. null은 존재하지 않는 회원이므로 발송하지 않는다. */
     @Transactional
-    public Notification createNotification(Long userId, String eventId, String notificationType, String title, String body) {
+    public Optional<Notification> createNotification(Long userId, String eventId, String notificationType, String title, String body) {
         Optional<Notification> existing = notificationMapper.findByEventId(eventId);
         if (existing.isPresent()) {
             log.info("이미 처리된 이벤트라 알림 생성을 건너뜁니다: eventId={}", eventId);
-            return existing.get();
+            return existing;
+        }
+
+        UserSummary user = userQueryClient.getUserSummary(userId);
+        if (user == null || !Boolean.TRUE.equals(user.alarmAgree())) {
+            log.info("알림 수신 동의가 꺼져 있어 알림 생성을 건너뜁니다: userId={}, eventId={}", userId, eventId);
+            return Optional.empty();
         }
 
         Notification notification = Notification.builder()
@@ -38,7 +48,7 @@ public class NotificationService {
                 .build();
 
         notificationMapper.insertNotification(notification);
-        return notification;
+        return Optional.of(notification);
     }
 
     public List<Notification> getNotifications(Long userId, int page, int size) {
