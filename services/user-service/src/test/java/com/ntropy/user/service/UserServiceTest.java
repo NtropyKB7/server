@@ -73,7 +73,10 @@ class UserServiceTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
+        assertThat(response.getUserId()).isEqualTo(1L);
         verify(userMapper, times(1)).insertUser(any(User.class));
+        verify(userMapper, times(1)).updateLoginInfo(any(User.class));
+        verify(jwtProvider).createAccessToken("1", testUser.getEmail(), testUser.getRole());
     }
 
     @Test

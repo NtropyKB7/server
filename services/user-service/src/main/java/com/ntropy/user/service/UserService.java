@@ -78,13 +78,16 @@ public class UserService {
             user.setStatus("ACTIVE");
             user.setRole("ROLE_USER");
             user.setTermsAgreed(true);
+            user.setOnboardingCompleted(false);
+
+            userMapper.insertUser(user); // userId(PK)가 여기서 채워진다 (useGeneratedKeys)
 
             accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
             refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
 
             user.setRefreshTokenHash(refreshToken);
             user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
-            userMapper.insertUser(user);
+            userMapper.updateLoginInfo(user);
         }
 
         return OAuthLoginResponse.builder()

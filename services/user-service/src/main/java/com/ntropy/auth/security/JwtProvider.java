@@ -4,16 +4,10 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
-import java.util.Collections;
 import java.util.Date;
 
 @Slf4j
@@ -122,28 +116,5 @@ public class JwtProvider {
             log.warn("유효하지 않은 JWT 토큰: {}", e.getMessage());
             return false;
         }
-    }
-
-    /**
-     * JWT 토큰에서 인증 정보를 조회함
-     * @param token JWT 토큰
-     * @return 인증 정보 (Authentication 객체)
-     */
-    public Authentication getAuthentication(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-
-        // 클레임에서 권한 정보 가져오기
-        String role = (String) claims.get("role");
-        if (role == null) {
-            role = "ROLE_USER"; // 기본값 설정
-        }
-
-        UserDetails userDetails = new User(claims.getSubject(), "", Collections.singletonList(new SimpleGrantedAuthority(role)));
-
-        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 }

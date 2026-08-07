@@ -5,11 +5,14 @@ import com.ntropy.bff.dto.defense.request.DefenseModeEnterRequest;
 import com.ntropy.bff.dto.defense.request.DefenseModeReleaseRequest;
 import com.ntropy.bff.dto.defense.response.DefenseCausesResponse;
 import com.ntropy.bff.dto.defense.response.DefenseModeResponse;
+import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.DefenseModeCommandClient;
 import com.ntropy.common.client.DefenseModeQueryClient;
+import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DefenseModeController {
     private final DefenseModeCommandClient defenseModeCommandClient;
     private final DefenseModeQueryClient defenseModeQueryClient;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     @GetMapping("/causes")
     public ApiResponse<DefenseCausesResponse> getCauses() {
@@ -39,7 +43,8 @@ public class DefenseModeController {
     }
 
     @GetMapping("/active")
-    public ApiResponse<DefenseModeResponse> getCurrent(@RequestParam Long userId) {
+    public ApiResponse<DefenseModeResponse> getCurrent(@ApiParam(hidden = true) Authentication authentication) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(DefenseModeResponse.from(defenseModeQueryClient.getCurrent(userId)));
     }
 
