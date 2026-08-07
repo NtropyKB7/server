@@ -86,4 +86,40 @@ public class AiReportService {
         // 조회 결과가 없으면 MyBatis는 빈 List를 반환합니다.
         return aiReportMapper.findAllByUserId(userId);
     }
+
+    /**
+     * 사용자·연월 기준으로 AI 리포트를 저장하거나 갱신합니다.
+     *
+     * 같은 사용자의 같은 달 리포트가 이미 있으면
+     * 유니크 인덱스를 기준으로 JSON 데이터가 갱신됩니다.
+     *
+     * @param aiReport 저장 또는 갱신할 AI 리포트 객체
+     */
+    public void upsert(AiReport aiReport) {
+        if (aiReport == null) {
+            throw new ServiceException(
+                    AiReportErrorCode.INVALID_REQUEST,
+                    "AI 리포트는 필수입니다."
+            );
+        }
+
+        if (aiReport.getUserId() == null || aiReport.getUserId() <= 0) {
+            throw new ServiceException(
+                    AiReportErrorCode.INVALID_REQUEST,
+                    "userId는 양수여야 합니다."
+            );
+        }
+
+        if (
+                aiReport.getYearMonth() == null
+                        || !aiReport.getYearMonth().matches("\\d{4}-\\d{2}")
+        ) {
+            throw new ServiceException(
+                    AiReportErrorCode.INVALID_REQUEST,
+                    "yearMonth는 YYYY-MM 형식이어야 합니다."
+            );
+        }
+
+        aiReportMapper.upsert(aiReport);
+    }
 }

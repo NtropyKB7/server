@@ -19,4 +19,6 @@ dependencies {
 
     // AI_REPORT의 JSON 문자열을 JsonNode 객체로 변환하기 위해 사용
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.4'
+
+    implementation 'org.slf4j:slf4j-api:1.7.36'
 }

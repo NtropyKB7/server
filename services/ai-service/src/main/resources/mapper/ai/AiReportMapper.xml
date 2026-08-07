@@ -32,6 +32,26 @@
                  )
     </insert>
 
+    <!-- 사용자·연월 기준 AI 리포트 저장 또는 갱신 -->
+    <insert id="upsert"
+            parameterType="com.ntropy.ai.domain.AiReport">
+
+        INSERT INTO `AI_REPORT` (
+            `user_id`,
+            `year_month`,
+            `financial_summary_json`,
+            `recommendation_json`
+        ) VALUES (
+                     #{userId},
+                     #{yearMonth},
+                     #{financialSummaryJson},
+                     #{recommendationJson}
+                 )
+            ON DUPLICATE KEY UPDATE
+                                 `financial_summary_json` = VALUES(`financial_summary_json`),
+                                 `recommendation_json` = VALUES(`recommendation_json`)
+    </insert>
+
     <!-- 2. PK(report_id) 기준 단건 조회 -->
     <select id="findById" resultMap="aiReportResultMap">
         SELECT <include refid="aiReportColumns"/>

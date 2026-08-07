@@ -21,6 +21,19 @@ public interface AiReportMapper {
     int insert(AiReport aiReport);
 
     /**
+     * 사용자·연월 기준으로 AI 리포트를 저장하거나 갱신합니다.
+     *
+     * (user_id, year_month) 유니크 제약조건이 충돌하면
+     * 기존 리포트의 JSON 데이터만 갱신합니다.
+     *
+     * @param aiReport 저장 또는 갱신할 AI 리포트 객체
+     * @return 영향받은 행 수
+     */
+    int upsert(AiReport aiReport);
+
+
+
+    /**
      * 리포트 고유 ID(PK) 기준으로 단건 조회
      * @param reportId 조회할 리포트 PK
      * @return AI 리포트 객체
