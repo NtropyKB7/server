@@ -5,20 +5,27 @@
     <insert id="upsert" parameterType="com.ntropy.account.domain.entity.Account">
         INSERT INTO ACCOUNT (
             codef_connection_id, user_id, organization_code, account_group, deposit_type_code,
-            account_no_masked, account_no_hash, account_name, balance, currency_code,
-            account_start_date, last_tran_date, overdraft_yn, next_payment_date, status, deactivated_at
+            account_no_masked, account_no_hash, account_name, balance,
+            loan_contract_principal, interest_rate, currency_code,
+            account_start_date, maturity_date, last_tran_date, overdraft_yn, next_payment_date,
+            status, deactivated_at
         ) VALUES (
             #{codefConnectionId}, #{userId}, #{organizationCode}, #{accountGroup}, #{depositTypeCode},
-            #{accountNoMasked}, #{accountNoHash}, #{accountName}, #{balance}, #{currencyCode},
-            #{accountStartDate}, #{lastTranDate}, #{overdraftYn}, #{nextPaymentDate},
+            #{accountNoMasked}, #{accountNoHash}, #{accountName}, #{balance},
+            #{loanContractPrincipal}, #{interestRate}, #{currencyCode},
+            #{accountStartDate}, #{maturityDate}, #{lastTranDate}, #{overdraftYn}, #{nextPaymentDate},
             COALESCE(#{status}, 'ACTIVE'), #{deactivatedAt}
         )
         ON DUPLICATE KEY UPDATE
             account_no_masked = VALUES(account_no_masked),
             account_name = VALUES(account_name),
             balance = VALUES(balance),
+            loan_contract_principal = COALESCE(VALUES(loan_contract_principal), loan_contract_principal),
+            -- interest_rate는 고정금리 정책상 이미 값이 있으면 재동기화로 자동 덮어쓰지 않는다
+            interest_rate = COALESCE(interest_rate, VALUES(interest_rate)),
             currency_code = VALUES(currency_code),
             account_start_date = VALUES(account_start_date),
+            maturity_date = COALESCE(VALUES(maturity_date), maturity_date),
             last_tran_date = VALUES(last_tran_date),
             overdraft_yn = VALUES(overdraft_yn),
             next_payment_date = VALUES(next_payment_date),
@@ -30,6 +37,10 @@
         UPDATE ACCOUNT
         SET account_start_date = COALESCE(#{accountStartDate}, account_start_date),
             balance = COALESCE(#{balance}, balance),
+            loan_contract_principal = COALESCE(#{loanContractPrincipal}, loan_contract_principal),
+            -- interest_rate는 고정금리 정책상 이미 값이 있으면 재동기화로 자동 덮어쓰지 않는다
+            interest_rate = COALESCE(interest_rate, #{interestRate}),
+            maturity_date = COALESCE(#{maturityDate}, maturity_date),
             next_payment_date = #{nextPaymentDate}
         WHERE account_id = #{id}
     </update>
@@ -45,8 +56,11 @@
                account_no_hash     AS accountNoHash,
                account_name        AS accountName,
                balance,
+               loan_contract_principal AS loanContractPrincipal,
+               interest_rate       AS interestRate,
                currency_code       AS currencyCode,
                account_start_date  AS accountStartDate,
+               maturity_date       AS maturityDate,
                last_tran_date      AS lastTranDate,
                overdraft_yn        AS overdraftYn,
                next_payment_date   AS nextPaymentDate,
@@ -70,8 +84,11 @@
                account_no_hash     AS accountNoHash,
                account_name        AS accountName,
                balance,
+               loan_contract_principal AS loanContractPrincipal,
+               interest_rate       AS interestRate,
                currency_code       AS currencyCode,
                account_start_date  AS accountStartDate,
+               maturity_date       AS maturityDate,
                last_tran_date      AS lastTranDate,
                overdraft_yn        AS overdraftYn,
                next_payment_date   AS nextPaymentDate,
@@ -101,8 +118,11 @@
                account_no_hash     AS accountNoHash,
                account_name        AS accountName,
                balance,
+               loan_contract_principal AS loanContractPrincipal,
+               interest_rate       AS interestRate,
                currency_code       AS currencyCode,
                account_start_date  AS accountStartDate,
+               maturity_date       AS maturityDate,
                last_tran_date      AS lastTranDate,
                overdraft_yn        AS overdraftYn,
                next_payment_date   AS nextPaymentDate,

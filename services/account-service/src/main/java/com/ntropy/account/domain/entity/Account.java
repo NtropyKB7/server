@@ -32,8 +32,19 @@ public class Account {
     private String accountNoHash;
     private String accountName;
     private BigDecimal balance;
+
+    /** 대출 거래내역 계좌 상세의 약정원금(resPrincipal). 대출 계좌 전용. */
+    private BigDecimal loanContractPrincipal;
+
+    /** 적금·대출 거래내역 계좌 상세의 이율(resRate). 보유계좌 응답에는 없어 미적용·응답 누락 시 null. */
+    private BigDecimal interestRate;
+
     private String currencyCode;
     private LocalDate accountStartDate;
+
+    /** 예금·적금·대출 만기일(resAccountEndDate). */
+    private LocalDate maturityDate;
+
     private LocalDate lastTranDate;
 
     // 예금/신탁 그룹 전용
