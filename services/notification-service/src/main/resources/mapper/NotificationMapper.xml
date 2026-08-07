@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ntropy.notification.mapper.NotificationMapper">
+
+    <resultMap id="notificationResultMap" type="com.ntropy.notification.domain.entity.Notification">
+        <id property="notificationId" column="notification_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="eventId" column="event_id"/>
+        <result property="notificationType" column="notification_type"/>
+        <result property="title" column="title"/>
+        <result property="body" column="body"/>
+        <result property="readAt" column="read_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <!-- 알림 생성 -->
+    <insert id="insertNotification" parameterType="com.ntropy.notification.domain.entity.Notification"
+            useGeneratedKeys="true" keyProperty="notificationId">
+        INSERT INTO NOTIFICATION (
+            user_id, event_id, notification_type, title, body, created_at
+        ) VALUES (
+                     #{userId}, #{eventId}, #{notificationType}, #{title}, #{body}, NOW()
+                 )
+    </insert>
+
+    <!-- 이벤트 중복 생성 방지용 조회 -->
+    <select id="findByEventId" resultMap="notificationResultMap">
+        SELECT *
+        FROM NOTIFICATION
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!-- 본인 알림 단건 조회 (소유권 검증용) -->
+    <select id="findByIdAndUserId" resultMap="notificationResultMap">
+        SELECT *
+        FROM NOTIFICATION
+        WHERE notification_id = #{notificationId}
+          AND user_id = #{userId}
+          AND deleted_at IS NULL
+    </select>
+
+    <!-- 알림 이력 조회 (최신순, 페이징) -->
+    <select id="findByUserId" resultMap="notificationResultMap">
+        SELECT *
+        FROM NOTIFICATION
+        WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(*)
+        FROM NOTIFICATION
+        WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="countUnreadByUserId" resultType="long">
+        SELECT COUNT(*)
+        FROM NOTIFICATION
+        WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+          AND read_at IS NULL
+    </select>
+
+    <update id="markAsRead">
+        UPDATE NOTIFICATION
+        SET read_at = NOW()
+        WHERE notification_id = #{notificationId}
+          AND read_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE NOTIFICATION
+        SET deleted_at = NOW()
+        WHERE notification_id = #{notificationId}
+    </update>
+
+</mapper>

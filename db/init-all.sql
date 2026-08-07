@@ -25,7 +25,7 @@ SOURCE services/defense-service/src/main/resources/db/defense-service-schema.sql
 SOURCE services/payment-service/src/main/resources/db/payment-service-schema.sql;
 
 -- notification-service
--- SOURCE services/notification-service/src/main/resources/db/notification-service-schema.sql;
+SOURCE services/notification-service/src/main/resources/db/notification-service-schema.sql;
 
 -- bff-service (해당 없으면 스킵)
 -- SOURCE services/bff-service/src/main/resources/db/bff-service-schema.sql;
