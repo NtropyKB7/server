@@ -317,7 +317,7 @@ public class VirtualFinancialTransactionGenerator {
         long amount = installment
                 ? 300_000L + (userOrdinal % 3) * 50_000L
                 : 450_000L + (userOrdinal % 4) * 50_000L;
-        LocalDate date = month.atDay(28);
+        LocalDate date = DefaultPaymentSchedule.occurrenceIn(month);
         String counterparty = installment ? "정기적금" : "대출상환";
 
         ordinaryPlans.add(new PlannedTransaction(

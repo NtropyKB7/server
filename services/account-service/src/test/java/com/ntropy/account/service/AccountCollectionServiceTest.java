@@ -227,14 +227,15 @@ class AccountCollectionServiceTest {
         assertTrue(transactionClient.calls.isEmpty());
         assertEquals(1, installmentClient.calls.size());
         assertEquals("302123456789", installmentClient.calls.get(0).account());
-        // 계좌 상세(이율·만기일) 갱신 1회 + 다음 납입일 추정 갱신 1회
-        assertEquals(2, accountMapper.updatedAccountDetails);
+        // 계좌 상세(이율·만기일)와 기본 다음 납입일을 한 번에 갱신한다.
+        assertEquals(1, accountMapper.updatedAccountDetails);
         assertEquals(1, transactionMapper.insertedTransactions.size());
 
         Account stored = accountMapper.findByConnectionIdAndAccountNoHash(1L,
                 com.ntropy.account.domain.AccountNoHash.hash("0011", "302123456789"));
         assertEquals(new java.math.BigDecimal("2.50"), stored.getInterestRate());
         assertEquals(LocalDate.of(2027, 1, 1), stored.getMaturityDate());
+        assertEquals(LocalDate.of(2026, 2, 25), stored.getNextPaymentDate());
     }
 
     @Test
@@ -298,6 +299,7 @@ class AccountCollectionServiceTest {
         assertEquals(new java.math.BigDecimal("120000000"), stored.getLoanContractPrincipal());
         assertEquals(new java.math.BigDecimal("3.45"), stored.getInterestRate());
         assertEquals(LocalDate.of(2030, 1, 1), stored.getMaturityDate());
+        assertEquals(LocalDate.of(2026, 2, 25), stored.getNextPaymentDate());
 
         AccountTransaction storedTransaction = transactionMapper.insertedTransactions.get(0);
         assertEquals("원리금상환", storedTransaction.getLoanTransactionTypeName());

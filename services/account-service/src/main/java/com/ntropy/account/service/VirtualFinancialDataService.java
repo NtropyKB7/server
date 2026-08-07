@@ -112,6 +112,8 @@ public class VirtualFinancialDataService {
 
         ordinaryAccount.setBalance(generated.finalBalances().get(ordinaryAccount.getId()));
         secondaryAccount.setBalance(generated.finalBalances().get(secondaryAccount.getId()));
+        ordinaryAccount.setLastTranDate(lastTransactionDate(ordinaryAccount.getId(), generated.transactions()));
+        secondaryAccount.setLastTranDate(lastTransactionDate(secondaryAccount.getId(), generated.transactions()));
         accountMapper.upsert(ordinaryAccount);
         accountMapper.upsert(secondaryAccount);
 
@@ -163,7 +165,7 @@ public class VirtualFinancialDataService {
         account.setAccountName(bank.getDisplayName() + (installment ? " 가상 적금" : " 가상 대출"));
         account.setBalance(BigDecimal.ZERO);
         account.setOverdraftYn(null);
-        account.setNextPaymentDate(nextOccurrence(referenceDate));
+        account.setNextPaymentDate(DefaultPaymentSchedule.nextAfter(referenceDate));
         if (installment) {
             account.setInterestRate(installmentInterestRate(userOrdinal));
             account.setMaturityDate(referenceDate.plusYears(2));
@@ -189,8 +191,16 @@ public class VirtualFinancialDataService {
         ));
         account.setCurrencyCode(CURRENCY_KRW);
         account.setAccountStartDate(LocalDate.of(2025, 1, 1).plusDays(userOrdinal));
-        account.setLastTranDate(referenceDate);
         return account;
+    }
+
+    private static LocalDate lastTransactionDate(Long accountId, List<AccountTransaction> transactions) {
+        return transactions.stream()
+                .filter(transaction -> accountId.equals(transaction.getAccountId()))
+                .map(AccountTransaction::getTranDate)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(null);
     }
 
     /** 적금 고정이율: 2.00~3.20% 사이에서 사용자 순번에 따라 결정적으로 배정한다. */
@@ -205,12 +215,6 @@ public class VirtualFinancialDataService {
 
     private static BigDecimal loanContractPrincipal(int userOrdinal) {
         return BigDecimal.valueOf(50_000_000L + (userOrdinal % 10) * 5_000_000L);
-    }
-
-    /** 다음 적금 납입일 또는 대출 상환일: 기준일 다음 달의 같은 날짜(최대 28일)로 결정적으로 계산한다. */
-    private static LocalDate nextOccurrence(LocalDate referenceDate) {
-        int day = Math.min(28, referenceDate.getDayOfMonth());
-        return referenceDate.plusMonths(1).withDayOfMonth(day);
     }
 
     private void insertInBatches(List<AccountTransaction> transactions) {
