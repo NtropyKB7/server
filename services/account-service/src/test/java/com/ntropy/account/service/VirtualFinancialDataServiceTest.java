@@ -2,7 +2,9 @@ package com.ntropy.account.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,11 +28,15 @@ class VirtualFinancialDataServiceTest {
         InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
         InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
         InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
+        ZoneId zone = ZoneId.of("Asia/Seoul");
+        // 월말을 기준일로 고정해 "현재 월"이 항상 완결된 3개월 창이 되도록 하고, 기존 고정 건수 검증값을 그대로 유지한다.
+        Clock clock = Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService service = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper),
                 accountMapper,
                 transactionMapper,
-                new VirtualFinancialTransactionGenerator()
+                new VirtualFinancialTransactionGenerator(),
+                clock
         );
 
         GenerationSummary first = service.generate();
@@ -44,6 +50,26 @@ class VirtualFinancialDataServiceTest {
         assertEquals(50, connectionMapper.store.size());
         assertEquals(100, accountMapper.store.size());
         assertEquals(15_000, transactionMapper.store.size());
+
+        // 사용자 순번 1은 적금(installment), 26은 대출(loan) 보조계좌를 받는다.
+        Account installmentAccount = accountMapper.store.values().stream()
+                .filter(account -> account.getUserId() == 9_000_046_001L
+                        && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.DEPOSIT_TRUST
+                        && "12".equals(account.getDepositTypeCode()))
+                .findFirst().orElseThrow();
+        assertEquals(null, installmentAccount.getLoanContractPrincipal());
+        assertEquals(java.math.BigDecimal.valueOf(230, 2), installmentAccount.getInterestRate());
+        assertEquals(LocalDate.of(2028, 6, 30), installmentAccount.getMaturityDate());
+        assertEquals(LocalDate.of(2026, 7, 28), installmentAccount.getNextPaymentDate());
+        assertEquals(LocalDate.of(2026, 6, 30), installmentAccount.getLastTranDate());
+
+        Account loanAccount = accountMapper.store.values().stream()
+                .filter(account -> account.getUserId() == 9_000_046_026L
+                        && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.LOAN)
+                .findFirst().orElseThrow();
+        assertEquals(java.math.BigDecimal.valueOf(80_000_000L), loanAccount.getLoanContractPrincipal());
+        assertEquals(java.math.BigDecimal.valueOf(340, 2), loanAccount.getInterestRate());
+        assertEquals(LocalDate.of(2036, 6, 30), loanAccount.getMaturityDate());
     }
 
     private static class InMemoryCodefConnectionMapper implements CodefConnectionMapper {
@@ -123,6 +149,11 @@ class VirtualFinancialDataServiceTest {
             return store.values().stream().filter(account -> userId.equals(account.getUserId())).toList();
         }
 
+        @Override
+        public void deleteByUserIdAndProvider(Long userId, String provider) {
+            store.values().removeIf(account -> userId.equals(account.getUserId()));
+        }
+
         private static String key(Long connectionId, String accountNoHash) {
             return connectionId + ":" + accountNoHash;
         }
@@ -158,5 +189,8 @@ class VirtualFinancialDataServiceTest {
             return result;
         }
 
+        @Override
+        public void deleteByUserIdAndProvider(Long userId, String provider) {
+        }
     }
 }

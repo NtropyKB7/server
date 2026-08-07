@@ -1,7 +1,9 @@
 package com.ntropy.account.service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Locale;
 
@@ -40,9 +42,11 @@ public class VirtualFinancialDataService {
     private final AccountMapper accountMapper;
     private final AccountTransactionMapper accountTransactionMapper;
     private final VirtualFinancialTransactionGenerator transactionGenerator;
+    private final Clock clock;
 
     @Transactional
     public GenerationSummary generate() {
+        LocalDate referenceDate = LocalDate.now(clock);
         int generatedAccounts = 0;
         int generatedTransactions = 0;
         PersonalBank[] banks = PersonalBank.values();
@@ -50,22 +54,25 @@ public class VirtualFinancialDataService {
         for (int userOrdinal = 1; userOrdinal <= USER_COUNT; userOrdinal++) {
             Long userId = LOGICAL_USER_ID_BASE + userOrdinal;
             PersonalBank bank = banks[(userOrdinal - 1) % banks.length];
-            UserGenerationResult result = generateForUser(userId, bank, userOrdinal, false);
+            UserGenerationResult result = generateForUser(userId, bank, userOrdinal, false, referenceDate);
             generatedAccounts += result.accounts();
             generatedTransactions += result.transactions();
         }
 
-        if (generatedTransactions != EXPECTED_TRANSACTION_COUNT) {
+        // 지난 2개월은 사용자당 200건 고정이고, 현재 월은 기준일까지만 생성돼 사용자당 0~100건이다.
+        int minimumExpected = USER_COUNT * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 2;
+        int maximumExpected = USER_COUNT * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 3;
+        if (generatedTransactions < minimumExpected || generatedTransactions > maximumExpected) {
             throw new IllegalStateException(
-                    "가상 거래 총 건수 불일치: expected=" + EXPECTED_TRANSACTION_COUNT
+                    "가상 거래 총 건수 불일치: expected=[" + minimumExpected + "," + maximumExpected + "]"
                             + ", actual=" + generatedTransactions
             );
         }
         return new GenerationSummary(
                 USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.INCOME_COUNTERPARTY_COUNT,
                 generatedTransactions,
-                VirtualFinancialTransactionGenerator.START_DATE,
-                VirtualFinancialTransactionGenerator.END_DATE
+                YearMonth.from(referenceDate).minusMonths(2).atDay(1),
+                referenceDate
         );
     }
 
@@ -78,25 +85,30 @@ public class VirtualFinancialDataService {
         if (bank == null) {
             throw new IllegalArgumentException("은행이 필요합니다");
         }
+        LocalDate referenceDate = LocalDate.now(clock);
         int ordinal = stableUserOrdinal(userId);
-        UserGenerationResult result = generateForUser(userId, bank, ordinal, true);
+        UserGenerationResult result = generateForUser(userId, bank, ordinal, true, referenceDate);
         return new GenerationSummary(
                 1, result.accounts(), result.incomeCounterparties(), result.transactions(),
-                VirtualFinancialTransactionGenerator.START_DATE,
-                VirtualFinancialTransactionGenerator.END_DATE
+                YearMonth.from(referenceDate).minusMonths(2).atDay(1),
+                referenceDate
         );
     }
 
     private UserGenerationResult generateForUser(Long userId, PersonalBank bank, int userOrdinal,
-                                                  boolean useUserIdProfile) {
+                                                  boolean useUserIdProfile, LocalDate referenceDate) {
         CodefConnection connection = virtualConnectionService.getOrCreateConnection(userId);
         virtualConnectionService.registerInstitution(connection, bank.getOrganizationCode());
 
-        Account ordinaryAccount = saveAccount(buildOrdinaryAccount(userOrdinal, userId, connection, bank));
-        Account secondaryAccount = saveAccount(buildSecondaryAccount(userOrdinal, userId, connection, bank));
+        Account ordinaryAccount = saveAccount(
+                buildOrdinaryAccount(userOrdinal, userId, connection, bank, referenceDate)
+        );
+        Account secondaryAccount = saveAccount(
+                buildSecondaryAccount(userOrdinal, userId, connection, bank, referenceDate)
+        );
         GeneratedTransactions generated = useUserIdProfile
-                ? transactionGenerator.generateForUser(userId, bank, ordinaryAccount, secondaryAccount)
-                : transactionGenerator.generate(userOrdinal, bank, ordinaryAccount, secondaryAccount);
+                ? transactionGenerator.generateForUser(referenceDate, userId, bank, ordinaryAccount, secondaryAccount)
+                : transactionGenerator.generate(referenceDate, userOrdinal, bank, ordinaryAccount, secondaryAccount);
 
         ordinaryAccount.setBalance(generated.finalBalances().get(ordinaryAccount.getId()));
         secondaryAccount.setBalance(generated.finalBalances().get(secondaryAccount.getId()));
@@ -104,8 +116,8 @@ public class VirtualFinancialDataService {
         accountMapper.upsert(secondaryAccount);
 
         insertInBatches(generated.transactions());
-        validateStoredBalance(ordinaryAccount);
-        validateStoredBalance(secondaryAccount);
+        validateStoredBalance(ordinaryAccount, referenceDate);
+        validateStoredBalance(secondaryAccount, referenceDate);
         return new UserGenerationResult(2, generated.transactions().size(), generated.userIncomeCounterpartyCount());
     }
 
@@ -129,31 +141,43 @@ public class VirtualFinancialDataService {
     }
 
     private static Account buildOrdinaryAccount(int userOrdinal, Long userId,
-                                                CodefConnection connection, PersonalBank bank) {
-        Account account = baseAccount(userOrdinal, userId, connection, bank, 1);
+                                                CodefConnection connection, PersonalBank bank,
+                                                LocalDate referenceDate) {
+        Account account = baseAccount(userOrdinal, userId, connection, bank, 1, referenceDate);
         account.setAccountGroup(AccountGroup.DEPOSIT_TRUST);
         account.setDepositTypeCode("11");
         account.setAccountName(bank.getDisplayName() + " 가상 수시입출금");
         account.setBalance(BigDecimal.ZERO);
         account.setOverdraftYn(false);
+        // 입출금계좌는 이율이 적용되지 않아 interestRate=null로 둔다.
         return account;
     }
 
     private static Account buildSecondaryAccount(int userOrdinal, Long userId,
-                                                 CodefConnection connection, PersonalBank bank) {
-        Account account = baseAccount(userOrdinal, userId, connection, bank, 2);
+                                                 CodefConnection connection, PersonalBank bank,
+                                                 LocalDate referenceDate) {
+        Account account = baseAccount(userOrdinal, userId, connection, bank, 2, referenceDate);
         boolean installment = userOrdinal <= USER_COUNT / 2;
         account.setAccountGroup(installment ? AccountGroup.DEPOSIT_TRUST : AccountGroup.LOAN);
         account.setDepositTypeCode(installment ? "12" : "40");
         account.setAccountName(bank.getDisplayName() + (installment ? " 가상 적금" : " 가상 대출"));
         account.setBalance(BigDecimal.ZERO);
         account.setOverdraftYn(null);
-        account.setNextPaymentDate(LocalDate.of(2026, 7, 28));
+        account.setNextPaymentDate(nextOccurrence(referenceDate));
+        if (installment) {
+            account.setInterestRate(installmentInterestRate(userOrdinal));
+            account.setMaturityDate(referenceDate.plusYears(2));
+        } else {
+            account.setLoanContractPrincipal(loanContractPrincipal(userOrdinal));
+            account.setInterestRate(loanInterestRate(userOrdinal));
+            account.setMaturityDate(referenceDate.plusYears(10));
+        }
         return account;
     }
 
     private static Account baseAccount(int userOrdinal, Long userId,
-                                       CodefConnection connection, PersonalBank bank, int accountOrdinal) {
+                                       CodefConnection connection, PersonalBank bank, int accountOrdinal,
+                                       LocalDate referenceDate) {
         String rawAccountNo = String.format(Locale.ROOT, "46%03d%07d", userOrdinal, accountOrdinal);
         Account account = new Account();
         account.setCodefConnectionId(connection.getId());
@@ -165,8 +189,28 @@ public class VirtualFinancialDataService {
         ));
         account.setCurrencyCode(CURRENCY_KRW);
         account.setAccountStartDate(LocalDate.of(2025, 1, 1).plusDays(userOrdinal));
-        account.setLastTranDate(VirtualFinancialTransactionGenerator.END_DATE);
+        account.setLastTranDate(referenceDate);
         return account;
+    }
+
+    /** 적금 고정이율: 2.00~3.20% 사이에서 사용자 순번에 따라 결정적으로 배정한다. */
+    private static BigDecimal installmentInterestRate(int userOrdinal) {
+        return BigDecimal.valueOf(200 + (userOrdinal % 5) * 30, 2);
+    }
+
+    /** 대출 고정이율: 3.00~4.60% 사이에서 사용자 순번에 따라 결정적으로 배정한다. */
+    private static BigDecimal loanInterestRate(int userOrdinal) {
+        return BigDecimal.valueOf(300 + (userOrdinal % 5) * 40, 2);
+    }
+
+    private static BigDecimal loanContractPrincipal(int userOrdinal) {
+        return BigDecimal.valueOf(50_000_000L + (userOrdinal % 10) * 5_000_000L);
+    }
+
+    /** 다음 적금 납입일 또는 대출 상환일: 기준일 다음 달의 같은 날짜(최대 28일)로 결정적으로 계산한다. */
+    private static LocalDate nextOccurrence(LocalDate referenceDate) {
+        int day = Math.min(28, referenceDate.getDayOfMonth());
+        return referenceDate.plusMonths(1).withDayOfMonth(day);
     }
 
     private void insertInBatches(List<AccountTransaction> transactions) {
@@ -176,11 +220,11 @@ public class VirtualFinancialDataService {
         }
     }
 
-    private void validateStoredBalance(Account account) {
+    private void validateStoredBalance(Account account, LocalDate referenceDate) {
         List<AccountTransaction> transactions = accountTransactionMapper.findByAccountIdAndDateRange(
                 account.getId(),
-                VirtualFinancialTransactionGenerator.START_DATE,
-                VirtualFinancialTransactionGenerator.END_DATE
+                YearMonth.from(referenceDate).minusMonths(2).atDay(1),
+                referenceDate
         );
         AccountBalanceConsistencyValidator.validate(account, transactions);
     }
