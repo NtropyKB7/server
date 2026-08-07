@@ -2,7 +2,6 @@ package com.ntropy.account.client.codef.parser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,7 +20,7 @@ class AccountResponseParserTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void parsesDepositTrustAndFundGroupsDefensively() throws Exception {
+    void parsesDepositTrustAndSkipsFundGroupEntirely() throws Exception {
         JsonNode data = objectMapper.readTree("""
                 {
                   "resDepositTrust": [
@@ -61,7 +60,7 @@ class AccountResponseParserTest {
 
         List<ParsedAccount> parsed = AccountResponseParser.parse(data, 1L, 100L, "0004");
 
-        assertEquals(2, parsed.size());
+        assertEquals(1, parsed.size(), "resFund 영역은 전용 ACCOUNT 행을 만들지 않고 건너뛰어야 한다");
 
         ParsedAccount depositTrust = parsed.get(0);
         assertEquals("110123456789", depositTrust.rawAccountNo());
@@ -74,13 +73,6 @@ class AccountResponseParserTest {
         assertEquals(new BigDecimal("1234567"), deposit.getBalance());
         assertEquals("KRW", deposit.getCurrencyCode());
         assertFalse(deposit.getOverdraftYn());
-
-        ParsedAccount fund = parsed.get(1);
-        Account fundAccount = fund.account();
-        assertEquals(AccountGroup.FUND, fundAccount.getAccountGroup());
-        assertEquals("글로벌성장펀드", fundAccount.getAccountName());
-        assertNull(fundAccount.getBalance());
-        assertEquals("KRW", fundAccount.getCurrencyCode());
     }
 
     @Test
