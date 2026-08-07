@@ -2,7 +2,7 @@ package com.ntropy.user.client;
 
 import com.ntropy.common.client.UserQueryClient;
 import com.ntropy.common.dto.user.UserSummary;
-import com.ntropy.user.model.User;
+import com.ntropy.user.domain.entity.User;
 import com.ntropy.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

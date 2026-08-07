@@ -1,4 +1,4 @@
-package com.ntropy.auth.security;
+package com.ntropy.user.security;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;

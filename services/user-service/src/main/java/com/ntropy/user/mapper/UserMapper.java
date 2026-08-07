@@ -1,6 +1,6 @@
 package com.ntropy.user.mapper;
 
-import com.ntropy.user.model.User;
+import com.ntropy.user.domain.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

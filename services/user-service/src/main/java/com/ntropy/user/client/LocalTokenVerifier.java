@@ -1,6 +1,6 @@
 package com.ntropy.user.client;
 
-import com.ntropy.auth.security.JwtProvider;
+import com.ntropy.user.security.JwtProvider;
 import com.ntropy.common.client.TokenVerifier;
 import com.ntropy.common.dto.user.VerifiedToken;
 import lombok.RequiredArgsConstructor;

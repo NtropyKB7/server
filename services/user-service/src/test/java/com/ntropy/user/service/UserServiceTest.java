@@ -1,13 +1,14 @@
 package com.ntropy.user.service;
 
-import com.ntropy.auth.dto.OAuthLoginResponse;
-import com.ntropy.auth.security.JwtProvider;
+import com.ntropy.user.client.oauth.GoogleOAuthClient;
+import com.ntropy.user.client.oauth.KakaoOAuthClient;
+
+import com.ntropy.user.dto.OAuthLoginResponse;
+import com.ntropy.user.security.JwtProvider;
 import com.ntropy.common.exception.ServiceException;
-import com.ntropy.user.client.GoogleOAuthClient;
-import com.ntropy.user.client.KakaoOAuthClient;
 import com.ntropy.user.dto.TokenRefreshResponseDto;
 import com.ntropy.user.mapper.UserMapper;
-import com.ntropy.user.model.User;
+import com.ntropy.user.domain.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

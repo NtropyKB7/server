@@ -1,4 +1,4 @@
-package com.ntropy.user.model;
+package com.ntropy.user.domain.entity;
 
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;

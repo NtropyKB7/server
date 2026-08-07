@@ -1,4 +1,4 @@
-package com.ntropy.auth.security;
+package com.ntropy.user.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

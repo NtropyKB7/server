@@ -1,6 +1,6 @@
 package com.ntropy.user.client;
 
-import com.ntropy.auth.dto.OAuthLoginResponse;
+import com.ntropy.user.dto.OAuthLoginResponse;
 import com.ntropy.common.client.UserCommandClient;
 import com.ntropy.common.dto.user.OAuthLoginResult;
 import com.ntropy.common.dto.user.TokenPair;
@@ -8,7 +8,7 @@ import com.ntropy.common.dto.user.command.UserUpdateCommand;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.user.dto.TokenRefreshResponseDto;
 import com.ntropy.user.exception.UserErrorCode;
-import com.ntropy.user.model.User;
+import com.ntropy.user.domain.entity.User;
 import com.ntropy.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -1,4 +1,4 @@
-package com.ntropy.auth.dto;
+package com.ntropy.user.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,6 +1,6 @@
-package com.ntropy.user.client;
+package com.ntropy.user.client.oauth;
 
-import com.ntropy.user.model.User;
+import com.ntropy.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
