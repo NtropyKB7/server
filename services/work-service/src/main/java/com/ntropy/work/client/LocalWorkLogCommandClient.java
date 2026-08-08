@@ -31,18 +31,18 @@ public class LocalWorkLogCommandClient implements WorkLogCommandClient {
     }
 
     @Override
-    public void editWorkLog(Long logId, WorkLogPatchCommand command) {
-        workLogService.editWorkLog(logId, toPatch(command));
+    public void editWorkLog(Long userId, Long logId, WorkLogPatchCommand command) {
+        workLogService.editWorkLog(userId, logId, toPatch(command));
     }
 
     @Override
-    public void confirmWorkLog(Long logId, WorkLogPatchCommand command) {
-        workLogService.confirmWorkLog(logId, toPatch(command));
+    public void confirmWorkLog(Long userId, Long logId, WorkLogPatchCommand command) {
+        workLogService.confirmWorkLog(userId, logId, toPatch(command));
     }
 
     @Override
-    public void deleteWorkLog(Long logId) {
-        workLogService.deleteWorkLog(logId);
+    public void deleteWorkLog(Long userId, Long logId) {
+        workLogService.deleteWorkLog(userId, logId);
     }
 
     private WorkLog toWorkLog(WorkLogRegisterCommand command) {

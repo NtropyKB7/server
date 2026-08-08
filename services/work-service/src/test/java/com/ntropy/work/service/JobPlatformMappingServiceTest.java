@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryPlatformMapper;
@@ -41,7 +42,7 @@ class JobPlatformMappingServiceTest {
     @Test
     @DisplayName("존재하지 않는 플랫폼으로 등록하면 실패한다")
     void register_unknownPlatform_throws() {
-        assertThrows(IllegalArgumentException.class, () -> service.register(JOB_ID, 999L));
+        assertThrows(ServiceException.class, () -> service.register(JOB_ID, 999L));
     }
 
     @Test
@@ -49,7 +50,7 @@ class JobPlatformMappingServiceTest {
     void register_duplicateMapping_throws() {
         service.register(JOB_ID, PLATFORM_ID);
 
-        assertThrows(IllegalArgumentException.class, () -> service.register(JOB_ID, PLATFORM_ID));
+        assertThrows(ServiceException.class, () -> service.register(JOB_ID, PLATFORM_ID));
     }
 
     @Test

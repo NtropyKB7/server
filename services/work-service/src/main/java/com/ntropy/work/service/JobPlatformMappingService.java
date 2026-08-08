@@ -4,7 +4,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
+import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.JobPlatformMappingMapper;
 import com.ntropy.work.mapper.PlatformMapper;
 
@@ -23,13 +25,13 @@ public class JobPlatformMappingService {
 
     public JobPlatformMapping register(Long jobId, Long platformId) {
         if (platformMapper.findById(platformId) == null) {
-            throw new IllegalArgumentException("존재하지 않는 플랫폼입니다. platformId=" + platformId);
+            throw new ServiceException(WorkErrorCode.PLATFORM_NOT_FOUND, "platformId=" + platformId);
         }
         boolean alreadyMapped = jobPlatformMappingMapper.findByJobId(jobId).stream()
                 .anyMatch(mapping -> mapping.getPlatformId().equals(platformId));
         if (alreadyMapped) {
-            throw new IllegalArgumentException(
-                    "이미 등록된 잡-플랫폼 매핑입니다. jobId=" + jobId + ", platformId=" + platformId);
+            throw new ServiceException(WorkErrorCode.JOB_PLATFORM_MAPPING_ALREADY_EXISTS,
+                    "jobId=" + jobId + ", platformId=" + platformId);
         }
 
         JobPlatformMapping mapping = JobPlatformMapping.builder()

@@ -5,19 +5,33 @@
     <insert id="insert" parameterType="com.ntropy.work.domain.entity.Settlement"
             useGeneratedKeys="true" keyProperty="settlementId">
         INSERT INTO SETTLEMENT
-            (job_id, period_start, period_end, expected_amount, actual_amount,
-             account_transaction_id, matched_at)
+            (user_id, status, job_id, period_start, period_end, deposit_date, expected_amount, actual_amount,
+             transaction_count, account_transaction_id, matched_at)
         VALUES
-            (#{jobId}, #{periodStart}, #{periodEnd}, #{expectedAmount}, #{actualAmount},
-             #{accountTransactionId}, #{matchedAt})
+            (#{userId}, #{status}, #{jobId}, #{periodStart}, #{periodEnd}, #{depositDate}, #{expectedAmount},
+             #{actualAmount}, #{transactionCount}, #{accountTransactionId}, #{matchedAt})
     </insert>
 
-    <select id="existsByJobIdAndPeriod" resultType="boolean">
+    <select id="existsByAccountTransactionId" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM SETTLEMENT
-        WHERE job_id = #{jobId}
+        WHERE account_transaction_id = #{accountTransactionId}
+    </select>
+
+    <select id="existsByUserIdAndStatusAndPeriod" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM SETTLEMENT
+        WHERE user_id = #{userId}
+          AND status = #{status}
           AND period_start = #{periodStart}
           AND period_end = #{periodEnd}
+    </select>
+
+    <select id="findByUserIdAndDepositDateRange" resultType="com.ntropy.work.domain.entity.Settlement">
+        SELECT *
+        FROM SETTLEMENT
+        WHERE user_id = #{userId}
+          AND deposit_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
 </mapper>

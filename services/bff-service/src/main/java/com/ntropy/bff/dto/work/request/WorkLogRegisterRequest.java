@@ -15,7 +15,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class WorkLogRegisterRequest {
 
-    private Long userId;
     private Long jobId;
     private LocalDate workDate;
     private LocalTime startTime;
@@ -23,7 +22,7 @@ public class WorkLogRegisterRequest {
     private Long taskCount;
     private Long fatigue;
 
-    public WorkLogRegisterCommand toCommand() {
+    public WorkLogRegisterCommand toCommand(Long userId) {
         return new WorkLogRegisterCommand(userId, jobId, workDate, startTime, endTime, taskCount, fatigue);
     }
 }

@@ -52,7 +52,7 @@ public class LocalJobCommandClient implements JobCommandClient {
     }
 
     @Override
-    public void updateJob(Long jobId, JobUpdateCommand command) {
+    public void updateJob(Long userId, Long jobId, JobUpdateCommand command) {
         Job job = Job.builder()
                 .jobId(jobId)
                 .categoryId(command.getCategoryId())
@@ -66,12 +66,12 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .baseFatigue(command.getBaseFatigue())
                 .build();
 
-        jobService.updateJob(job, toSchedules(command.getSchedules()));
+        jobService.updateJob(userId, job, toSchedules(command.getSchedules()));
     }
 
     @Override
-    public void deactivateJob(Long jobId) {
-        jobService.deactivateJob(jobId);
+    public void deactivateJob(Long userId, Long jobId) {
+        jobService.deactivateJob(userId, jobId);
     }
 
     private List<JobSchedule> toSchedules(List<JobScheduleCommand> commands) {
