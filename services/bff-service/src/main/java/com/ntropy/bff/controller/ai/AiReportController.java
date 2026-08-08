@@ -33,14 +33,10 @@ public class AiReportController {
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     /**
-     * 특정 월의 AI 리포트를 조회합니다.
+     * 인증된 사용자의 특정 월 AI 리포트를 조회합니다.
      *
      * 요청 예시:
-     * GET /api/ai-reports/2026-07?userId=1
-     *
-     * @param authentication 인증 정보. 사용자 ID를 추출하는 데 사용합니다.
-     * @param yearMonth 조회할 리포트 대상 연월. 예: "2026-07"
-     * @return 공통 응답 형식으로 감싼 AI 리포트 상세 데이터
+     * GET /api/ai-reports/2026-07
      */
     @GetMapping("/{yearMonth}")
     public ResponseEntity<ApiResponse<AiReportResponse>> getAiReport(
@@ -69,18 +65,20 @@ public class AiReportController {
     }
 
     /**
-     * 특정 사용자의 전체 AI 리포트 목록을 최신 연월순으로 조회합니다.
+     * 인증된 사용자의 전체 AI 리포트 목록을 최신 연월순으로 조회합니다.
      *
      * 요청 예시:
-     * GET /api/ai-reports?userId=1
+     * GET /api/ai-reports
      *
-     * @param userId 조회할 사용자 ID
-     * @return 공통 응답 형식으로 감싼 AI 리포트 목록 데이터
+     * JWT의 사용자 ID를 사용하므로 userId 쿼리 파라미터는 받지 않습니다.
      */
     @GetMapping
     public ResponseEntity<ApiResponse<AiReportListResponse>> getAiReports(
-            @RequestParam Long userId
+            @ApiParam(hidden = true) Authentication authentication
     ) {
+
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+
         // BFF는 인터페이스를 통해 ai-service에 전체 AI 리포트 목록을 요청합니다.
         List<AiReportSummary> summaries = aiReportQueryClient.findAllByUserId(userId);
 

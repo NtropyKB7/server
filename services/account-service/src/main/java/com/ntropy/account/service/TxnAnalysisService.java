@@ -2,10 +2,11 @@ package com.ntropy.account.service;
 
 import java.util.List;
 
+import com.ntropy.account.mapper.FinancialDataQueryMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.ntropy.account.domain.TxnAnalysis;
+import com.ntropy.account.domain.entity.TxnAnalysis;
 import com.ntropy.account.mapper.TxnAnalysisMapper;
 import com.ntropy.common.dto.account.ClassificationTargetTransaction;
 import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
@@ -18,46 +19,26 @@ import lombok.RequiredArgsConstructor;
 public class TxnAnalysisService {
 
     private final TxnAnalysisMapper txnAnalysisMapper;
+    private final FinancialDataQueryMapper financialDataQueryMapper;
 
     public List<ClassificationTargetTransaction> findClassificationTargets(
             Long userId,
             String yearMonth
     ) {
-        validateUserId(userId);
-        validateYearMonth(yearMonth);
-
-        return txnAnalysisMapper.findClassificationTargets(userId, yearMonth);
+        return financialDataQueryMapper.findClassificationTargets(
+                userId,
+                yearMonth
+        );
     }
 
     @Transactional
-    public void saveTransactionAnalyses(TransactionAnalysisSaveRequest request) {
-        validateUserId(request.getUserId());
-        validateYearMonth(request.getYearMonth());
-
-        if (request.getResults() == null || request.getResults().isEmpty()) {
+    public void saveAnalyses(TransactionAnalysisSaveRequest request) {
+        if (request == null
+                || request.getAnalyses() == null
+                || request.getAnalyses().isEmpty()) {
             return;
         }
 
-        for (TransactionAnalysisSaveItem item : request.getResults()) {
-            TxnAnalysis txnAnalysis = new TxnAnalysis();
-            txnAnalysis.setAccountTransactionId(item.getTransactionId());
-            txnAnalysis.setIsConsumption(item.getIsConsumption());
-            txnAnalysis.setCategory(item.getCategory());
-            txnAnalysis.setExpenseType(item.getExpenseType());
-
-            txnAnalysisMapper.upsert(txnAnalysis);
-        }
-    }
-
-    private void validateUserId(Long userId) {
-        if (userId == null || userId <= 0) {
-            throw new IllegalArgumentException("userId는 양수여야 합니다.");
-        }
-    }
-
-    private void validateYearMonth(String yearMonth) {
-        if (yearMonth == null || !yearMonth.matches("\\d{4}-\\d{2}")) {
-            throw new IllegalArgumentException("yearMonth는 YYYY-MM 형식이어야 합니다.");
-        }
+        txnAnalysisMapper.upsertAnalyses(request);
     }
 }

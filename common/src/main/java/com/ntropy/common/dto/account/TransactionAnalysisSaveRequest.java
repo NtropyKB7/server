@@ -16,5 +16,5 @@ public class TransactionAnalysisSaveRequest {
 
     private Long userId;
     private String yearMonth;
-    private List<TransactionAnalysisSaveItem> results;
+    private List<TransactionAnalysisSaveItem> analyses;
 }

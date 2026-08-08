@@ -3,6 +3,7 @@ package com.ntropy.account.mapper;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.ntropy.common.dto.account.ClassificationTargetTransaction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,5 +33,10 @@ public interface FinancialDataQueryMapper {
             @Param("endDate") LocalDate endDate,
             @Param("limit") int limit,
             @Param("offset") int offset
+    );
+
+    List<ClassificationTargetTransaction> findClassificationTargets(
+            @Param("userId") Long userId,
+            @Param("yearMonth") String yearMonth
     );
 }

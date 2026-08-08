@@ -34,7 +34,7 @@
           AND at.out_amount > 0
     </select>
 
-    <insert id="upsert" parameterType="com.ntropy.account.domain.TxnAnalysis">
+    <insert id="upsert" parameterType="com.ntropy.account.domain.entity.TxnAnalysis">
         INSERT INTO TXN_ANALYSIS (
             account_transaction_id,
             is_consumption,
@@ -53,6 +53,33 @@
                                  category = VALUES(category),
                                  expense_type = VALUES(expense_type),
                                  classified_at = NOW()
+    </insert>
+
+    <insert id="upsertAnalyses"
+            parameterType="com.ntropy.common.dto.account.TransactionAnalysisSaveRequest">
+
+        INSERT INTO TXN_ANALYSIS (
+        account_transaction_id,
+        is_consumption,
+        category,
+        expense_type,
+        classified_at
+        )
+        VALUES
+        <foreach collection="analyses" item="item" separator=",">
+            (
+            #{item.transactionId},
+            #{item.isConsumption},
+            #{item.category},
+            #{item.expenseType},
+            CURRENT_TIMESTAMP
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        is_consumption = VALUES(is_consumption),
+        category = VALUES(category),
+        expense_type = VALUES(expense_type),
+        classified_at = CURRENT_TIMESTAMP
     </insert>
 
 </mapper>

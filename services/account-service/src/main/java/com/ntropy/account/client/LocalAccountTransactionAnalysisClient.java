@@ -11,9 +11,6 @@ import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * AccountTransactionAnalysisClient의 account-service 내부 구현체입니다.
- */
 @Component
 @RequiredArgsConstructor
 public class LocalAccountTransactionAnalysisClient
@@ -26,11 +23,16 @@ public class LocalAccountTransactionAnalysisClient
             Long userId,
             String yearMonth
     ) {
-        return txnAnalysisService.findClassificationTargets(userId, yearMonth);
+        return txnAnalysisService.findClassificationTargets(
+                userId,
+                yearMonth
+        );
     }
 
     @Override
-    public void saveTransactionAnalyses(TransactionAnalysisSaveRequest request) {
-        txnAnalysisService.saveTransactionAnalyses(request);
+    public void saveTransactionAnalyses(
+            TransactionAnalysisSaveRequest request
+    ) {
+        txnAnalysisService.saveAnalyses(request);
     }
 }
