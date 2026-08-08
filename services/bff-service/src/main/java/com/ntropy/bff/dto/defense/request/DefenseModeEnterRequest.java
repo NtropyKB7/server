@@ -9,12 +9,11 @@ import java.time.LocalDate;
 @Getter
 @NoArgsConstructor
 public class DefenseModeEnterRequest {
-    private Long userId;
     private String causeCode;
     private LocalDate unavailableStartDate;
     private LocalDate expectedReturnDate;
 
-    public DefenseModeEnterCommand toCommand() {
+    public DefenseModeEnterCommand toCommand(Long userId) {
         return new DefenseModeEnterCommand(userId, causeCode, unavailableStartDate, expectedReturnDate);
     }
 }

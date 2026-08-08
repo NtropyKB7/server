@@ -36,8 +36,11 @@ public class DefenseModeController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<DefenseModeResponse>> enter(@RequestBody DefenseModeEnterRequest request) {
-        DefenseModeResponse response = DefenseModeResponse.from(defenseModeCommandClient.enter(request.toCommand()));
+    public ResponseEntity<ApiResponse<DefenseModeResponse>> enter(
+            @ApiParam(hidden = true) Authentication authentication,
+            @RequestBody DefenseModeEnterRequest request) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        DefenseModeResponse response = DefenseModeResponse.from(defenseModeCommandClient.enter(request.toCommand(userId)));
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(HttpStatus.CREATED.value(), "방어모드가 시작되었습니다.", response));
     }
@@ -50,8 +53,10 @@ public class DefenseModeController {
 
     @PatchMapping("/{defenseId}/return")
     public ApiResponse<DefenseModeResponse> release(@PathVariable Long defenseId,
+                                                     @ApiParam(hidden = true) Authentication authentication,
                                                      @RequestBody DefenseModeReleaseRequest request) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(200, "방어모드가 해제되었습니다.",
-                DefenseModeResponse.from(defenseModeCommandClient.release(defenseId, request.toCommand())));
+                DefenseModeResponse.from(defenseModeCommandClient.release(defenseId, request.toCommand(userId))));
     }
 }
