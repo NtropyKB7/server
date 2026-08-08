@@ -13,9 +13,12 @@ public interface WorkLogCommandClient {
 
     Long registerActual(WorkLogRegisterCommand command);
 
-    void editWorkLog(Long logId, WorkLogPatchCommand command);
+    /** userId는 요청자 본인 확인용 - logId가 그 사람 소유가 아니면 예외. */
+    void editWorkLog(Long userId, Long logId, WorkLogPatchCommand command);
 
-    void confirmWorkLog(Long logId, WorkLogPatchCommand command);
+    /** userId는 요청자 본인 확인용 - logId가 그 사람 소유가 아니면 예외. */
+    void confirmWorkLog(Long userId, Long logId, WorkLogPatchCommand command);
 
-    void deleteWorkLog(Long logId);
+    /** userId는 요청자 본인 확인용 - logId가 그 사람 소유가 아니면 예외. */
+    void deleteWorkLog(Long userId, Long logId);
 }

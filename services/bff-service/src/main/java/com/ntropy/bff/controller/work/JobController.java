@@ -56,22 +56,31 @@ public class JobController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<JobCreateResponse>> createJob(@RequestBody JobCreateRequest request) {
-        Long jobId = jobCommandClient.registerJob(request.toCommand());
+    public ResponseEntity<ApiResponse<JobCreateResponse>> createJob(
+            @ApiParam(hidden = true) Authentication authentication,
+            @RequestBody JobCreateRequest request) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        Long jobId = jobCommandClient.registerJob(request.toCommand(userId));
         ApiResponse<JobCreateResponse> body =
                 ApiResponse.success(HttpStatus.CREATED.value(), "잡이 등록되었습니다.", new JobCreateResponse(jobId));
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
     @PutMapping("/{jobId}")
-    public ApiResponse<Void> updateJob(@PathVariable Long jobId, @RequestBody JobUpdateRequest request) {
-        jobCommandClient.updateJob(jobId, request.toCommand());
+    public ApiResponse<Void> updateJob(
+            @ApiParam(hidden = true) Authentication authentication,
+            @PathVariable Long jobId, @RequestBody JobUpdateRequest request) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        jobCommandClient.updateJob(userId, jobId, request.toCommand());
         return ApiResponse.success(HttpStatus.OK.value(), "잡이 수정되었습니다.", null);
     }
 
     @PatchMapping("/{jobId}/deactivate")
-    public ApiResponse<Void> deactivateJob(@PathVariable Long jobId) {
-        jobCommandClient.deactivateJob(jobId);
+    public ApiResponse<Void> deactivateJob(
+            @ApiParam(hidden = true) Authentication authentication,
+            @PathVariable Long jobId) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        jobCommandClient.deactivateJob(userId, jobId);
         return ApiResponse.success(HttpStatus.OK.value(), "잡이 비활성화되었습니다.", null);
     }
 }

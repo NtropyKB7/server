@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
@@ -117,7 +118,7 @@ class WorkLogServiceTest {
     void registerPlan_missingRequiredField_throws() {
         WorkLog plan = planOf(null, LocalTime.of(18, 0), LocalTime.of(22, 0));
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.registerPlan(plan));
+        assertThrows(ServiceException.class, () -> workLogService.registerPlan(plan));
     }
 
     @Test
@@ -128,7 +129,7 @@ class WorkLogServiceTest {
 
         WorkLog overlapping = planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(23, 0));
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.registerPlan(overlapping));
+        assertThrows(ServiceException.class, () -> workLogService.registerPlan(overlapping));
     }
 
     @Test
@@ -140,7 +141,7 @@ class WorkLogServiceTest {
 
         WorkLog overlapping = planOf(jobB.getJobId(), LocalTime.of(19, 0), LocalTime.of(21, 0));
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.registerPlan(overlapping));
+        assertThrows(ServiceException.class, () -> workLogService.registerPlan(overlapping));
     }
 
     @Test
@@ -149,7 +150,7 @@ class WorkLogServiceTest {
         Job job = hourlyJob();
         WorkLog actual = planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0));
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.registerActual(actual));
+        assertThrows(ServiceException.class, () -> workLogService.registerActual(actual));
     }
 
     @Test
@@ -159,7 +160,7 @@ class WorkLogServiceTest {
         WorkLog actual = planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0));
         actual.setFatigue(4L);
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.registerActual(actual));
+        assertThrows(ServiceException.class, () -> workLogService.registerActual(actual));
     }
 
     @Test
@@ -196,7 +197,7 @@ class WorkLogServiceTest {
         WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
 
         WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
-        WorkLog result = workLogService.editWorkLog(plan.getLogId(), patch);
+        WorkLog result = workLogService.editWorkLog(USER_ID, plan.getLogId(), patch);
 
         assertEquals(LocalTime.of(18, 0), result.getStartTime());
         assertEquals(LocalTime.of(23, 0), result.getEndTime());
@@ -212,7 +213,7 @@ class WorkLogServiceTest {
         WorkLog patch = WorkLog.builder().startTime(LocalTime.of(18, 30)).build();
 
         assertEquals(LocalTime.of(18, 30),
-                workLogService.editWorkLog(plan.getLogId(), patch).getStartTime());
+                workLogService.editWorkLog(USER_ID, plan.getLogId(), patch).getStartTime());
     }
 
     @Test
@@ -220,7 +221,17 @@ class WorkLogServiceTest {
     void editWorkLog_notFound_throws() {
         WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.editWorkLog(999L, patch));
+        assertThrows(ServiceException.class, () -> workLogService.editWorkLog(USER_ID, 999L, patch));
+    }
+
+    @Test
+    @DisplayName("다른 유저의 근무일지를 수정하면 실패한다")
+    void editWorkLog_notOwner_throws() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+        WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
+
+        assertThrows(ServiceException.class, () -> workLogService.editWorkLog(999L, plan.getLogId(), patch));
     }
 
     @Test
@@ -229,7 +240,7 @@ class WorkLogServiceTest {
         Job job = hourlyJob();
         WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
 
-        WorkLog result = workLogService.confirmWorkLog(plan.getLogId(), WorkLog.builder().build());
+        WorkLog result = workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
 
         assertEquals("CONFIRMED", result.getStatus());
         assertEquals(SettlementStatus.PENDING, result.getSettlementStatus());
@@ -240,10 +251,10 @@ class WorkLogServiceTest {
     void confirmWorkLog_alreadyConfirmed_throws() {
         Job job = hourlyJob();
         WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
-        workLogService.confirmWorkLog(plan.getLogId(), WorkLog.builder().build());
+        workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
 
-        assertThrows(IllegalStateException.class,
-                () -> workLogService.confirmWorkLog(plan.getLogId(), WorkLog.builder().build()));
+        assertThrows(ServiceException.class,
+                () -> workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build()));
     }
 
     @Test
@@ -252,8 +263,18 @@ class WorkLogServiceTest {
         Job job = perTaskJob();
         WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> workLogService.confirmWorkLog(plan.getLogId(), WorkLog.builder().build()));
+        assertThrows(ServiceException.class,
+                () -> workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build()));
+    }
+
+    @Test
+    @DisplayName("다른 유저의 근무일지를 확정하면 실패한다")
+    void confirmWorkLog_notOwner_throws() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+
+        assertThrows(ServiceException.class,
+                () -> workLogService.confirmWorkLog(999L, plan.getLogId(), WorkLog.builder().build()));
     }
 
     @Test
@@ -262,14 +283,23 @@ class WorkLogServiceTest {
         Job job = hourlyJob();
         WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
 
-        workLogService.deleteWorkLog(plan.getLogId());
+        workLogService.deleteWorkLog(USER_ID, plan.getLogId());
 
-        assertThrows(IllegalArgumentException.class, () -> workLogService.findById(plan.getLogId()));
+        assertThrows(ServiceException.class, () -> workLogService.findById(plan.getLogId()));
     }
 
     @Test
     @DisplayName("존재하지 않는 근무일지를 삭제하면 실패한다")
     void deleteWorkLog_notFound_throws() {
-        assertThrows(IllegalArgumentException.class, () -> workLogService.deleteWorkLog(999L));
+        assertThrows(ServiceException.class, () -> workLogService.deleteWorkLog(USER_ID, 999L));
+    }
+
+    @Test
+    @DisplayName("다른 유저의 근무일지를 삭제하면 실패한다")
+    void deleteWorkLog_notOwner_throws() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+
+        assertThrows(ServiceException.class, () -> workLogService.deleteWorkLog(999L, plan.getLogId()));
     }
 }

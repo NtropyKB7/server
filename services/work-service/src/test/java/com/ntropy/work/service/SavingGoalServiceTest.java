@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 
@@ -46,7 +47,7 @@ class SavingGoalServiceTest {
     void register_invalidTargetAmount_throws() {
         SavingGoal invalid = validGoal().targetAmount(0L).build();
 
-        assertThrows(IllegalArgumentException.class, () -> service.registerSavingGoal(invalid));
+        assertThrows(ServiceException.class, () -> service.registerSavingGoal(invalid));
     }
 
     @Test
@@ -54,7 +55,7 @@ class SavingGoalServiceTest {
     void register_invalidLaborIntensity_throws() {
         SavingGoal invalid = validGoal().laborIntensity(6L).build();
 
-        assertThrows(IllegalArgumentException.class, () -> service.registerSavingGoal(invalid));
+        assertThrows(ServiceException.class, () -> service.registerSavingGoal(invalid));
     }
 
     @Test
@@ -63,7 +64,7 @@ class SavingGoalServiceTest {
         service.registerSavingGoal(validGoal().build());
 
         SavingGoal duplicate = validGoal().targetAmount(3_000_000L).laborIntensity(2L).build();
-        assertThrows(IllegalArgumentException.class, () -> service.registerSavingGoal(duplicate));
+        assertThrows(ServiceException.class, () -> service.registerSavingGoal(duplicate));
     }
 
     @Test
