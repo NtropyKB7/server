@@ -6,10 +6,12 @@ import java.time.LocalTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
+import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
@@ -70,10 +72,13 @@ public class WorkLogService {
     /**
      * 근무일지 수정. PLANNED/CONFIRMED 둘 다 가능하며 상태는 그대로 유지한다.
      * 넘어온 필드만 덮어쓰고 나머지는 기존 값을 유지한다.
+     *
+     * @param requesterUserId 요청자 userId. 근무일지 소유자와 다르면 예외
      */
     @Transactional
-    public WorkLog editWorkLog(Long logId, WorkLog patch) {
+    public WorkLog editWorkLog(Long requesterUserId, Long logId, WorkLog patch) {
         WorkLog existing = findById(logId);
+        verifyOwnership(requesterUserId, existing.getUserId(), logId);
         applyPatch(existing, patch);
         validateNoOverlap(existing.getUserId(), existing.getWorkDate(), existing.getStartTime(), existing.getEndTime(),
                 existing.getLogId());
@@ -89,12 +94,15 @@ public class WorkLogService {
     /**
      * 근무일지 확정. PLANNED 상태에서만 가능하다. jobId/시간/건수/피로도를 전부
      * 받아 덮어쓸 수 있고(사진 화면 기준), 최종적으로 CONFIRMED로 전환한다.
+     *
+     * @param requesterUserId 요청자 userId. 근무일지 소유자와 다르면 예외
      */
     @Transactional
-    public WorkLog confirmWorkLog(Long logId, WorkLog patch) {
+    public WorkLog confirmWorkLog(Long requesterUserId, Long logId, WorkLog patch) {
         WorkLog existing = findById(logId);
+        verifyOwnership(requesterUserId, existing.getUserId(), logId);
         if (STATUS_CONFIRMED.equals(existing.getStatus())) {
-            throw new IllegalStateException("이미 확정된 근무일지입니다. logId=" + logId);
+            throw new ServiceException(WorkErrorCode.WORK_LOG_ALREADY_CONFIRMED, "logId=" + logId);
         }
         applyPatch(existing, patch);
         validateNoOverlap(existing.getUserId(), existing.getWorkDate(), existing.getStartTime(), existing.getEndTime(),
@@ -113,17 +121,25 @@ public class WorkLogService {
     }
 
     @Transactional
-    public void deleteWorkLog(Long logId) {
-        findById(logId);
+    public void deleteWorkLog(Long requesterUserId, Long logId) {
+        WorkLog existing = findById(logId);
+        verifyOwnership(requesterUserId, existing.getUserId(), logId);
         workLogMapper.deleteById(logId);
     }
 
     public WorkLog findById(Long logId) {
         WorkLog workLog = workLogMapper.findById(logId);
         if (workLog == null) {
-            throw new IllegalArgumentException("존재하지 않는 근무일지입니다. logId=" + logId);
+            throw new ServiceException(WorkErrorCode.WORK_LOG_NOT_FOUND, "logId=" + logId);
         }
         return workLog;
+    }
+
+    /** 요청자가 이 근무일지의 소유자가 아니면 예외를 던진다. */
+    private void verifyOwnership(Long requesterUserId, Long ownerUserId, Long logId) {
+        if (!ownerUserId.equals(requesterUserId)) {
+            throw new ServiceException(WorkErrorCode.WORK_LOG_ACCESS_DENIED, "logId=" + logId);
+        }
     }
 
     private void applyPatch(WorkLog existing, WorkLog patch) {
@@ -152,7 +168,7 @@ public class WorkLogService {
             return null;
         }
         if (startTime.equals(endTime)) {
-            throw new IllegalArgumentException("시작 시간과 종료 시간이 같을 수 없습니다.");
+            throw new ServiceException(WorkErrorCode.INVALID_WORK_TIME_RANGE);
         }
         double hours = WorkTimeUtils.durationMinutes(startTime, endTime) / 60.0;
 
@@ -185,37 +201,36 @@ public class WorkLogService {
                 continue;
             }
             if (WorkTimeUtils.isOverlapping(startTime, endTime, other.getStartTime(), other.getEndTime())) {
-                throw new IllegalArgumentException(
-                        "해당 시간대에 이미 등록된 근무일지가 있습니다. workDate=" + workDate);
+                throw new ServiceException(WorkErrorCode.WORK_LOG_TIME_OVERLAP, "workDate=" + workDate);
             }
         }
     }
 
     private void validateTaskCountIfPerTask(Job job, Long taskCount) {
         if (SettlementType.PER_TASK.equals(job.getSettlementType()) && taskCount == null) {
-            throw new IllegalArgumentException("건별 정산 잡은 확정 시 task_count가 필요합니다.");
+            throw new ServiceException(WorkErrorCode.TASK_COUNT_REQUIRED);
         }
     }
 
     private void validatePlan(WorkLog workLog) {
         if (workLog.getUserId() == null) {
-            throw new IllegalArgumentException("user_id는 필수입니다.");
+            throw new ServiceException(WorkErrorCode.WORK_LOG_USER_ID_REQUIRED);
         }
         if (workLog.getJobId() == null) {
-            throw new IllegalArgumentException("job_id는 필수입니다.");
+            throw new ServiceException(WorkErrorCode.WORK_LOG_JOB_ID_REQUIRED);
         }
         if (workLog.getWorkDate() == null) {
-            throw new IllegalArgumentException("work_date는 필수입니다.");
+            throw new ServiceException(WorkErrorCode.WORK_DATE_REQUIRED);
         }
         if (workLog.getStartTime() == null || workLog.getEndTime() == null) {
-            throw new IllegalArgumentException("start_time/end_time은 필수입니다.");
+            throw new ServiceException(WorkErrorCode.WORK_TIME_REQUIRED);
         }
     }
 
     private void validateActual(WorkLog workLog) {
         validatePlan(workLog);
         if (workLog.getFatigue() == null) {
-            throw new IllegalArgumentException("계획 외 등록은 fatigue가 필수입니다.");
+            throw new ServiceException(WorkErrorCode.FATIGUE_REQUIRED_FOR_ACTUAL);
         }
     }
 }

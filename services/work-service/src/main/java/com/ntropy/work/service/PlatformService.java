@@ -4,7 +4,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Platform;
+import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.PlatformMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -25,7 +27,7 @@ public class PlatformService {
     public Platform findById(Long platformId) {
         Platform platform = platformMapper.findById(platformId);
         if (platform == null) {
-            throw new IllegalArgumentException("존재하지 않는 플랫폼입니다. platformId=" + platformId);
+            throw new ServiceException(WorkErrorCode.PLATFORM_NOT_FOUND, "platformId=" + platformId);
         }
         return platform;
     }

@@ -11,7 +11,9 @@ public interface JobCommandClient {
 
     Long registerJob(JobRegisterCommand command);
 
-    void updateJob(Long jobId, JobUpdateCommand command);
+    /** userId는 요청자 본인 확인용 - jobId가 그 사람 소유가 아니면 예외. */
+    void updateJob(Long userId, Long jobId, JobUpdateCommand command);
 
-    void deactivateJob(Long jobId);
+    /** userId는 요청자 본인 확인용 - jobId가 그 사람 소유가 아니면 예외. */
+    void deactivateJob(Long userId, Long jobId);
 }

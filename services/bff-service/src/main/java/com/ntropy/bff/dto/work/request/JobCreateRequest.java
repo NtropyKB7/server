@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class JobCreateRequest {
 
-    private Long userId;
     private Long categoryId;
     private String jobName;
     private String settlementType;
@@ -26,7 +25,7 @@ public class JobCreateRequest {
     private List<Long> platformIds;
     private List<JobScheduleRequest> schedules;
 
-    public JobRegisterCommand toCommand() {
+    public JobRegisterCommand toCommand(Long userId) {
         List<JobScheduleRequest> safeSchedules = schedules == null ? Collections.emptyList() : schedules;
         return new JobRegisterCommand(
                 userId,

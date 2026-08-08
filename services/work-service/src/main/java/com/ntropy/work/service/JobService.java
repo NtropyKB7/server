@@ -9,8 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
+import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.JobMapper;
 import com.ntropy.work.mapper.JobScheduleMapper;
 import com.ntropy.work.util.WorkTimeUtils;
@@ -59,7 +61,7 @@ public class JobService {
     public Job findById(Long jobId) {
         Job job = jobMapper.findById(jobId);
         if (job == null) {
-            throw new IllegalArgumentException("존재하지 않는 잡입니다. jobId=" + jobId);
+            throw new ServiceException(WorkErrorCode.JOB_NOT_FOUND, "jobId=" + jobId);
         }
         return job;
     }
@@ -76,11 +78,15 @@ public class JobService {
      * 잡 수정. 스케줄은 부분 수정이 아니라 전체 교체다 — 넘어온 리스트로
      * 기존 스케줄을 다 지우고 새로 넣는다(PUT이 나머지 필드를 통째로 덮어쓰는 것과 동일한 규칙).
      *
-     * @param schedules 정기잡 아니면 null 또는 빈 리스트
+     * @param requesterUserId 요청자 userId. 잡 소유자와 다르면 예외
+     * @param schedules       정기잡 아니면 null 또는 빈 리스트
      */
     @Transactional
-    public Job updateJob(Job job, List<JobSchedule> schedules) {
+    public Job updateJob(Long requesterUserId, Job job, List<JobSchedule> schedules) {
         Job existing = findById(job.getJobId());
+        verifyOwnership(requesterUserId, existing.getUserId(), job.getJobId());
+        job.setUserId(existing.getUserId());
+
         validate(job);
         validateScheduleConsistency(job, schedules);
         validateScheduleOverlap(job.getUserId(), schedules, job.getJobId());
@@ -102,29 +108,37 @@ public class JobService {
     }
 
     @Transactional
-    public void deactivateJob(Long jobId) {
+    public void deactivateJob(Long requesterUserId, Long jobId) {
         Job job = findById(jobId);
+        verifyOwnership(requesterUserId, job.getUserId(), jobId);
         job.setIsActive(false);
         job.setUpdatedAt(LocalDateTime.now());
         jobMapper.update(job);
     }
 
+    /** 요청자가 이 잡의 소유자가 아니면 예외를 던진다. */
+    private void verifyOwnership(Long requesterUserId, Long ownerUserId, Long jobId) {
+        if (!ownerUserId.equals(requesterUserId)) {
+            throw new ServiceException(WorkErrorCode.JOB_ACCESS_DENIED, "jobId=" + jobId);
+        }
+    }
+
     private void validate(Job job) {
         if (!StringUtils.hasText(job.getJobName())) {
-            throw new IllegalArgumentException("job_name은 필수입니다.");
+            throw new ServiceException(WorkErrorCode.JOB_NAME_REQUIRED);
         }
         if (job.getCategoryId() == null) {
-            throw new IllegalArgumentException("category_id는 필수입니다.");
+            throw new ServiceException(WorkErrorCode.CATEGORY_ID_REQUIRED);
         }
         if (job.getSettlementType() == null) {
-            throw new IllegalArgumentException("settlement_type은 필수입니다.");
+            throw new ServiceException(WorkErrorCode.SETTLEMENT_TYPE_REQUIRED);
         }
         validateSettlementFields(job);
         if (job.getIsRegular() == null) {
-            throw new IllegalArgumentException("is_regular는 필수입니다.");
+            throw new ServiceException(WorkErrorCode.IS_REGULAR_REQUIRED);
         }
         if (job.getBaseFatigue() == null) {
-            throw new IllegalArgumentException("base_fatigue는 필수입니다.");
+            throw new ServiceException(WorkErrorCode.BASE_FATIGUE_REQUIRED);
         }
     }
 
@@ -135,17 +149,17 @@ public class JobService {
         switch (job.getSettlementType()) {
             case HOURLY:
                 if (job.getHourlyWage() == null) {
-                    throw new IllegalArgumentException("HOURLY 정산 방식은 hourly_wage가 필수입니다.");
+                    throw new ServiceException(WorkErrorCode.HOURLY_WAGE_REQUIRED);
                 }
                 break;
             case PER_TASK:
                 if (job.getPerTaskWage() == null || job.getTaskPerHour() == null) {
-                    throw new IllegalArgumentException("PER_TASK 정산 방식은 per_task_wage와 task_per_hour가 모두 필수입니다.");
+                    throw new ServiceException(WorkErrorCode.PER_TASK_FIELDS_REQUIRED);
                 }
                 break;
             case MONTHLY:
                 if (job.getMonthlyWage() == null) {
-                    throw new IllegalArgumentException("MONTHLY 정산 방식은 monthly_wage가 필수입니다.");
+                    throw new ServiceException(WorkErrorCode.MONTHLY_WAGE_REQUIRED);
                 }
                 break;
             default:
@@ -185,10 +199,10 @@ public class JobService {
     private void validateScheduleConsistency(Job job, List<JobSchedule> schedules) {
         boolean hasSchedules = !safe(schedules).isEmpty();
         if (Boolean.TRUE.equals(job.getIsRegular()) && !hasSchedules) {
-            throw new IllegalArgumentException("정기잡(is_regular=true)은 정기근무 스케줄이 최소 1개 필요합니다.");
+            throw new ServiceException(WorkErrorCode.REGULAR_JOB_SCHEDULE_REQUIRED);
         }
         if (Boolean.FALSE.equals(job.getIsRegular()) && hasSchedules) {
-            throw new IllegalArgumentException("비정기잡(is_regular=false)에는 정기근무 스케줄을 등록할 수 없습니다.");
+            throw new ServiceException(WorkErrorCode.NON_REGULAR_JOB_SCHEDULE_NOT_ALLOWED);
         }
     }
 
@@ -220,8 +234,7 @@ public class JobService {
                 }
                 if (WorkTimeUtils.isOverlapping(newSchedule.getStartTime(), newSchedule.getEndTime(),
                         other.getStartTime(), other.getEndTime())) {
-                    throw new IllegalArgumentException(
-                            "겹치는 정기근무 스케줄이 있습니다. dayOfWeek=" + newSchedule.getDayOfWeek());
+                    throw new ServiceException(WorkErrorCode.SCHEDULE_OVERLAP, "dayOfWeek=" + newSchedule.getDayOfWeek());
                 }
             }
         }

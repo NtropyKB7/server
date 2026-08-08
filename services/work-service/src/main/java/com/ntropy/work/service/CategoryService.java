@@ -4,7 +4,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Category;
+import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.CategoryMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -25,7 +27,7 @@ public class CategoryService {
     public Category findById(Long categoryId) {
         Category category = categoryMapper.findById(categoryId);
         if (category == null) {
-            throw new IllegalArgumentException("존재하지 않는 카테고리입니다. categoryId=" + categoryId);
+            throw new ServiceException(WorkErrorCode.CATEGORY_NOT_FOUND, "categoryId=" + categoryId);
         }
         return category;
     }

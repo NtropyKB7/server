@@ -6,13 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalTime;
-import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
@@ -67,7 +67,7 @@ class JobServiceTest {
     void registerJob_hourlyMissingWage_throws() {
         Job job = baseJob().hourlyWage(null).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(job, null));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(job, null));
     }
 
     @Test
@@ -79,7 +79,7 @@ class JobServiceTest {
                 .perTaskWage(3000)
                 .build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(job, null));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(job, null));
     }
 
     @Test
@@ -87,7 +87,7 @@ class JobServiceTest {
     void registerJob_monthlyMissingWage_throws() {
         Job job = baseJob().settlementType(SettlementType.MONTHLY).hourlyWage(null).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(job, null));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(job, null));
     }
 
     @Test
@@ -95,7 +95,7 @@ class JobServiceTest {
     void registerJob_regularWithoutSchedule_throws() {
         Job job = baseJob().isRegular(true).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(job, null));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(job, null));
     }
 
     @Test
@@ -104,7 +104,7 @@ class JobServiceTest {
         Job job = baseJob().isRegular(false).build();
         List<JobSchedule> schedules = List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0)));
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(job, schedules));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(job, schedules));
     }
 
     @Test
@@ -127,7 +127,7 @@ class JobServiceTest {
                 scheduleOf("MON", LocalTime.of(21, 0), LocalTime.of(23, 0))
         );
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(job, schedules));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(job, schedules));
     }
 
     @Test
@@ -139,7 +139,7 @@ class JobServiceTest {
         Job secondJob = baseJob().jobName("쿠팡이츠 배달").isRegular(true).build();
         List<JobSchedule> overlapping = List.of(scheduleOf("MON", LocalTime.of(21, 0), LocalTime.of(23, 0)));
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.registerJob(secondJob, overlapping));
+        assertThrows(ServiceException.class, () -> jobService.registerJob(secondJob, overlapping));
     }
 
     @Test
@@ -179,7 +179,7 @@ class JobServiceTest {
         Job job = jobService.registerJob(baseJob().build(), null);
         Job patch = baseJob().jobId(job.getJobId()).hourlyWage(null).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, null));
+        assertThrows(ServiceException.class, () -> jobService.updateJob(USER_ID, patch, null));
     }
 
     @Test
@@ -187,7 +187,16 @@ class JobServiceTest {
     void updateJob_notFound_throws() {
         Job patch = baseJob().jobId(999L).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, null));
+        assertThrows(ServiceException.class, () -> jobService.updateJob(USER_ID, patch, null));
+    }
+
+    @Test
+    @DisplayName("다른 유저의 잡을 수정하면 실패한다")
+    void updateJob_notOwner_throws() {
+        Job job = jobService.registerJob(baseJob().build(), null);
+        Job patch = baseJob().jobId(job.getJobId()).build();
+
+        assertThrows(ServiceException.class, () -> jobService.updateJob(999L, patch, null));
     }
 
     @Test
@@ -195,15 +204,23 @@ class JobServiceTest {
     void deactivateJob_setsIsActiveFalse() {
         Job job = jobService.registerJob(baseJob().build(), null);
 
-        jobService.deactivateJob(job.getJobId());
+        jobService.deactivateJob(USER_ID, job.getJobId());
 
         assertEquals(false, jobService.findById(job.getJobId()).getIsActive());
     }
 
     @Test
+    @DisplayName("다른 유저의 잡을 비활성화하면 실패한다")
+    void deactivateJob_notOwner_throws() {
+        Job job = jobService.registerJob(baseJob().build(), null);
+
+        assertThrows(ServiceException.class, () -> jobService.deactivateJob(999L, job.getJobId()));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 잡을 조회하면 실패한다")
     void findById_notFound_throws() {
-        assertThrows(IllegalArgumentException.class, () -> jobService.findById(999L));
+        assertThrows(ServiceException.class, () -> jobService.findById(999L));
     }
 
     @Test
@@ -266,7 +283,7 @@ class JobServiceTest {
                 List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(23, 0))));
 
         Job patch = baseJob().jobId(job.getJobId()).isRegular(true).hourlyWage(15000).build();
-        Job result = jobService.updateJob(patch,
+        Job result = jobService.updateJob(USER_ID, patch,
                 List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(23, 0))));
 
         assertEquals(Math.round(5 * (30.0 / 7.0) * 15000), result.getMonthlyExpectedIncome());
@@ -279,7 +296,7 @@ class JobServiceTest {
                 List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0))));
         Job patch = baseJob().jobId(job.getJobId()).isRegular(true).build();
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, null));
+        assertThrows(ServiceException.class, () -> jobService.updateJob(USER_ID, patch, null));
     }
 
     @Test
@@ -290,7 +307,7 @@ class JobServiceTest {
 
         Job patch = baseJob().jobId(job.getJobId()).isRegular(true).build();
         List<JobSchedule> newSchedules = List.of(scheduleOf("TUE", LocalTime.of(9, 0), LocalTime.of(13, 0)));
-        jobService.updateJob(patch, newSchedules);
+        jobService.updateJob(USER_ID, patch, newSchedules);
 
         List<JobSchedule> saved = jobScheduleMapper.findByJobId(job.getJobId());
         assertEquals(1, saved.size());
@@ -306,7 +323,7 @@ class JobServiceTest {
         Job patch = baseJob().jobId(job.getJobId()).isRegular(true).build();
         List<JobSchedule> sameSchedule = List.of(scheduleOf("MON", LocalTime.of(18, 0), LocalTime.of(22, 0)));
 
-        Job result = jobService.updateJob(patch, sameSchedule);
+        Job result = jobService.updateJob(USER_ID, patch, sameSchedule);
 
         assertEquals(1, jobScheduleMapper.findByJobId(result.getJobId()).size());
     }
@@ -322,6 +339,6 @@ class JobServiceTest {
         Job patch = baseJob().jobId(secondJob.getJobId()).jobName("쿠팡이츠 배달").isRegular(true).build();
         List<JobSchedule> overlapping = List.of(scheduleOf("MON", LocalTime.of(19, 0), LocalTime.of(21, 0)));
 
-        assertThrows(IllegalArgumentException.class, () -> jobService.updateJob(patch, overlapping));
+        assertThrows(ServiceException.class, () -> jobService.updateJob(USER_ID, patch, overlapping));
     }
 }
