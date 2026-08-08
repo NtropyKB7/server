@@ -69,6 +69,24 @@ class FinancialAccountControllerContractTest {
         assertEquals(null, command.bankLoginPassword());
     }
 
+    @Test
+    void codefRegistrationForwardsBirthDateToCommand() {
+        AccountRegistrationRequest request = new AccountRegistrationRequest();
+        request.setConnectionType("CODEF");
+        request.setOrganizationCode("0004");
+        request.setBankLoginId("bank-user-id");
+        request.setBankLoginPassword("bank-password");
+        request.setBirthDate("19900101");
+
+        AccountRegistrationCommand command = request.toCommand();
+
+        assertEquals("CODEF", command.connectionType());
+        assertEquals("0004", command.organizationCode());
+        assertEquals("bank-user-id", command.bankLoginId());
+        assertEquals("bank-password", command.bankLoginPassword());
+        assertEquals("19900101", command.birthDate());
+    }
+
     private static Method method(String name, Class<?>... parameterTypes) throws NoSuchMethodException {
         return FinancialAccountController.class.getDeclaredMethod(name, parameterTypes);
     }
