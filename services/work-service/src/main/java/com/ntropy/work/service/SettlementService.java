@@ -29,7 +29,9 @@ import lombok.RequiredArgsConstructor;
 /**
  * 입금 거래를 PLATFORM/JOB과 매칭해 SETTLEMENT를 생성하고, 해당 기간의 확정된(CONFIRMED)
  * WORK_LOG를 COMPLETED로 갱신한다. processDate 당일의 입금 거래만 확인하므로 매일 배치로
- * 호출하는 것을 전제로 한다. 이미 매칭된 job+기간은 SETTLEMENT UNIQUE 제약으로 재처리하지 않는다.
+ * 호출하는 것을 전제로 한다. 이미 같은 accountTransactionId로 처리된 거래는 재처리하지
+ * 않는다 - 배치가 중복 실행돼도 안전하고, 같은 잡·같은 정산기간에 서로 다른 거래가 여러 건
+ * 들어와도(거래 ID가 다르므로) 각각 정상적으로 반영된다.
  *
  * <p>매칭되지 않은(UNMATCHED) 거래도 버리지 않고, 같은 날짜에 들어온 것들을 합산해
  * status=UNMATCHED(job_id=null) 행 하나로 저장한다. 한 플랫폼에 회원 잡이 여러 개
@@ -69,7 +71,7 @@ public class SettlementService {
         }
     }
 
-    /** 매칭에 성공해 SETTLEMENT를 만들었거나 이미 만들어져 있으면 true. */
+    /** 매칭에 성공해 SETTLEMENT를 만들었거나 이미 이 거래로 만들어져 있으면 true. */
     private boolean processMatchedTransaction(Long userId, NormalizedIncomingTransaction transaction,
                                                List<Platform> platforms, List<Job> jobs) {
         PlatformMatchResult result = PlatformMatcher.match(transaction.counterpartyName(), platforms);
@@ -82,11 +84,11 @@ public class SettlementService {
             return false;
         }
 
-        SettlementPeriod period = SettlementPeriodCalculator.calculate(platform, transaction.transactionDate());
-        if (settlementMapper.existsByJobIdAndPeriod(jobId, period.start(), period.end())) {
+        if (settlementMapper.existsByAccountTransactionId(transaction.transactionId())) {
             return true;
         }
 
+        SettlementPeriod period = SettlementPeriodCalculator.calculate(platform, transaction.transactionDate());
         List<WorkLog> logsInPeriod = findConfirmedLogsInPeriod(jobId, period);
         long expectedAmount = logsInPeriod.stream()
                 .mapToLong(log -> log.getEstimatedIncome() == null ? 0L : log.getEstimatedIncome())

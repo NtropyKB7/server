@@ -335,7 +335,7 @@ class IncomeAnalysisServiceTest {
         }
 
         @Override
-        public boolean existsByJobIdAndPeriod(Long jobId, LocalDate periodStart, LocalDate periodEnd) {
+        public boolean existsByAccountTransactionId(Long accountTransactionId) {
             throw new UnsupportedOperationException("이 테스트 더블은 조회만 지원합니다.");
         }
 

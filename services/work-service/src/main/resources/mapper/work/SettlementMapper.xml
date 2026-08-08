@@ -12,12 +12,10 @@
              #{actualAmount}, #{transactionCount}, #{accountTransactionId}, #{matchedAt})
     </insert>
 
-    <select id="existsByJobIdAndPeriod" resultType="boolean">
+    <select id="existsByAccountTransactionId" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM SETTLEMENT
-        WHERE job_id = #{jobId}
-          AND period_start = #{periodStart}
-          AND period_end = #{periodEnd}
+        WHERE account_transaction_id = #{accountTransactionId}
     </select>
 
     <select id="existsByUserIdAndStatusAndPeriod" resultType="boolean">

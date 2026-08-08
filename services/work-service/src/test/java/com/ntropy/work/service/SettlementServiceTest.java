@@ -141,14 +141,14 @@ class SettlementServiceTest {
     }
 
     @Test
-    @DisplayName("이미 같은 job+기간의 MATCHED SETTLEMENT가 있으면 중복 생성하지 않는다")
-    void processSettlement_alreadySettled_skipsDuplicate() {
+    @DisplayName("이미 같은 accountTransactionId로 처리된 거래는 재처리하지 않는다 (배치 재실행 방지)")
+    void processSettlement_sameTransactionAlreadySettled_skipsDuplicate() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
         settlementMapper.insert(Settlement.builder()
                 .userId(USER_ID).status(SettlementMatchStatus.MATCHED)
                 .jobId(JOB_ID).periodStart(PERIOD_DATE).periodEnd(PERIOD_DATE)
-                .depositDate(PROCESS_DATE.minusDays(1))
-                .expectedAmount(0L).actualAmount(0L).transactionCount(1).accountTransactionId(1L)
+                .depositDate(PROCESS_DATE)
+                .expectedAmount(0L).actualAmount(48_000L).transactionCount(1).accountTransactionId(999L)
                 .matchedAt(java.time.LocalDateTime.now())
                 .build());
         incomingTransactionQueryClient.transactions = List.of(transaction(999L, 48_000L));
@@ -156,6 +156,23 @@ class SettlementServiceTest {
         service.processSettlement(USER_ID, PROCESS_DATE);
 
         assertEquals(1, settlementMapper.findAll().size());
+    }
+
+    @Test
+    @DisplayName("같은 잡·같은 정산기간에 서로 다른 거래 2건이 들어오면 각각 SETTLEMENT로 반영된다")
+    void processSettlement_twoDistinctTransactionsSamePeriod_bothCreateSettlements() {
+        jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
+        incomingTransactionQueryClient.transactions = List.of(
+                transaction(111L, 30_000L),
+                transaction(222L, 20_000L)
+        );
+
+        service.processSettlement(USER_ID, PROCESS_DATE);
+
+        List<Settlement> settlements = settlementMapper.findAll();
+        assertEquals(2, settlements.size());
+        long totalActualAmount = settlements.stream().mapToLong(Settlement::getActualAmount).sum();
+        assertEquals(50_000L, totalActualAmount);
     }
 
     @Test

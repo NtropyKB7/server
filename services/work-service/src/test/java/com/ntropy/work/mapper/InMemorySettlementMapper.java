@@ -22,12 +22,9 @@ public class InMemorySettlementMapper implements SettlementMapper {
     }
 
     @Override
-    public boolean existsByJobIdAndPeriod(Long jobId, LocalDate periodStart, LocalDate periodEnd) {
+    public boolean existsByAccountTransactionId(Long accountTransactionId) {
         return store.stream().anyMatch(settlement ->
-                settlement.getJobId() != null
-                        && settlement.getJobId().equals(jobId)
-                        && settlement.getPeriodStart().equals(periodStart)
-                        && settlement.getPeriodEnd().equals(periodEnd));
+                accountTransactionId != null && accountTransactionId.equals(settlement.getAccountTransactionId()));
     }
 
     @Override
