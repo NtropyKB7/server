@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.ntropy.common.dto.account.ClassificationTargetTransaction;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.account.domain.AccountGroup;
@@ -230,6 +231,14 @@ class LocalAccountQueryClientTest {
             int from = Math.min(offset, rows.size());
             int to = Math.min(from + limit, rows.size());
             return rows.subList(from, to);
+        }
+
+        @Override
+        public List<ClassificationTargetTransaction> findClassificationTargets(
+                Long userId,
+                String yearMonth
+        ) {
+            return List.of();
         }
     }
 }

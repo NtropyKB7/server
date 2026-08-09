@@ -93,4 +93,34 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <select id="findClassificationTargets"
+            resultType="com.ntropy.common.dto.account.ClassificationTargetTransaction">
+
+        SELECT
+            transaction_row.account_transaction_id AS transactionId,
+            NULLIF(TRIM(transaction_row.desc3), '') AS merchantName,
+            CONCAT_WS(
+                    ' | ',
+                    NULLIF(TRIM(transaction_row.desc2), ''),
+                    NULLIF(TRIM(transaction_row.desc3), ''),
+                    NULLIF(TRIM(transaction_row.desc4), '')
+            ) AS description,
+            CAST(transaction_row.out_amount AS SIGNED) AS amount,
+            TIMESTAMP(
+            transaction_row.tran_date,
+            transaction_row.tran_time
+            ) AS transactionDate
+        FROM ACCOUNT account_row
+            INNER JOIN ACCOUNT_TRANSACTION transaction_row
+        ON transaction_row.account_id = account_row.account_id
+        WHERE account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+          AND transaction_row.transaction_category = 'ORDINARY'
+          AND transaction_row.out_amount > 0
+          AND DATE_FORMAT(transaction_row.tran_date, '%Y-%m') = #{yearMonth}
+        ORDER BY
+            transaction_row.tran_date,
+            transaction_row.tran_time,
+            transaction_row.account_transaction_id
+    </select>
 </mapper>

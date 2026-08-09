@@ -95,3 +95,22 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS TXN_ANALYSIS
+(
+    txn_analysis_id        BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_transaction_id BIGINT      NOT NULL,
+    is_consumption         BOOLEAN     NOT NULL,
+    category               VARCHAR(32) NULL,
+    expense_type           VARCHAR(16) NULL,
+    classified_at          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uk_txn_analysis_transaction (
+                                               account_transaction_id
+                                           ),
+
+    CONSTRAINT fk_txn_analysis_transaction
+    FOREIGN KEY (account_transaction_id)
+    REFERENCES ACCOUNT_TRANSACTION (account_transaction_id)
+    ) ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4;

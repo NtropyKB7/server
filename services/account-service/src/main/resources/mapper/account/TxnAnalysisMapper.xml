@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ntropy.account.mapper.TxnAnalysisMapper">
+
+    <resultMap id="classificationTargetResultMap"
+               type="com.ntropy.common.dto.account.ClassificationTargetTransaction">
+        <result property="transactionId" column="transaction_id"/>
+        <result property="merchantName" column="merchant_name"/>
+        <result property="description" column="description"/>
+        <result property="amount" column="amount"/>
+        <result property="transactionDate" column="transaction_date"/>
+    </resultMap>
+
+    <select id="findClassificationTargets" resultMap="classificationTargetResultMap">
+        SELECT
+            at.id AS transaction_id,
+            at.desc3 AS merchant_name,
+            CONCAT_WS(' ', at.desc2, at.desc3) AS description,
+            at.out_amount AS amount,
+            STR_TO_DATE(
+                    CONCAT(at.tran_date, at.tran_time),
+                    '%Y%m%d%H%i%s'
+            ) AS transaction_date
+        FROM ACCOUNT_TRANSACTION at
+        INNER JOIN ACCOUNT a
+        ON at.account_id = a.account_id
+        WHERE a.user_id = #{userId}
+          AND DATE_FORMAT(
+            STR_TO_DATE(at.tran_date, '%Y%m%d'),
+            '%Y-%m'
+            ) = #{yearMonth}
+          AND at.out_amount IS NOT NULL
+          AND at.out_amount > 0
+    </select>
+
+    <insert id="upsert" parameterType="com.ntropy.account.domain.entity.TxnAnalysis">
+        INSERT INTO TXN_ANALYSIS (
+            account_transaction_id,
+            is_consumption,
+            category,
+            expense_type,
+            classified_at
+        ) VALUES (
+                     #{accountTransactionId},
+                     #{isConsumption},
+                     #{category},
+                     #{expenseType},
+                     NOW()
+                 )
+            ON DUPLICATE KEY UPDATE
+                                 is_consumption = VALUES(is_consumption),
+                                 category = VALUES(category),
+                                 expense_type = VALUES(expense_type),
+                                 classified_at = NOW()
+    </insert>
+
+    <insert id="upsertAnalyses"
+            parameterType="com.ntropy.common.dto.account.TransactionAnalysisSaveRequest">
+
+        INSERT INTO TXN_ANALYSIS (
+        account_transaction_id,
+        is_consumption,
+        category,
+        expense_type,
+        classified_at
+        )
+        VALUES
+        <foreach collection="analyses" item="item" separator=",">
+            (
+            #{item.transactionId},
+            #{item.isConsumption},
+            #{item.category},
+            #{item.expenseType},
+            CURRENT_TIMESTAMP
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        is_consumption = VALUES(is_consumption),
+        category = VALUES(category),
+        expense_type = VALUES(expense_type),
+        classified_at = CURRENT_TIMESTAMP
+    </insert>
+
+</mapper>
