@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -140,5 +141,12 @@ public class UserService {
         log.info("Access Token 재발급 및 Refresh Token 회전 완료: userId={}", user.getUserId());
 
         return new TokenRefreshResponseDto(newAccessToken, newRefreshToken);
+    }
+
+    /**
+     * 월간 AI 리포트 배치 대상 활성 사용자 ID를 조회합니다.
+     */
+    public List<Long> findActiveUserIds() {
+        return userMapper.findActiveUserIds();
     }
 }
