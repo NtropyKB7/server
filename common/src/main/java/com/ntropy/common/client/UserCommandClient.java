@@ -16,4 +16,6 @@ public interface UserCommandClient {
     void updateUser(Long userId, UserUpdateCommand command);
 
     void deleteUser(Long userId);
+
+    void completeOnboarding(Long userId);
 }

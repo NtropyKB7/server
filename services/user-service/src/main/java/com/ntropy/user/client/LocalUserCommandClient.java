@@ -69,4 +69,9 @@ public class LocalUserCommandClient implements UserCommandClient {
     public void deleteUser(Long userId) {
         userService.deleteUser(userId);
     }
+
+    @Override
+    public void completeOnboarding(Long userId) {
+        userService.completeOnboarding(userId);
+    }
 }

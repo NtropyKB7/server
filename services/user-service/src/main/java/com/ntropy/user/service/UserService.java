@@ -112,6 +112,15 @@ public class UserService {
     }
 
     @Transactional
+    public void completeOnboarding(Long userId) {
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new ServiceException(UserErrorCode.USER_NOT_FOUND);
+        }
+        userMapper.updateOnboardingCompleted(userId);
+    }
+
+    @Transactional
     public void deleteUser(Long userId) {
         userMapper.deleteUser(userId);
     }

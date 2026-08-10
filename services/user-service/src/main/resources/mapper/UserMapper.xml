@@ -69,6 +69,13 @@
         WHERE user_id = #{userId}
     </update>
 
+    <!-- 온보딩 완료 처리 -->
+    <update id="updateOnboardingCompleted" parameterType="java.lang.Long">
+        UPDATE USERS
+        SET onboarding_completed = true
+        WHERE user_id = #{userId}
+    </update>
+
     <!-- 회원 탈퇴 -->
     <delete id="deleteUser" parameterType="java.lang.Long">
         DELETE FROM USERS WHERE user_id = #{userId}
