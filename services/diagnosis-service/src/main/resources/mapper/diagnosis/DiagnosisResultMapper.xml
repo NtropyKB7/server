@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- DiagnosisResultMapper 인터페이스와 연결되는 MyBatis Mapper입니다. -->
+<mapper namespace="com.ntropy.diagnosis.mapper.DiagnosisResultMapper">
+
+    <!-- DB 컬럼명과 Java 필드명을 매핑합니다. -->
+    <resultMap id="diagnosisResultMap"
+               type="com.ntropy.diagnosis.domain.entity.DiagnosisResult">
+
+        <id property="diagnosisId" column="diagnosis_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="yearMonth" column="year_month"/>
+        <result property="totalIncome" column="total_income"/>
+        <result property="unmatchedIncome" column="unmatched_income"/>
+        <result property="totalExpense" column="total_expense"/>
+        <result property="netCashFlow" column="net_cash_flow"/>
+        <result property="fixedExpense" column="fixed_expense"/>
+        <result property="fixedExpenseRatio" column="fixed_expense_ratio"/>
+        <result property="totalFinancialAssets" column="total_financial_assets"/>
+        <result property="liquidAssets" column="liquid_assets"/>
+        <result property="safeAssets" column="safe_assets"/>
+        <result property="calculatedAt" column="calculated_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+
+    </resultMap>
+
+    <!--
+        사용자·연월 기준 진단 결과 upsert입니다.
+
+        같은 (user_id, year_month)가 이미 존재하면
+        기존 스냅샷의 계산값을 최신 값으로 갱신합니다.
+        diagnosis_id와 created_at은 변경하지 않습니다.
+    -->
+    <insert id="upsert"
+            parameterType="com.ntropy.diagnosis.domain.entity.DiagnosisResult">
+
+        INSERT INTO DIAGNOSIS_RESULT (
+            user_id,
+            year_month,
+            total_income,
+            unmatched_income,
+            total_expense,
+            net_cash_flow,
+            fixed_expense,
+            fixed_expense_ratio,
+            total_financial_assets,
+            liquid_assets,
+            safe_assets,
+            calculated_at
+        )
+        VALUES (
+                   #{userId},
+                   #{yearMonth},
+                   #{totalIncome},
+                   #{unmatchedIncome},
+                   #{totalExpense},
+                   #{netCashFlow},
+                   #{fixedExpense},
+                   #{fixedExpenseRatio},
+                   #{totalFinancialAssets},
+                   #{liquidAssets},
+                   #{safeAssets},
+                   CURRENT_TIMESTAMP
+               )
+            ON DUPLICATE KEY UPDATE
+                                 total_income = VALUES(total_income),
+                                 unmatched_income = VALUES(unmatched_income),
+                                 total_expense = VALUES(total_expense),
+                                 net_cash_flow = VALUES(net_cash_flow),
+                                 fixed_expense = VALUES(fixed_expense),
+                                 fixed_expense_ratio = VALUES(fixed_expense_ratio),
+                                 total_financial_assets = VALUES(total_financial_assets),
+                                 liquid_assets = VALUES(liquid_assets),
+                                 safe_assets = VALUES(safe_assets),
+                                 calculated_at = CURRENT_TIMESTAMP
+
+    </insert>
+
+    <!-- 사용자·연월 기준 진단 결과 조회입니다. -->
+    <select id="findByUserIdAndYearMonth"
+            resultMap="diagnosisResultMap">
+
+        SELECT *
+        FROM DIAGNOSIS_RESULT
+        WHERE user_id = #{userId}
+          AND year_month = #{yearMonth}
+
+    </select>
+
+</mapper>
