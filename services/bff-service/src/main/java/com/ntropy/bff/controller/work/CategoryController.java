@@ -8,8 +8,11 @@ import com.ntropy.bff.dto.work.response.CategoriesResponse;
 import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.common.client.CategoryQueryClient;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "카테고리")
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
@@ -17,6 +20,7 @@ public class CategoryController {
 
     private final CategoryQueryClient categoryQueryClient;
 
+    @ApiOperation("카테고리 목록 조회")
     @GetMapping
     public ApiResponse<CategoriesResponse> getCategories() {
         return ApiResponse.success(new CategoriesResponse(categoryQueryClient.getCategories()));

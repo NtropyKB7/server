@@ -11,6 +11,8 @@ import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.AiReportQueryClient;
 import com.ntropy.common.dto.ai.AiReportSummary;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
@@ -23,6 +25,7 @@ import com.ntropy.bff.dto.ai.AiReportListResponse;
  * 인증된 사용자 ID를 기준으로
  * ai-service에 AI 리포트 조회를 요청하고 프론트 응답 형태로 변환합니다.
  */
+@Api(tags = "AI 리포트")
 @RestController
 @RequestMapping("/api/ai-reports")
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class AiReportController {
      * 요청 예시:
      * GET /api/ai-reports/2026-07
      */
+    @ApiOperation("월별 AI 리포트 조회")
     @GetMapping("/{yearMonth}")
     public ResponseEntity<ApiResponse<AiReportResponse>> getAiReport(
             @ApiParam(hidden = true) Authentication authentication,
@@ -72,6 +76,7 @@ public class AiReportController {
      *
      * JWT의 사용자 ID를 사용하므로 userId 쿼리 파라미터는 받지 않습니다.
      */
+    @ApiOperation("전체 AI 리포트 목록 조회")
     @GetMapping
     public ResponseEntity<ApiResponse<AiReportListResponse>> getAiReports(
             @ApiParam(hidden = true) Authentication authentication

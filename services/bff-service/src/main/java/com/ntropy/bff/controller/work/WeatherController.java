@@ -9,8 +9,11 @@ import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.common.client.WeatherQueryClient;
 import com.ntropy.common.dto.work.summary.WeatherForecastList;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "날씨")
 @RestController
 @RequestMapping("/api/weather")
 @RequiredArgsConstructor
@@ -18,6 +21,7 @@ public class WeatherController {
 
     private final WeatherQueryClient weatherQueryClient;
 
+    @ApiOperation("단기예보 조회")
     @GetMapping
     public ApiResponse<WeatherForecastList> getForecasts(
             @RequestParam(required = false) Double latitude,

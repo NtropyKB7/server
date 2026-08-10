@@ -9,6 +9,8 @@ import com.ntropy.common.client.SubscriptionCommandClient;
 import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.dto.payment.PlanSummary;
 import com.ntropy.common.dto.payment.PaymentConfigSummary;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Api(tags = "구독")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/subscriptions")
@@ -29,12 +32,14 @@ public class SubscriptionController {
     private final SubscriptionCommandClient subscriptionCommandClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("구독 플랜 목록 조회")
     @GetMapping("/plans")
     public ApiResponse<PlansResponse> getPlans() {
         PlansResponse response = new PlansResponse(subscriptionQueryClient.getPlans());
         return ApiResponse.success(response);
     }
 
+    @ApiOperation("결제 설정 조회")
     @GetMapping("/config")
     public ResponseEntity<ApiResponse<PaymentConfigSummary>> getPaymentConfig(
             @ApiParam(hidden = true) Authentication authentication
@@ -46,6 +51,7 @@ public class SubscriptionController {
                 .body(ApiResponse.success(config));
     }
 
+    @ApiOperation("내 구독 조회")
     @GetMapping
     public ApiResponse<SubscriptionResponse> getMySubscription(
             @ApiParam(hidden = true) Authentication authentication
@@ -58,6 +64,7 @@ public class SubscriptionController {
 
     //최초결제 + 빌링키 발급요청 (SUBSCRIPTION02_F01).
 
+    @ApiOperation("구독 시작(최초 결제 + 빌링키 발급)")
     @PostMapping
     public ApiResponse<SubscriptionResponse> initSubscription(
             @ApiParam(hidden = true) Authentication authentication,
@@ -70,6 +77,7 @@ public class SubscriptionController {
         return ApiResponse.success(response);
     }
 
+    @ApiOperation("결제수단 변경")
     @PostMapping("/payment-method")
     public ApiResponse<SubscriptionResponse> updatePaymentMethod(
             @ApiParam(hidden = true) Authentication authentication,
@@ -82,6 +90,7 @@ public class SubscriptionController {
         return ApiResponse.success(response);
     }
 
+    @ApiOperation("PortOne 웹훅 수신")
     @PostMapping("/webhook")
     public ResponseEntity<Void> receiveWebhook(
             @RequestHeader("webhook-id") String webhookId,
@@ -93,6 +102,7 @@ public class SubscriptionController {
         return verified ? ResponseEntity.ok().build() : ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
+    @ApiOperation("구독 해지 예약")
     @PostMapping("/cancel")
     public ApiResponse<SubscriptionResponse> cancelSubscription(
             @ApiParam(hidden = true) Authentication authentication
@@ -102,6 +112,7 @@ public class SubscriptionController {
         return ApiResponse.success(response);
     }
 
+    @ApiOperation("구독 해지 예약 취소")
     @DeleteMapping("/cancel")
     public ApiResponse<SubscriptionResponse> revokeCancel(
             @ApiParam(hidden = true) Authentication authentication
@@ -111,6 +122,7 @@ public class SubscriptionController {
         return ApiResponse.success(response);
     }
 
+    @ApiOperation("결제 내역 조회")
     @GetMapping("/payments")
     public ApiResponse<PaymentHistoryResponse> getPaymentHistory(
             @ApiParam(hidden = true) Authentication authentication
@@ -124,6 +136,7 @@ public class SubscriptionController {
         return ApiResponse.success(response);
     }
 
+    @ApiOperation("구독 관리 화면용 정보 조회")
     @GetMapping("/management")
     public ApiResponse<SubscriptionManagementResponse> getSubscriptionManagement(
             @ApiParam(hidden = true) Authentication authentication

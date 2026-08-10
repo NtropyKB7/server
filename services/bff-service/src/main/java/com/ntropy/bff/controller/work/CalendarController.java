@@ -15,9 +15,12 @@ import com.ntropy.common.client.CalendarQueryClient;
 import com.ntropy.common.dto.work.summary.CalendarDailySummary;
 import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "캘린더")
 @RestController
 @RequestMapping("/api/calendar")
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class CalendarController {
     private final CalendarQueryClient calendarQueryClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("월간 캘린더 요약 조회")
     @GetMapping("/monthly")
     public ApiResponse<CalendarMonthlySummary> getMonthlySummary(@ApiParam(hidden = true) Authentication authentication,
                                                                    @RequestParam int year,
@@ -36,6 +40,7 @@ public class CalendarController {
         return ApiResponse.success(calendarQueryClient.getMonthlySummary(userId, year, month, latitude, longitude));
     }
 
+    @ApiOperation("일간 캘린더 요약 조회")
     @GetMapping("/daily")
     public ApiResponse<CalendarDailySummary> getDailySummary(@ApiParam(hidden = true) Authentication authentication,
                                                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

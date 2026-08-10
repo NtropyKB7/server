@@ -8,6 +8,8 @@ import com.ntropy.bff.dto.defense.response.DefenseModeResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.DefenseModeCommandClient;
 import com.ntropy.common.client.DefenseModeQueryClient;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Api(tags = "방어모드")
 @RestController
 @RequestMapping("/api/defense")
 @RequiredArgsConstructor
@@ -30,11 +33,13 @@ public class DefenseModeController {
     private final DefenseModeQueryClient defenseModeQueryClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("방어모드 발동 원인 목록 조회")
     @GetMapping("/causes")
     public ApiResponse<DefenseCausesResponse> getCauses() {
         return ApiResponse.success(new DefenseCausesResponse(defenseModeQueryClient.getCauses()));
     }
 
+    @ApiOperation("방어모드 진입")
     @PostMapping
     public ResponseEntity<ApiResponse<DefenseModeResponse>> enter(
             @ApiParam(hidden = true) Authentication authentication,
@@ -45,12 +50,14 @@ public class DefenseModeController {
                 ApiResponse.success(HttpStatus.CREATED.value(), "방어모드가 시작되었습니다.", response));
     }
 
+    @ApiOperation("현재 방어모드 조회")
     @GetMapping("/active")
     public ApiResponse<DefenseModeResponse> getCurrent(@ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(DefenseModeResponse.from(defenseModeQueryClient.getCurrent(userId)));
     }
 
+    @ApiOperation("방어모드 해제")
     @PatchMapping("/{defenseId}/return")
     public ApiResponse<DefenseModeResponse> release(@PathVariable Long defenseId,
                                                      @ApiParam(hidden = true) Authentication authentication,

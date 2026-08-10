@@ -25,9 +25,12 @@ import com.ntropy.common.client.JobCandidateQueryClient;
 import com.ntropy.common.client.JobCommandClient;
 import com.ntropy.common.client.JobQueryClient;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "잡")
 @RestController
 @RequestMapping("/api/jobs")
 @RequiredArgsConstructor
@@ -38,23 +41,27 @@ public class JobController {
     private final JobCandidateQueryClient jobCandidateQueryClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("잡 단건 조회")
     @GetMapping("/{jobId}")
     public ApiResponse<JobResponse> getJob(@PathVariable Long jobId) {
         return ApiResponse.success(JobResponse.from(jobQueryClient.getJob(jobId)));
     }
 
+    @ApiOperation("내 잡 목록 조회")
     @GetMapping
     public ApiResponse<JobsResponse> getJobs(@ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(JobsResponse.from(jobQueryClient.getJobsByUserId(userId)));
     }
 
+    @ApiOperation("잡 등록 후보 조회")
     @GetMapping("/candidates")
     public ApiResponse<JobCandidatesResponse> getJobCandidates(@ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(JobCandidatesResponse.from(jobCandidateQueryClient.getJobCandidates(userId)));
     }
 
+    @ApiOperation("잡 등록")
     @PostMapping
     public ResponseEntity<ApiResponse<JobCreateResponse>> createJob(
             @ApiParam(hidden = true) Authentication authentication,
@@ -66,6 +73,7 @@ public class JobController {
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
+    @ApiOperation("잡 수정")
     @PutMapping("/{jobId}")
     public ApiResponse<Void> updateJob(
             @ApiParam(hidden = true) Authentication authentication,
@@ -75,6 +83,7 @@ public class JobController {
         return ApiResponse.success(HttpStatus.OK.value(), "잡이 수정되었습니다.", null);
     }
 
+    @ApiOperation("잡 비활성화")
     @PatchMapping("/{jobId}/deactivate")
     public ApiResponse<Void> deactivateJob(
             @ApiParam(hidden = true) Authentication authentication,

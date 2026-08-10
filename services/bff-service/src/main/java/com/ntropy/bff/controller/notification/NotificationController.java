@@ -16,9 +16,12 @@ import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.client.NotificationQueryClient;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "알림")
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class NotificationController {
     private final NotificationCommandClient notificationCommandClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("알림 목록 조회")
     @GetMapping
     public ApiResponse<NotificationsResponse> getNotifications(@ApiParam(hidden = true) Authentication authentication,
                                                                  @RequestParam(defaultValue = "0") int page,
@@ -37,12 +41,14 @@ public class NotificationController {
                 NotificationsResponse.from(notificationQueryClient.findNotifications(userId, page, size)));
     }
 
+    @ApiOperation("읽지 않은 알림 개수 조회")
     @GetMapping("/unread-count")
     public ApiResponse<UnreadCountResponse> getUnreadCount(@ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(new UnreadCountResponse(notificationQueryClient.countUnread(userId)));
     }
 
+    @ApiOperation("알림 읽음 처리")
     @PatchMapping("/{notificationId}/read")
     public ApiResponse<Void> markAsRead(@ApiParam(hidden = true) Authentication authentication,
                                          @PathVariable Long notificationId) {
@@ -51,6 +57,7 @@ public class NotificationController {
         return ApiResponse.success(200, "알림을 읽음 처리했습니다.", null);
     }
 
+    @ApiOperation("알림 삭제")
     @DeleteMapping("/{notificationId}")
     public ApiResponse<Void> delete(@ApiParam(hidden = true) Authentication authentication,
                                      @PathVariable Long notificationId) {

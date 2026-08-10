@@ -18,9 +18,12 @@ import com.ntropy.bff.dto.work.response.WorkLogCreateResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.WorkLogCommandClient;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "근무일지")
 @RestController
 @RequestMapping("/api/works")
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class WorkLogController {
     private final WorkLogCommandClient workLogCommandClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("근무 계획 등록")
     @PostMapping("/plan")
     public ResponseEntity<ApiResponse<WorkLogCreateResponse>> registerPlan(
             @ApiParam(hidden = true) Authentication authentication,
@@ -40,6 +44,7 @@ public class WorkLogController {
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
+    @ApiOperation("근무일지 등록")
     @PostMapping("/actual")
     public ResponseEntity<ApiResponse<WorkLogCreateResponse>> registerActual(
             @ApiParam(hidden = true) Authentication authentication,
@@ -51,6 +56,7 @@ public class WorkLogController {
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
+    @ApiOperation("근무일지 수정")
     @PatchMapping("/{workId}/edit")
     public ApiResponse<Void> editWorkLog(
             @ApiParam(hidden = true) Authentication authentication,
@@ -60,6 +66,7 @@ public class WorkLogController {
         return ApiResponse.success(HttpStatus.OK.value(), "근무일지가 수정되었습니다.", null);
     }
 
+    @ApiOperation("근무일지 확정")
     @PatchMapping("/{workId}/confirm")
     public ApiResponse<Void> confirmWorkLog(
             @ApiParam(hidden = true) Authentication authentication,
@@ -69,6 +76,7 @@ public class WorkLogController {
         return ApiResponse.success(HttpStatus.OK.value(), "근무일지가 확정되었습니다.", null);
     }
 
+    @ApiOperation("근무일지 삭제")
     @DeleteMapping("/{workId}")
     public ApiResponse<Void> deleteWorkLog(
             @ApiParam(hidden = true) Authentication authentication,

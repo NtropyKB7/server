@@ -15,9 +15,12 @@ import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.SavingGoalCommandClient;
 import com.ntropy.common.client.UserCommandClient;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
+@Api(tags = "저축목표")
 @RestController
 @RequestMapping("/api/saving-goals")
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class SavingGoalController {
     private final UserCommandClient userCommandClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
+    @ApiOperation("저축목표 등록")
     @PostMapping
     public ResponseEntity<ApiResponse<SavingGoalCreateResponse>> createSavingGoal(
             @ApiParam(hidden = true) Authentication authentication,
