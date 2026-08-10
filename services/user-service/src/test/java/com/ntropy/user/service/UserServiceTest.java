@@ -147,4 +147,24 @@ class UserServiceTest {
 
         verify(userMapper, times(1)).invalidateRefreshToken(testUser.getUserId());
     }
+
+    @Test
+    @DisplayName("온보딩 완료 처리 성공")
+    void completeOnboarding_success() {
+        when(userMapper.findById(testUser.getUserId())).thenReturn(testUser);
+
+        userService.completeOnboarding(testUser.getUserId());
+
+        verify(userMapper, times(1)).updateOnboardingCompleted(testUser.getUserId());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 유저의 온보딩 완료 처리 시도 시 실패")
+    void completeOnboarding_userNotFound_throws() {
+        when(userMapper.findById(testUser.getUserId())).thenReturn(null);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.completeOnboarding(testUser.getUserId()));
+        assertThat(exception.getStatusCode()).isEqualTo(404);
+    }
 }

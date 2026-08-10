@@ -22,6 +22,8 @@ public interface UserMapper {
 
     void updateUser(User user);
 
+    void updateOnboardingCompleted(Long userId);
+
     void deleteUser(Long userId);
 
     void invalidateRefreshToken(Long userId);
