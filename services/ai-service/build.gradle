@@ -21,4 +21,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.4'
 
     implementation 'org.slf4j:slf4j-api:1.7.36'
+
+    // @Transactional 어노테이션 제공
+    implementation "org.springframework:spring-tx:$springVersion"
 }

@@ -1,0 +1,48 @@
+package com.ntropy.common.dto.account;
+
+import java.util.Map;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+/**
+ * 사용자·연월별 소비 집계 결과입니다.
+ *
+ * 원천 거래 전체를 전달하지 않고,
+ * AI 리포트에 필요한 집계 결과만 전달합니다.
+ */
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+public class MonthlyExpenseSummary {
+
+    /**
+     * 집계 대상 사용자 ID입니다.
+     */
+    private Long userId;
+
+    /**
+     * 집계 기준 연월입니다.
+     *
+     * 예: 2026-07
+     */
+    private String yearMonth;
+
+    /**
+     * 해당 월의 총소비 금액입니다.
+     *
+     * TXN_ANALYSIS.is_consumption = true인 거래의
+     * ACCOUNT_TRANSACTION.out_amount를 합산합니다.
+     */
+    private Long totalExpense;
+
+    /**
+     * 카테고리별 소비 금액입니다.
+     *
+     * 예:
+     * FOOD -> 600000
+     * TRANSPORTATION -> 300000
+     */
+    private Map<String, Long> categoryExpenses;
+}

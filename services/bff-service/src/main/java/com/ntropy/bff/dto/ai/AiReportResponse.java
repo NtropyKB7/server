@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ntropy.bff.util.JsonNamingConverter;
 import com.ntropy.common.dto.ai.AiReportSummary;
 
 import lombok.Getter;
@@ -12,26 +13,38 @@ import lombok.NoArgsConstructor;
 /**
  * 프론트엔드에 반환할 AI 리포트 상세 응답 DTO입니다.
  *
- * ai-service에서 전달한 AiReportSummary를 프론트 화면에 필요한 형태로 변환합니다.
- * 내부 조회용 사용자 ID는 프론트에 노출하지 않습니다.
+ * <p>
+ * ai-service에서 전달받은 JSON을 프론트엔드 형식으로 변환합니다.
+ * FastAPI의 snake_case는 camelCase로 변환합니다.
+ * </p>
  */
 @Getter
 @NoArgsConstructor
 public class AiReportResponse {
 
-    // AI_REPORT.report_id
+    /**
+     * AI_REPORT의 리포트 ID입니다.
+     */
     private Long reportId;
 
-    // 리포트 대상 연월. 예: "2026-07"
+    /**
+     * 리포트 대상 연월입니다.
+     */
     private String yearMonth;
 
-    // 총수입, 총지출, 가용자금, 주요 소비 카테고리 등이 담긴 JSON 객체
+    /**
+     * 총소득, 총소비, 카테고리별 소비 등이 담긴 JSON입니다.
+     */
     private JsonNode financialSummary;
 
-    // 추천 상품과 추천 근거(reasoning)가 담긴 JSON 객체
+    /**
+     * 추천 상품과 추천 사유가 담긴 JSON입니다.
+     */
     private JsonNode recommendation;
 
-    // AI 리포트 생성 시각
+    /**
+     * AI 리포트 생성 시각입니다.
+     */
     @JsonFormat(
             shape = JsonFormat.Shape.STRING,
             pattern = "yyyy-MM-dd'T'HH:mm:ss"
@@ -39,19 +52,44 @@ public class AiReportResponse {
     private LocalDateTime createdAt;
 
     /**
-     * ai-service의 공통 DTO를 프론트엔드 응답 DTO로 변환합니다.
+     * ai-service의 공통 DTO를
+     * 프론트엔드 응답 DTO로 변환합니다.
      *
-     * @param summary ai-service에서 조회한 AI 리포트 데이터
-     * @return 프론트엔드에 노출할 AI 리포트 응답 객체
+     * @param summary ai-service에서 전달받은 리포트
+     * @return 프론트엔드 응답 객체
      */
-    public static AiReportResponse from(AiReportSummary summary) {
-        AiReportResponse response = new AiReportResponse();
+    public static AiReportResponse from(
+            AiReportSummary summary
+    ) {
+        AiReportResponse response =
+                new AiReportResponse();
 
-        response.reportId = summary.reportId();
-        response.yearMonth = summary.yearMonth();
-        response.financialSummary = summary.financialSummary();
-        response.recommendation = summary.recommendation();
-        response.createdAt = summary.createdAt();
+        response.reportId =
+                summary.reportId();
+
+        response.yearMonth =
+                summary.yearMonth();
+
+        /*
+         * 재무 요약 JSON도 과거 snake_case 데이터가 있을 수 있으므로
+         * camelCase로 변환합니다.
+         */
+        response.financialSummary =
+                JsonNamingConverter.toCamelCase(
+                        summary.financialSummary()
+                );
+
+        /*
+         * FastAPI 추천 응답은 snake_case이므로
+         * 프론트엔드 응답 전에 camelCase로 변환합니다.
+         */
+        response.recommendation =
+                JsonNamingConverter.toCamelCase(
+                        summary.recommendation()
+                );
+
+        response.createdAt =
+                summary.createdAt();
 
         return response;
     }
