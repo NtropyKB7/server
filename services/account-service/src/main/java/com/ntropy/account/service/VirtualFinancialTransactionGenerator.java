@@ -28,10 +28,15 @@ public class VirtualFinancialTransactionGenerator {
 
     public static final int TRANSACTIONS_PER_USER_PER_MONTH = 100;
     public static final int INCOME_COUNTERPARTY_COUNT = 11;
+    private static final int CONSUMPTION_TRANSACTIONS_PER_MONTH = 74;
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
-    /** 가상 소득 입금 거래에 사용할 정산 주체명. */
+    /**
+     * 가상 소득 입금 거래에 사용할 정산 주체명.
+     * work-service의 PLATFORM.deposit_name 시드 데이터(services/work-service/src/main/resources/db/work-service-seed.sql)와
+     * 동일한 값을 써야 한다. 두 서비스는 별도 모듈이라 자동 동기화되지 않으니, 시드 데이터가 바뀌면 이 배열도 함께 수정할 것.
+     */
     private static final String[] INCOME_COUNTERPARTY_NAMES = {
             "우아한형제들", "쿠팡이츠", "위대한상상", "카카오모빌리티", "구글코리아",
             "로지올", "쿠팡풀필먼트서비스", "미소", "알바몬", "도그메이트", "엠브레인패널파워"
@@ -84,7 +89,7 @@ public class VirtualFinancialTransactionGenerator {
             spending("카페", 6_000L, 20_000L, "스타벅스", "블루보틀", "런던베이글뮤지엄"),
             spending("외식", 25_000L, 70_000L, "캐치테이블", "아웃백", "오마카세서울"),
             spending("문화여가", 20_000L, 90_000L, "인터파크티켓", "YES24티켓"),
-            spending("이동", 12_000L, 55_000L, "카카오T블랙", "쏘카"),
+            spending("이동", 12_000L, 55_000L, "카카오모빌리티", "쏘카"),
             spending("인테리어", 20_000L, 90_000L, "오늘의집", "이케아")
     };
 
@@ -100,15 +105,38 @@ public class VirtualFinancialTransactionGenerator {
     };
 
     private static final ConsumptionTemplate[] IMPULSE_CONSUMPTION = {
-            spending("배달", 12_000L, 75_000L, "배달의민족", "쿠팡이츠", "요기요"),
+            spending("배달", 12_000L, 75_000L, "우아한형제들", "쿠팡이츠", "위대한상상"),
             spending("편의점", 2_000L, 38_000L, "CU", "GS25", "세븐일레븐"),
             spending("모바일", 3_000L, 120_000L, "구글플레이", "애플앱스토어", "카카오이모티콘"),
             spending("즉흥쇼핑", 8_000L, 190_000L, "쿠팡", "네이버쇼핑", "카카오선물하기"),
-            spending("심야이동", 8_000L, 85_000L, "카카오T", "타다"),
+            spending("심야이동", 8_000L, 85_000L, "카카오모빌리티", "타다"),
             spending("간식", 3_000L, 35_000L, "스타벅스", "공차", "배스킨라빈스"),
             spending("오락", 5_000L, 95_000L, "PC방", "코인노래방", "넷마블"),
             spending("생활", 4_000L, 80_000L, "다이소", "오늘의집", "편의점택배")
     };
+
+    /** FIN-102 소비 분류 난이도 "보통": PG사/간편결제명 접두어를 원 상호명 앞에 붙인다. */
+    private static final String[] DIFFICULTY_MEDIUM_PREFIXES = {
+            "KG이니시스_", "토스페이_", "네이버페이_", "카카오페이_", "나이스페이_", "NHN페이코_"
+    };
+
+    /** FIN-102 소비 분류 난이도 "어려움": 카테고리를 짐작할 수 없는 사업자명으로 상호명을 완전히 대체한다. */
+    private static final String[] DIFFICULTY_HARD_NAMES = {
+            "주식회사 더원", "에이치앤에스", "케이에스컴퍼니", "스마트로",
+            "제이앤파트너스", "한올유통", "비앤에스코퍼레이션", "지오정보통신"
+    };
+
+    /** FIN-102 소비 분류 난이도 "판별 불가": 어떤 보조 정보로도 카테고리를 정할 수 없는 이름들. */
+    private static final String[] DIFFICULTY_UNDECIDABLE_NAMES = {
+            "김민수", "결제", "기타", "1234PAY"
+    };
+
+    /**
+     * FIN-102 난이도 목표 비율(%). 합은 100이며 각각 이슈에서 정한 범위
+     * (쉬움 20~30%, 보통 50~60%, 어려움 15~20%, 판별불가 5~10%) 안에 있다.
+     * 74건 기준으로 largest-remainder 배분하면 18/40/12/4건이 나온다.
+     */
+    private static final double[] DIFFICULTY_TARGET_PERCENTAGES = {24.3, 54.1, 16.2, 5.4};
 
     public GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, PersonalBank bank,
                                           Account ordinaryAccount, Account secondaryAccount) {
@@ -234,7 +262,7 @@ public class VirtualFinancialTransactionGenerator {
         plans.add(nonJobIncome(month.atDay(11), LocalTime.of(7, 10), 32_000L,
                 "쿠팡", "카드취소", "쇼핑 환불"));
         plans.add(nonJobIncome(month.atDay(24), LocalTime.of(7, 20), 18_500L,
-                "배달의민족", "카드취소", "식비 환불"));
+                "김밥천국", "카드취소", "식비 환불"));
         plans.add(nonJobIncome(month.atDay(15), LocalTime.of(7, 30), 4_800L,
                 "NH카드캐쉬백", "캐시백", "카드 캐시백"));
         plans.add(nonJobIncome(month.atEndOfMonth(), LocalTime.of(23, 50), 1_200L + userOrdinal * 10L,
@@ -288,26 +316,131 @@ public class VirtualFinancialTransactionGenerator {
 
     private static void addConsumptionPlans(List<PlannedTransaction> plans, int userOrdinal,
                                              int monthOffset, YearMonth month, ConsumerProfile profile) {
-        for (int i = 0; i < 74; i++) {
+        ConsumptionDifficulty[] difficulties = difficultyAssignments(
+                userOrdinal, monthOffset, CONSUMPTION_TRANSACTIONS_PER_MONTH
+        );
+        for (int i = 0; i < CONSUMPTION_TRANSACTIONS_PER_MONTH; i++) {
             int day = 1 + i % 28;
             int hour = 10 + (i / 28) * 4 + (i % 3);
             int minute = (userOrdinal * 7 + monthOffset * 13 + i * 17) % 60;
             ConsumptionTemplate template = consumptionTemplate(profile, i + monthOffset);
-            long rawAmount = template.minimumAmount + Math.floorMod(
-                    userOrdinal * 7_919L + monthOffset * 1_237L + i * 3_571L,
-                    template.maximumAmount - template.minimumAmount + 1L
-            );
-            long amount = (rawAmount / 100L) * 100L;
             String merchant = template.merchants[
                     (userOrdinal + monthOffset + i) % template.merchants.length
             ];
-            String method = merchant.equals("티머니") || merchant.equals("서울교통공사")
+            ConsumptionDifficulty difficulty = difficulties[i];
+            long amount = difficulty == ConsumptionDifficulty.UNDECIDABLE
+                    ? undecidableAmount(userOrdinal, monthOffset, i)
+                    : consumptionAmount(template, userOrdinal, monthOffset, i);
+            String method = difficulty == ConsumptionDifficulty.UNDECIDABLE
+                    ? "체크카드"
+                    : merchant.equals("티머니") || merchant.equals("서울교통공사")
                     ? "교통카드" : paymentMethod(profile, i);
+            String displayName = applyDifficulty(merchant, difficulty, userOrdinal, monthOffset, i);
             plans.add(new PlannedTransaction(
                     month.atDay(day), LocalTime.of(hour, minute, i % 60), BigDecimal.valueOf(amount), ZERO,
-                    "출금", method, merchant, template.label, "카드사"
+                    "출금", method, displayName, template.label, "카드사"
             ));
         }
+    }
+
+    private static long consumptionAmount(ConsumptionTemplate template, int userOrdinal,
+                                          int monthOffset, int index) {
+        long rawAmount = template.minimumAmount + Math.floorMod(
+                userOrdinal * 7_919L + monthOffset * 1_237L + index * 3_571L,
+                template.maximumAmount - template.minimumAmount + 1L
+        );
+        return (rawAmount / 100L) * 100L;
+    }
+
+    /** 판별 불가 거래는 원 카테고리의 금액 범위를 사용하지 않아 금액으로 카테고리를 역추론할 수 없게 한다. */
+    private static long undecidableAmount(int userOrdinal, int monthOffset, int index) {
+        long rawAmount = 5_000L + Math.floorMod(
+                userOrdinal * 5_003L + monthOffset * 2_003L + index * 7_001L,
+                95_001L
+        );
+        return (rawAmount / 100L) * 100L;
+    }
+
+    /** 상호명 표시를 난이도에 맞춰 치환한다. */
+    private static String applyDifficulty(String merchant, ConsumptionDifficulty difficulty,
+                                          int userOrdinal, int monthOffset, int index) {
+        return switch (difficulty) {
+            case EASY -> merchant;
+            case MEDIUM -> DIFFICULTY_MEDIUM_PREFIXES[
+                    Math.floorMod(userOrdinal + monthOffset + index, DIFFICULTY_MEDIUM_PREFIXES.length)
+                    ] + merchant;
+            case HARD -> DIFFICULTY_HARD_NAMES[
+                    Math.floorMod(userOrdinal * 3 + monthOffset + index, DIFFICULTY_HARD_NAMES.length)
+                    ];
+            case UNDECIDABLE -> DIFFICULTY_UNDECIDABLE_NAMES[
+                    Math.floorMod(userOrdinal * 5 + monthOffset * 2 + index, DIFFICULTY_UNDECIDABLE_NAMES.length)
+                    ];
+        };
+    }
+
+    /**
+     * total건에 대해 {@link #DIFFICULTY_TARGET_PERCENTAGES} 비율대로 난이도를 배분한 뒤,
+     * total과 서로소인 stride로 인덱스를 치환해 월 앞부분에 특정 난이도가 몰리지 않게 섞는다.
+     * 동일 userOrdinal·monthOffset·total이면 항상 같은 배열을 반환한다(결정적).
+     */
+    private static ConsumptionDifficulty[] difficultyAssignments(int userOrdinal, int monthOffset, int total) {
+        int[] counts = difficultyCounts(total);
+        ConsumptionDifficulty[] values = ConsumptionDifficulty.values();
+        ConsumptionDifficulty[] base = new ConsumptionDifficulty[total];
+        int slot = 0;
+        for (int level = 0; level < values.length; level++) {
+            for (int c = 0; c < counts[level]; c++) {
+                base[slot++] = values[level];
+            }
+        }
+
+        int stride = coprimeStride(total, userOrdinal, monthOffset);
+        int seed = Math.floorMod(userOrdinal * 11 + monthOffset * 5, Math.max(total, 1));
+        ConsumptionDifficulty[] shuffled = new ConsumptionDifficulty[total];
+        for (int i = 0; i < total; i++) {
+            shuffled[i] = base[Math.floorMod(i * stride + seed, total)];
+        }
+        return shuffled;
+    }
+
+    /** {@link #DIFFICULTY_TARGET_PERCENTAGES}를 largest-remainder 방식으로 total건에 배분한다. */
+    private static int[] difficultyCounts(int total) {
+        int levelCount = DIFFICULTY_TARGET_PERCENTAGES.length;
+        double[] exact = new double[levelCount];
+        int[] counts = new int[levelCount];
+        int allocated = 0;
+        for (int level = 0; level < levelCount; level++) {
+            exact[level] = DIFFICULTY_TARGET_PERCENTAGES[level] * total / 100.0;
+            counts[level] = (int) exact[level];
+            allocated += counts[level];
+        }
+        List<Integer> byRemainderDesc = new ArrayList<>();
+        for (int level = 0; level < levelCount; level++) {
+            byRemainderDesc.add(level);
+        }
+        byRemainderDesc.sort((a, b) -> Double.compare(
+                (exact[b] - counts[b]), (exact[a] - counts[a])
+        ));
+        int remaining = total - allocated;
+        for (int i = 0; i < remaining; i++) {
+            counts[byRemainderDesc.get(i % levelCount)]++;
+        }
+        return counts;
+    }
+
+    private static int coprimeStride(int total, int userOrdinal, int monthOffset) {
+        if (total <= 1) {
+            return 1;
+        }
+        int candidate = 2 + Math.floorMod(userOrdinal * 5 + monthOffset * 3, Math.max(total - 2, 1));
+        while (gcd(candidate, total) != 1) {
+            candidate++;
+        }
+        return candidate;
+    }
+
+    private static int gcd(int a, int b) {
+        return b == 0 ? a : gcd(b, a % b);
     }
 
     private static void addSecondaryTransferPlans(List<PlannedTransaction> ordinaryPlans,
@@ -656,6 +789,10 @@ public class VirtualFinancialTransactionGenerator {
             Map<Long, BigDecimal> finalBalances,
             int userIncomeCounterpartyCount
     ) {
+    }
+
+    private enum ConsumptionDifficulty {
+        EASY, MEDIUM, HARD, UNDECIDABLE
     }
 
     private record PlannedTransaction(

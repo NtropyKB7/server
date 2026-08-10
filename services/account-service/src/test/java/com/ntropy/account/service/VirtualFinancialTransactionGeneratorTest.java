@@ -32,6 +32,20 @@ class VirtualFinancialTransactionGeneratorTest {
             "우아한형제들", "쿠팡이츠", "위대한상상", "카카오모빌리티", "구글코리아",
             "로지올", "쿠팡풀필먼트서비스", "미소", "알바몬", "도그메이트", "엠브레인패널파워"
     );
+    // work-service PLATFORM.platform_name 시드값 중 deposit_name과 다른 것들.
+    // (쿠팡이츠는 platform_name==deposit_name이라 제외 — 정산 수입에 정상적으로 등장한다.)
+    // 거래 상대방명에는 플랫폼 표시명 대신 실제 정산처명이 저장돼야 한다.
+    private static final Set<String> PLATFORM_DISPLAY_NAME_TOKENS = Set.of(
+            "배달의민족", "요기요", "카카오T", "유튜브", "쿠팡플렉스"
+    );
+    private static final Set<String> MEDIUM_PREFIXES = Set.of(
+            "KG이니시스_", "토스페이_", "네이버페이_", "카카오페이_", "나이스페이_", "NHN페이코_"
+    );
+    private static final Set<String> HARD_NAMES = Set.of(
+            "주식회사 더원", "에이치앤에스", "케이에스컴퍼니", "스마트로",
+            "제이앤파트너스", "한올유통", "비앤에스코퍼레이션", "지오정보통신"
+    );
+    private static final Set<String> UNDECIDABLE_NAMES = Set.of("김민수", "결제", "기타", "1234PAY");
 
     // 월말을 기준일로 고정해 "현재 월"이 항상 완결된 3개월 창(2026-04~06)이 되도록 하고, 기존 고정 기간 검증값을 그대로 유지한다.
     private static final LocalDate REFERENCE_DATE = LocalDate.of(2026, 6, 30);
@@ -327,6 +341,125 @@ class VirtualFinancialTransactionGeneratorTest {
         assertEquals(300, generated.transactions().size());
     }
 
+    @Test
+    void storesDepositNamesInsteadOfPlatformDisplayNamesInEveryTransaction() {
+        for (int userOrdinal = 1; userOrdinal <= 4; userOrdinal++) {
+            GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
+                    userOrdinal, PersonalBank.SHINHAN_BANK,
+                    account(100L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
+                    account(110L + userOrdinal, AccountGroup.DEPOSIT_TRUST)
+            );
+            assertTrue(generated.transactions().stream()
+                    .noneMatch(transaction ->
+                            transaction.getDesc3() != null
+                                    && PLATFORM_DISPLAY_NAME_TOKENS.stream()
+                                    .anyMatch(transaction.getDesc3()::contains)),
+                    "userOrdinal=" + userOrdinal);
+        }
+    }
+
+    @Test
+    void completedMonthsMeetDifficultyRatioRanges() {
+        Account ordinary = account(120L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(121L, AccountGroup.DEPOSIT_TRUST);
+
+        // REFERENCE_DATE가 월말이라 세 달(4~6월) 모두 완결된 달로 취급된다.
+        GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
+                1, PersonalBank.SHINHAN_BANK, ordinary, installment
+        );
+
+        Map<YearMonth, Map<Difficulty, Long>> byMonth =
+                generated.transactions().stream()
+                        .filter(VirtualFinancialTransactionGeneratorTest::isConsumption)
+                        .collect(Collectors.groupingBy(
+                                transaction -> YearMonth.from(transaction.getTranDate()),
+                                Collectors.groupingBy(
+                                        VirtualFinancialTransactionGeneratorTest::difficultyOf,
+                                        Collectors.counting()
+                                )
+                        ));
+
+        assertEquals(3, byMonth.size());
+        byMonth.forEach((month, counts) -> {
+            long total = counts.values().stream().mapToLong(Long::longValue).sum();
+            assertEquals(74L, total, month.toString());
+            assertRatioInRange(counts, Difficulty.EASY, total, 0.20, 0.30);
+            assertRatioInRange(counts, Difficulty.MEDIUM, total, 0.50, 0.60);
+            assertRatioInRange(counts, Difficulty.HARD, total, 0.15, 0.20);
+            assertRatioInRange(counts, Difficulty.UNDECIDABLE, total, 0.05, 0.10);
+        });
+    }
+
+    @Test
+    void everyConsumerProfileIncludesAllFourDifficulties() {
+        for (int userOrdinal = 1; userOrdinal <= 4; userOrdinal++) {
+            GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
+                    userOrdinal, PersonalBank.SHINHAN_BANK,
+                    account(130L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
+                    account(140L + userOrdinal, AccountGroup.DEPOSIT_TRUST)
+            );
+            Set<Difficulty> difficulties =
+                    generated.transactions().stream()
+                            .filter(VirtualFinancialTransactionGeneratorTest::isConsumption)
+                            .map(VirtualFinancialTransactionGeneratorTest::difficultyOf)
+                            .collect(Collectors.toSet());
+            assertEquals(
+                    Set.of(Difficulty.values()), difficulties,
+                    "userOrdinal=" + userOrdinal
+            );
+        }
+    }
+
+    @Test
+    void undecidableDifficultyDoesNotExposeCategorySpecificAmountOrPaymentMethod() {
+        GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
+                2, PersonalBank.KEB_HANA_BANK,
+                account(150L, AccountGroup.DEPOSIT_TRUST), account(151L, AccountGroup.DEPOSIT_TRUST)
+        );
+
+        List<AccountTransaction> undecidable = generated.transactions().stream()
+                        .filter(transaction -> UNDECIDABLE_NAMES.contains(transaction.getDesc3()))
+                        .toList();
+        assertTrue(!undecidable.isEmpty());
+        assertTrue(undecidable.stream()
+                .allMatch(transaction -> "체크카드".equals(transaction.getDesc2())));
+        assertTrue(undecidable.stream()
+                .allMatch(transaction -> transaction.getOutAmount().longValue() >= 5_000L
+                        && transaction.getOutAmount().longValue() <= 100_000L));
+    }
+
+    private static void assertRatioInRange(
+            Map<Difficulty, Long> counts,
+            Difficulty difficulty,
+            long total, double minRatio, double maxRatio) {
+        long count = counts.getOrDefault(difficulty, 0L);
+        double ratio = (double) count / total;
+        assertTrue(ratio >= minRatio && ratio <= maxRatio,
+                difficulty + " ratio=" + ratio + " count=" + count + " total=" + total);
+    }
+
+    private static boolean isConsumption(AccountTransaction transaction) {
+        return transaction.getOutAmount().signum() > 0 && "신한체".equals(transaction.getDesc2());
+    }
+
+    private static Difficulty difficultyOf(AccountTransaction transaction) {
+        String name = transaction.getDesc3();
+        if (UNDECIDABLE_NAMES.contains(name)) {
+            return Difficulty.UNDECIDABLE;
+        }
+        if (HARD_NAMES.contains(name)) {
+            return Difficulty.HARD;
+        }
+        if (name != null && MEDIUM_PREFIXES.stream().anyMatch(name::startsWith)) {
+            return Difficulty.MEDIUM;
+        }
+        return Difficulty.EASY;
+    }
+
+    private enum Difficulty {
+        EASY, MEDIUM, HARD, UNDECIDABLE
+    }
+
     private static long countCategory(List<AccountTransaction> transactions,
                                       AccountTransactionCategory category) {
         return transactions.stream()
@@ -342,8 +475,11 @@ class VirtualFinancialTransactionGeneratorTest {
         AccountBalanceConsistencyValidator.validate(account, accountTransactions);
     }
 
+    // 난이도 "보통" 등급은 PG사 접두어를 붙여서 표시하므로 contains로 비교해야 EASY/MEDIUM 등급 표기를 모두 잡아낸다.
+    // HARD/UNDECIDABLE 등급은 상호명을 완전히 다른 이름으로 대체하므로 매치되지 않는 게 정상이다.
     private static boolean hasMerchant(GeneratedTransactions generated, String merchant) {
-        return generated.transactions().stream().anyMatch(transaction -> merchant.equals(transaction.getDesc3()));
+        return generated.transactions().stream()
+                .anyMatch(transaction -> transaction.getDesc3() != null && transaction.getDesc3().contains(merchant));
     }
 
     private static double averageCardSpending(GeneratedTransactions generated) {
