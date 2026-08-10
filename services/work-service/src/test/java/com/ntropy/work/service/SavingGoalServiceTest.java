@@ -2,7 +2,10 @@ package com.ntropy.work.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.time.YearMonth;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +19,7 @@ class SavingGoalServiceTest {
 
     private static final Long USER_ID = 1L;
     private static final String TARGET_MONTH = "2026-08";
+    private static final String CURRENT_MONTH = YearMonth.now().toString();
 
     private SavingGoalService service;
 
@@ -76,5 +80,50 @@ class SavingGoalServiceTest {
         SavingGoal result = service.registerSavingGoal(nextMonth);
 
         assertNotNull(result.getSavingGoalId());
+    }
+
+    @Test
+    @DisplayName("이번 달 저축목표가 있으면 조회된다")
+    void findCurrentMonthGoal_exists_returnsGoal() {
+        service.registerSavingGoal(validGoal().targetMonth(CURRENT_MONTH).build());
+
+        SavingGoal result = service.findCurrentMonthGoal(USER_ID);
+
+        assertNotNull(result);
+        assertEquals(CURRENT_MONTH, result.getTargetMonth());
+    }
+
+    @Test
+    @DisplayName("이번 달 저축목표가 없으면 조회 결과는 null이다")
+    void findCurrentMonthGoal_notExists_returnsNull() {
+        SavingGoal result = service.findCurrentMonthGoal(USER_ID);
+
+        assertNull(result);
+    }
+
+    @Test
+    @DisplayName("이번 달 저축목표를 정상 수정한다")
+    void updateCurrentMonthGoal_success() {
+        service.registerSavingGoal(validGoal().targetMonth(CURRENT_MONTH).build());
+
+        SavingGoal result = service.updateCurrentMonthGoal(USER_ID, 3_000_000L, 5L);
+
+        assertEquals(3_000_000L, result.getTargetAmount());
+        assertEquals(5L, result.getLaborIntensity());
+        assertEquals(CURRENT_MONTH, service.findCurrentMonthGoal(USER_ID).getTargetMonth());
+    }
+
+    @Test
+    @DisplayName("이번 달 저축목표가 없으면 수정에 실패한다")
+    void updateCurrentMonthGoal_notFound_throws() {
+        assertThrows(ServiceException.class, () -> service.updateCurrentMonthGoal(USER_ID, 3_000_000L, 5L));
+    }
+
+    @Test
+    @DisplayName("수정 시에도 target_amount, labor_intensity 검증을 통과해야 한다")
+    void updateCurrentMonthGoal_invalidLaborIntensity_throws() {
+        service.registerSavingGoal(validGoal().targetMonth(CURRENT_MONTH).build());
+
+        assertThrows(ServiceException.class, () -> service.updateCurrentMonthGoal(USER_ID, 3_000_000L, 6L));
     }
 }

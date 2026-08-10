@@ -1,6 +1,7 @@
 package com.ntropy.common.client;
 
 import com.ntropy.common.dto.work.command.SavingGoalRegisterCommand;
+import com.ntropy.common.dto.work.command.SavingGoalUpdateCommand;
 
 /**
  * work-service의 SAVING_GOAL 쓰기 계약. work-service가 LocalSavingGoalCommandClient로 구현하고,
@@ -9,4 +10,7 @@ import com.ntropy.common.dto.work.command.SavingGoalRegisterCommand;
 public interface SavingGoalCommandClient {
 
     Long registerSavingGoal(SavingGoalRegisterCommand command);
+
+    /** 이번 달(서버 시간 기준) 저축목표를 수정한다. 이번 달에 등록된 게 없으면 예외. */
+    void updateSavingGoal(Long userId, SavingGoalUpdateCommand command);
 }

@@ -13,13 +13,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class JobCreateRequest {
 
+    /** 사용자 입력 미허용, PER_TASK 잡의 시간당 예상 처리 건수는 3건으로 고정한다 (추후 변경 예정). */
+    private static final float FIXED_TASK_PER_HOUR = 3f;
+
     private Long categoryId;
     private String jobName;
     private String settlementType;
     private Integer hourlyWage;
     private Integer monthlyWage;
     private Integer perTaskWage;
-    private Float taskPerHour;
     private Boolean isRegular;
     private Integer baseFatigue;
     private List<Long> platformIds;
@@ -35,7 +37,7 @@ public class JobCreateRequest {
                 hourlyWage,
                 monthlyWage,
                 perTaskWage,
-                taskPerHour,
+                "PER_TASK".equals(settlementType) ? FIXED_TASK_PER_HOUR : null,
                 isRegular,
                 baseFatigue,
                 platformIds,

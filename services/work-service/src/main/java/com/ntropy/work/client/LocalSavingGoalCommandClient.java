@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.SavingGoalCommandClient;
 import com.ntropy.common.dto.work.command.SavingGoalRegisterCommand;
+import com.ntropy.common.dto.work.command.SavingGoalUpdateCommand;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.service.SavingGoalService;
 
@@ -26,5 +27,10 @@ public class LocalSavingGoalCommandClient implements SavingGoalCommandClient {
 
         savingGoalService.registerSavingGoal(savingGoal);
         return savingGoal.getSavingGoalId();
+    }
+
+    @Override
+    public void updateSavingGoal(Long userId, SavingGoalUpdateCommand command) {
+        savingGoalService.updateCurrentMonthGoal(userId, command.getTargetAmount(), command.getLaborIntensity());
     }
 }
