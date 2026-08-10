@@ -29,6 +29,7 @@ public class JobResponse {
     private Integer baseFatigue;
     private Boolean isActive;
     private List<JobScheduleResponse> schedules;
+    private List<PlatformBriefResponse> platforms;
 
     public static JobResponse from(JobSummary summary) {
         JobResponse response = new JobResponse();
@@ -47,6 +48,11 @@ public class JobResponse {
                 ? List.of()
                 : summary.getSchedules().stream()
                         .map(JobScheduleResponse::from)
+                        .collect(Collectors.toList());
+        response.platforms = summary.getPlatforms() == null
+                ? List.of()
+                : summary.getPlatforms().stream()
+                        .map(PlatformBriefResponse::from)
                         .collect(Collectors.toList());
         return response;
     }

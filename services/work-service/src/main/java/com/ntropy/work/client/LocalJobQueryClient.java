@@ -8,9 +8,13 @@ import org.springframework.stereotype.Component;
 import com.ntropy.common.client.JobQueryClient;
 import com.ntropy.common.dto.work.summary.JobScheduleSummary;
 import com.ntropy.common.dto.work.summary.JobSummary;
+import com.ntropy.common.dto.work.summary.PlatformBrief;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.JobPlatformMapping;
 import com.ntropy.work.domain.entity.JobSchedule;
+import com.ntropy.work.service.JobPlatformMappingService;
 import com.ntropy.work.service.JobService;
+import com.ntropy.work.service.PlatformService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 public class LocalJobQueryClient implements JobQueryClient {
 
     private final JobService jobService;
+    private final JobPlatformMappingService jobPlatformMappingService;
+    private final PlatformService platformService;
 
     @Override
     public JobSummary getJob(Long jobId) {
@@ -47,7 +53,17 @@ public class LocalJobQueryClient implements JobQueryClient {
                 .baseFatigue(job.getBaseFatigue())
                 .isActive(job.getIsActive())
                 .schedules(toScheduleSummaries(jobService.findSchedulesByJobId(job.getJobId())))
+                .platforms(toPlatformBriefs(jobPlatformMappingService.findByJobId(job.getJobId())))
                 .build();
+    }
+
+    private List<PlatformBrief> toPlatformBriefs(List<JobPlatformMapping> mappings) {
+        return mappings.stream()
+                .map(mapping -> {
+                    String platformName = platformService.findById(mapping.getPlatformId()).getPlatformName();
+                    return new PlatformBrief(mapping.getPlatformId(), platformName);
+                })
+                .collect(Collectors.toList());
     }
 
     private List<JobScheduleSummary> toScheduleSummaries(List<JobSchedule> schedules) {

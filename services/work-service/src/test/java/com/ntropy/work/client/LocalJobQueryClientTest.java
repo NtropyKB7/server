@@ -12,15 +12,21 @@ import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.dto.work.summary.JobScheduleSummary;
 import com.ntropy.common.dto.work.summary.JobSummary;
+import com.ntropy.common.dto.work.summary.PlatformBrief;
 import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
+import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
+import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.mapper.InMemoryPlatformMapper;
 import com.ntropy.work.service.CategoryService;
+import com.ntropy.work.service.JobPlatformMappingService;
 import com.ntropy.work.service.JobService;
+import com.ntropy.work.service.PlatformService;
 
 class LocalJobQueryClientTest {
 
@@ -29,6 +35,7 @@ class LocalJobQueryClientTest {
     private InMemoryJobMapper jobMapper;
     private InMemoryJobScheduleMapper jobScheduleMapper;
     private JobService jobService;
+    private JobPlatformMappingService jobPlatformMappingService;
     private LocalJobQueryClient jobQueryClient;
 
     @BeforeEach
@@ -38,7 +45,13 @@ class LocalJobQueryClientTest {
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
         jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper));
-        jobQueryClient = new LocalJobQueryClient(jobService);
+
+        InMemoryPlatformMapper platformMapper = new InMemoryPlatformMapper();
+        platformMapper.seed(Platform.builder().platformId(1L).categoryId(1L)
+                .platformName("배달의민족").settlementCycle("DAILY").build());
+        jobPlatformMappingService = new JobPlatformMappingService(new InMemoryJobPlatformMappingMapper(), platformMapper);
+
+        jobQueryClient = new LocalJobQueryClient(jobService, jobPlatformMappingService, new PlatformService(platformMapper));
     }
 
     private Job.JobBuilder baseJob() {
@@ -97,5 +110,29 @@ class LocalJobQueryClientTest {
 
         assertEquals(1, regularSummary.getSchedules().size());
         assertTrue(nonRegularSummary.getSchedules().isEmpty());
+    }
+
+    @Test
+    @DisplayName("잡에 연결된 플랫폼이 있으면 단건 조회 시 함께 내려온다")
+    void getJob_withPlatformMapping_includesPlatforms() {
+        Job job = jobService.registerJob(baseJob().isRegular(false).build(), null);
+        jobPlatformMappingService.register(job.getJobId(), 1L);
+
+        JobSummary summary = jobQueryClient.getJob(job.getJobId());
+
+        assertEquals(1, summary.getPlatforms().size());
+        PlatformBrief platform = summary.getPlatforms().get(0);
+        assertEquals(1L, platform.getPlatformId());
+        assertEquals("배달의민족", platform.getPlatformName());
+    }
+
+    @Test
+    @DisplayName("연결된 플랫폼이 없으면 platforms는 빈 리스트다")
+    void getJob_withoutPlatformMapping_hasEmptyPlatforms() {
+        Job job = jobService.registerJob(baseJob().isRegular(false).build(), null);
+
+        JobSummary summary = jobQueryClient.getJob(job.getJobId());
+
+        assertTrue(summary.getPlatforms().isEmpty());
     }
 }

@@ -67,6 +67,7 @@ public class LocalJobCommandClient implements JobCommandClient {
                 .build();
 
         jobService.updateJob(userId, job, toSchedules(command.getSchedules()));
+        jobPlatformMappingService.replaceForJob(jobId, command.getPlatformIds());
     }
 
     @Override

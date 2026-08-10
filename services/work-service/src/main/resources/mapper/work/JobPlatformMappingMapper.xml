@@ -37,4 +37,9 @@
         WHERE mapping_id = #{mappingId}
     </delete>
 
+    <delete id="deleteByJobId" parameterType="long">
+        DELETE FROM JOBPLATFORMMAPPING
+        WHERE job_id = #{jobId}
+    </delete>
+
 </mapper>

@@ -23,6 +23,7 @@ public class JobUpdateRequest {
     private Boolean isRegular;
     private Integer baseFatigue;
     private List<JobScheduleRequest> schedules;
+    private List<Long> platformIds;
 
     public JobUpdateCommand toCommand() {
         List<JobScheduleRequest> safeSchedules = schedules == null ? Collections.emptyList() : schedules;
@@ -31,7 +32,8 @@ public class JobUpdateRequest {
                 monthlyWage, perTaskWage, taskPerHour, isRegular, baseFatigue,
                 safeSchedules.stream()
                         .map(JobScheduleRequest::toCommand)
-                        .collect(Collectors.toList())
+                        .collect(Collectors.toList()),
+                platformIds
         );
     }
 }
