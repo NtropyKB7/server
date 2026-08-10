@@ -46,4 +46,9 @@ public class InMemoryJobPlatformMappingMapper implements JobPlatformMappingMappe
     public void deleteById(Long mappingId) {
         store.remove(mappingId);
     }
+
+    @Override
+    public void deleteByJobId(Long jobId) {
+        store.values().removeIf(mapping -> jobId.equals(mapping.getJobId()));
+    }
 }

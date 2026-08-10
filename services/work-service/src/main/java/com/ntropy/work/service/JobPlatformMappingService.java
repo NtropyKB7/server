@@ -3,6 +3,7 @@ package com.ntropy.work.service;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
@@ -44,5 +45,27 @@ public class JobPlatformMappingService {
 
     public void deleteById(Long mappingId) {
         jobPlatformMappingMapper.deleteById(mappingId);
+    }
+
+    /**
+     * 잡의 플랫폼 매핑을 전체 교체한다(잡 수정 PUT과 동일하게 부분 수정이 아니라 통째로 갈아끼움).
+     * platformIds가 null/빈 리스트면 기존 매핑을 전부 지우고 끝난다.
+     */
+    @Transactional
+    public void replaceForJob(Long jobId, List<Long> platformIds) {
+        jobPlatformMappingMapper.deleteByJobId(jobId);
+        if (platformIds == null) {
+            return;
+        }
+        for (Long platformId : platformIds.stream().distinct().toList()) {
+            if (platformMapper.findById(platformId) == null) {
+                throw new ServiceException(WorkErrorCode.PLATFORM_NOT_FOUND, "platformId=" + platformId);
+            }
+            JobPlatformMapping mapping = JobPlatformMapping.builder()
+                    .jobId(jobId)
+                    .platformId(platformId)
+                    .build();
+            jobPlatformMappingMapper.insert(mapping);
+        }
     }
 }

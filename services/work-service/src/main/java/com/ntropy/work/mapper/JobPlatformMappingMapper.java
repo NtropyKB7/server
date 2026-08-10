@@ -18,4 +18,6 @@ public interface JobPlatformMappingMapper {
     void update(JobPlatformMapping jobPlatformMapping);
 
     void deleteById(Long mappingId);
+
+    void deleteByJobId(Long jobId);
 }

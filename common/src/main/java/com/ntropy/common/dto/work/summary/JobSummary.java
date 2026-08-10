@@ -30,4 +30,5 @@ public class JobSummary {
     private Integer baseFatigue;
     private Boolean isActive;
     private List<JobScheduleSummary> schedules;
+    private List<PlatformBrief> platforms;
 }
