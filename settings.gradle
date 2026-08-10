@@ -1,4 +1,4 @@
-rootProject.name = 'SpringLegacy'
+rootProject.name = 'Ntropy'
 include 'common', 'api'
 include 'services:user-service', 'services:account-service', 'services:work-service',
         'services:diagnosis-service', 'services:defense-service', 'services:payment-service',
