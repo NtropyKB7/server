@@ -28,9 +28,14 @@ public class AccountRegistrationRequest {
     @ApiModelProperty(value = "CODEF 연결에서만 필수. 저장하거나 로그에 남기지 않습니다.")
     private String bankLoginPassword;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @ApiModelProperty(value = "기업은행·국민은행 CODEF 연결에서만 필수. YYYYMMDD. 저장하거나 로그에 남기지 않습니다.",
+            example = "19900101")
+    private String birthDate;
+
     public AccountRegistrationCommand toCommand() {
         return new AccountRegistrationCommand(
-                connectionType, organizationCode, bankLoginId, bankLoginPassword
+                connectionType, organizationCode, bankLoginId, bankLoginPassword, birthDate
         );
     }
 }

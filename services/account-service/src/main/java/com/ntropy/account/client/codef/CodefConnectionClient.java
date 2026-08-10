@@ -10,6 +10,8 @@ import com.ntropy.account.config.CodefProperties;
 import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse;
 import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse.AccountResult;
 import com.ntropy.account.client.codef.support.RsaUtil;
+import com.ntropy.account.exception.AccountErrorCode;
+import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -54,12 +56,13 @@ public class CodefConnectionClient {
             if (response.getResult() == null || !"CF-00000".equals(response.getResult().getCode())
                     || response.getData() == null || response.getData().getConnectedId() == null
                     || response.getData().getConnectedId().isBlank()) {
+                String code = response.getResult() != null ? response.getResult().getCode() : null;
                 String message = response.getResult() != null ? response.getResult().getMessage() : "알 수 없는 오류";
-                throw new IllegalStateException("CODEF 계정 등록 실패: " + message);
+                handleAccountFailure("등록", code, message, birthDate);
             }
-            validateInstitutionSuccess(response, organizationCode, "등록");
+            validateInstitutionSuccess(response, organizationCode, "등록", birthDate);
             return response.getData().getConnectedId();
-        } catch (IllegalStateException e) {
+        } catch (ServiceException | IllegalStateException e) {
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException("CODEF 계정 등록 요청 실패", e);
@@ -106,11 +109,12 @@ public class CodefConnectionClient {
                     CodefConnectionCreateResponse.class
             );
             if (response.getResult() == null || !"CF-00000".equals(response.getResult().getCode())) {
+                String code = response.getResult() != null ? response.getResult().getCode() : null;
                 String message = response.getResult() != null ? response.getResult().getMessage() : "알 수 없는 오류";
-                throw new IllegalStateException("CODEF 계정 " + action + " 실패: " + message);
+                handleAccountFailure(action, code, message, birthDate);
             }
-            validateInstitutionSuccess(response, organizationCode, action);
-        } catch (IllegalStateException e) {
+            validateInstitutionSuccess(response, organizationCode, action, birthDate);
+        } catch (ServiceException | IllegalStateException e) {
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException("CODEF 계정 " + action + " 요청 실패", e);
@@ -137,7 +141,7 @@ public class CodefConnectionClient {
     }
 
     private static void validateInstitutionSuccess(CodefConnectionCreateResponse response,
-                                                    String organizationCode, String action) {
+                                                    String organizationCode, String action, String birthDate) {
         if (response.getData() != null && response.getData().getSuccessList() != null) {
             boolean succeeded = response.getData().getSuccessList().stream()
                     .anyMatch(item -> organizationCode.equals(item.getOrganization())
@@ -151,10 +155,37 @@ public class CodefConnectionClient {
                 response.getData() != null ? response.getData().getErrorList() : null,
                 organizationCode
         );
-        String detail = failure == null
-                ? "기관별 성공 결과가 없습니다"
-                : failure.getCode() + " " + failure.getMessage();
+        String code = failure == null ? null : failure.getCode();
+        String message = failure == null ? "기관별 성공 결과가 없습니다" : failure.getMessage();
+        handleAccountFailure(action, code, message, birthDate);
+    }
+
+    /**
+     * CODEF는 생년월일 오입력을 별도 결과코드로 명세하지 않는다. 공식 명세·fixture로 정확한
+     * 코드가 확인되기 전까지는 실패 메시지에 "생년월일"과 불일치 계열 표현이 함께 있을 때만
+     * 오입력으로 최선 추정한다. 유효성 검증 처리 오류처럼 의미가 다른 메시지는 일반 실패로 유지한다.
+     * TODO(#98): 실제 CODEF 오입력 응답 코드가 확인되면 키워드 기반 추정 대신 코드 매핑으로 교체한다.
+     */
+    private static void handleAccountFailure(String action, String code, String message, String birthDate) {
+        if (birthDate != null && isBirthDateMismatchMessage(message)) {
+            throw new ServiceException(AccountErrorCode.BIRTH_DATE_MISMATCH, "생년월일을 다시 확인해주세요.");
+        }
+        String detail = (code == null ? "" : code + " ") + (message == null ? "" : message);
         throw new IllegalStateException("CODEF 계정 " + action + " 실패: " + detail.trim());
+    }
+
+    private static boolean isBirthDateMismatchMessage(String message) {
+        if (message == null) {
+            return false;
+        }
+        String normalized = message.replaceAll("\\s", "");
+        if (!normalized.contains("생년월일")) {
+            return false;
+        }
+        return normalized.contains("불일치")
+                || normalized.contains("일치하지않")
+                || normalized.contains("오입력")
+                || normalized.contains("다시확인");
     }
 
     private static AccountResult findInstitutionResult(List<AccountResult> results, String organizationCode) {

@@ -1,6 +1,7 @@
 package com.ntropy.account.client.codef;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse;
 import com.ntropy.account.client.codef.dto.CodefConnectionCreateResponse.AccountResult;
 import com.ntropy.account.config.CodefProperties;
+import com.ntropy.account.exception.AccountErrorCode;
+import com.ntropy.common.exception.ServiceException;
 
 class CodefConnectionClientTest {
 
@@ -94,6 +97,67 @@ class CodefConnectionClientTest {
                 IllegalStateException.class,
                 () -> client.addConnection(
                         "connected-id", "0088", "BK", "P", "id", "password", null
+                )
+        );
+    }
+
+    @Test
+    void mapsBirthDateMismatchWhenBirthDateSuppliedAndCodefRejectsIt() throws Exception {
+        CodefConnectionCreateResponse response = new CodefConnectionCreateResponse();
+        CodefConnectionCreateResponse.Result result = new CodefConnectionCreateResponse.Result();
+        result.setCode("CF-03002");
+        result.setMessage("입력하신 생년월일 정보가 일치하지 않습니다");
+        response.setResult(result);
+        CodefConnectionClient client = new CodefConnectionClient(
+                properties(), new StubCodefApiClient(response)
+        );
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.addConnection(
+                        "connected-id", "0004", "BK", "P", "id", "password", "19900101"
+                )
+        );
+
+        assertEquals(AccountErrorCode.BIRTH_DATE_MISMATCH.getStatusCode(), exception.getStatusCode());
+        assertFalse(exception.getErrorMessage().contains("CF-03002"), "CODEF 원문 응답코드를 그대로 노출하지 않는다");
+        assertFalse(exception.getErrorMessage().contains("19900101"), "입력한 생년월일 값을 노출하지 않는다");
+    }
+
+    @Test
+    void keepsGenericFailureWhenNoBirthDateWasSupplied() throws Exception {
+        CodefConnectionCreateResponse response = new CodefConnectionCreateResponse();
+        CodefConnectionCreateResponse.Result result = new CodefConnectionCreateResponse.Result();
+        result.setCode("CF-03002");
+        result.setMessage("입력하신 생년월일 정보가 일치하지 않습니다");
+        response.setResult(result);
+        CodefConnectionClient client = new CodefConnectionClient(
+                properties(), new StubCodefApiClient(response)
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> client.addConnection(
+                        "connected-id", "0088", "BK", "P", "id", "password", null
+                )
+        );
+    }
+
+    @Test
+    void keepsGenericFailureForBirthDateValidationProcessingError() throws Exception {
+        CodefConnectionCreateResponse response = new CodefConnectionCreateResponse();
+        CodefConnectionCreateResponse.Result result = new CodefConnectionCreateResponse.Result();
+        result.setCode("CF-03002");
+        result.setMessage("생년월일 유효성 검증 중 오류가 발생했습니다");
+        response.setResult(result);
+        CodefConnectionClient client = new CodefConnectionClient(
+                properties(), new StubCodefApiClient(response)
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> client.addConnection(
+                        "connected-id", "0004", "BK", "P", "id", "password", "19900101"
                 )
         );
     }

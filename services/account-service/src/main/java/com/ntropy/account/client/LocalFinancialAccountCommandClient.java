@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.account.domain.ConnectionProvider;
@@ -18,7 +17,6 @@ import com.ntropy.account.service.AccountCollectionService;
 import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.client.FinancialAccountCommandClient;
-import com.ntropy.common.client.UserBirthDateQueryClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
 import com.ntropy.common.dto.account.AccountRegistrationSummary;
 import com.ntropy.common.dto.account.BankSummary;
@@ -38,7 +36,6 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
     private final VirtualAccountRegenerationService virtualAccountRegenerationService;
     private final AccountLifecycleMapper accountLifecycleMapper;
     private final CodefConnectionMapper codefConnectionMapper;
-    private final ObjectProvider<UserBirthDateQueryClient> userBirthDateQueryClientProvider;
 
     @Override
     public List<BankSummary> findSupportedBanks() {
@@ -80,7 +77,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
 
         requireNonBlank(command.bankLoginId(), bank.getDisplayName() + " 로그인 ID");
         requireNonBlank(command.bankLoginPassword(), bank.getDisplayName() + " 로그인 비밀번호");
-        String birthDate = findBirthDateIfRequired(userId, bank);
+        String birthDate = resolveBirthDate(bank, command.birthDate());
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(DEFAULT_COLLECTION_DAYS - 1L);
         int accountCount = accountCollectionService.registerAndCollect(
@@ -107,24 +104,22 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         }
     }
 
-    private String findBirthDateIfRequired(Long userId, PersonalBank bank) {
+    private String resolveBirthDate(PersonalBank bank, String birthDate) {
         if (!bank.isBirthDateRequired()) {
             return null;
         }
-        UserBirthDateQueryClient client = userBirthDateQueryClientProvider.getIfAvailable();
-        if (client == null) {
+        if (birthDate == null || birthDate.isBlank()) {
             throw new ServiceException(
-                    AccountErrorCode.INVALID_REQUEST,
-                    "해당 은행 연결에는 회원 생년월일 조회 연동이 필요합니다."
+                    AccountErrorCode.BIRTH_DATE_REQUIRED,
+                    bank.getDisplayName() + " 생년월일이 필요합니다."
             );
         }
-        String birthDate = client.findBirthDate(userId);
         try {
             return bank.normalizeBirthDate(birthDate);
         } catch (IllegalArgumentException e) {
             throw new ServiceException(
-                    AccountErrorCode.INVALID_REQUEST,
-                    "회원정보에 유효한 생년월일(YYYYMMDD)이 필요합니다."
+                    AccountErrorCode.BIRTH_DATE_INVALID,
+                    "YYYYMMDD 형식의 유효한 생년월일이 필요합니다."
             );
         }
     }

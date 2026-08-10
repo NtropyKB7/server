@@ -5,6 +5,7 @@ public record AccountRegistrationCommand(
         String connectionType,
         String organizationCode,
         String bankLoginId,
-        String bankLoginPassword
+        String bankLoginPassword,
+        String birthDate
 ) {
 }

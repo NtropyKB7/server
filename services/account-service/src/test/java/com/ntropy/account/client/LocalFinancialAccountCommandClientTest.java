@@ -9,18 +9,17 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.CodefConnection;
+import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.AccountCollectionService;
 import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
-import com.ntropy.common.client.UserBirthDateQueryClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
 import com.ntropy.common.exception.ServiceException;
 
@@ -32,11 +31,11 @@ class LocalFinancialAccountCommandClientTest {
         StubVirtualAccountRegenerationService regenerationService = new StubVirtualAccountRegenerationService();
         LocalFinancialAccountCommandClient client = newClient(
                 collectionService, regenerationService, new StubAccountLifecycleMapper(1, 1),
-                new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                new StubCodefConnectionMapper()
         );
 
         var result = client.registerAccount(
-                42L, new AccountRegistrationCommand("VIRTUAL", "0088", null, null)
+                42L, new AccountRegistrationCommand("VIRTUAL", "0088", null, null, null)
         );
 
         assertEquals("VIRTUAL", result.connectionType());
@@ -47,16 +46,32 @@ class LocalFinancialAccountCommandClientTest {
     }
 
     @Test
+    void ignoresBirthDateForVirtualAccount() {
+        StubAccountCollectionService collectionService = new StubAccountCollectionService();
+        LocalFinancialAccountCommandClient client = newClient(
+                collectionService, new StubVirtualAccountRegenerationService(),
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
+        );
+
+        var result = client.registerAccount(
+                42L, new AccountRegistrationCommand("VIRTUAL", "0088", null, null, "19900101")
+        );
+
+        assertEquals("VIRTUAL", result.connectionType());
+        assertTrue(collectionService.registerAndCollectCalls == 0, "VIRTUAL 요청은 CODEF 수집을 호출하면 안 된다");
+    }
+
+    @Test
     void requiresCredentialsOnlyForCodef() {
         LocalFinancialAccountCommandClient client = newClient(
                 new StubAccountCollectionService(), new StubVirtualAccountRegenerationService(),
-                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
         );
 
         ServiceException exception = assertThrows(
                 ServiceException.class,
                 () -> client.registerAccount(
-                        42L, new AccountRegistrationCommand("CODEF", "0088", null, null)
+                        42L, new AccountRegistrationCommand("CODEF", "0088", null, null, null)
                 )
         );
 
@@ -64,20 +79,88 @@ class LocalFinancialAccountCommandClientTest {
     }
 
     @Test
-    void requiresMemberBirthDateIntegrationForBirthDateBank() {
+    void rejectsMissingBirthDateForRequiredBank() {
         LocalFinancialAccountCommandClient client = newClient(
                 new StubAccountCollectionService(), new StubVirtualAccountRegenerationService(),
-                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
         );
 
         ServiceException exception = assertThrows(
                 ServiceException.class,
                 () -> client.registerAccount(
-                        42L, new AccountRegistrationCommand("CODEF", "0004", "bank-id", "bank-password")
+                        42L, new AccountRegistrationCommand("CODEF", "0004", "bank-id", "bank-password", null)
                 )
         );
 
-        assertEquals(400, exception.getStatusCode());
+        assertEquals(AccountErrorCode.BIRTH_DATE_REQUIRED.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void rejectsInvalidBirthDateFormatForRequiredBank() {
+        LocalFinancialAccountCommandClient client = newClient(
+                new StubAccountCollectionService(), new StubVirtualAccountRegenerationService(),
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
+        );
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.registerAccount(
+                        42L, new AccountRegistrationCommand(
+                                "CODEF", "0003", "bank-id", "bank-password", "1990-01-01"
+                        )
+                )
+        );
+
+        assertEquals(AccountErrorCode.BIRTH_DATE_INVALID.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void registersKookminBankWithValidBirthDate() {
+        StubAccountCollectionService collectionService = new StubAccountCollectionService();
+        LocalFinancialAccountCommandClient client = newClient(
+                collectionService, new StubVirtualAccountRegenerationService(),
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
+        );
+
+        var result = client.registerAccount(
+                42L, new AccountRegistrationCommand("CODEF", "0004", "bank-id", "bank-password", "19900101")
+        );
+
+        assertEquals("CODEF", result.connectionType());
+        assertEquals(1, collectionService.registerAndCollectCalls);
+        assertEquals("19900101", collectionService.lastBirthDate);
+    }
+
+    @Test
+    void registersIndustrialBankWithValidBirthDate() {
+        StubAccountCollectionService collectionService = new StubAccountCollectionService();
+        LocalFinancialAccountCommandClient client = newClient(
+                collectionService, new StubVirtualAccountRegenerationService(),
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
+        );
+
+        client.registerAccount(
+                42L, new AccountRegistrationCommand("CODEF", "0003", "bank-id", "bank-password", "19900101")
+        );
+
+        assertEquals(1, collectionService.registerAndCollectCalls);
+        assertEquals("19900101", collectionService.lastBirthDate);
+    }
+
+    @Test
+    void doesNotForwardBirthDateForBanksThatDoNotRequireIt() {
+        StubAccountCollectionService collectionService = new StubAccountCollectionService();
+        LocalFinancialAccountCommandClient client = newClient(
+                collectionService, new StubVirtualAccountRegenerationService(),
+                new StubAccountLifecycleMapper(1, 1), new StubCodefConnectionMapper()
+        );
+
+        client.registerAccount(
+                42L, new AccountRegistrationCommand("CODEF", "0088", "bank-id", "bank-password", "19900101")
+        );
+
+        assertEquals(1, collectionService.registerAndCollectCalls);
+        assertEquals(null, collectionService.lastBirthDate, "생년월일이 필요 없는 은행에는 전달하지 않는다");
     }
 
     @Test
@@ -85,7 +168,7 @@ class LocalFinancialAccountCommandClientTest {
         StubCodefConnectionMapper mapper = new StubCodefConnectionMapper();
         LocalFinancialAccountCommandClient client = newClient(
                 new StubAccountCollectionService(), new StubVirtualAccountRegenerationService(),
-                new StubAccountLifecycleMapper(1, 1), mapper, emptyBirthDateProvider()
+                new StubAccountLifecycleMapper(1, 1), mapper
         );
 
         assertFalse(client.findMyDataStatus(42L).connected());
@@ -107,7 +190,7 @@ class LocalFinancialAccountCommandClientTest {
     void returnsSameNotFoundForDeactivationFailure() {
         LocalFinancialAccountCommandClient client = newClient(
                 new StubAccountCollectionService(), new StubVirtualAccountRegenerationService(),
-                new StubAccountLifecycleMapper(0, 1), new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                new StubAccountLifecycleMapper(0, 1), new StubCodefConnectionMapper()
         );
 
         ServiceException exception = assertThrows(
@@ -122,7 +205,7 @@ class LocalFinancialAccountCommandClientTest {
         StubAccountLifecycleMapper lifecycleMapper = new StubAccountLifecycleMapper(1, 1);
         LocalFinancialAccountCommandClient client = newClient(
                 new StubAccountCollectionService(), regenerationService,
-                lifecycleMapper, new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                lifecycleMapper, new StubCodefConnectionMapper()
         );
 
         client.activateAccount(42L, 100L);
@@ -136,7 +219,7 @@ class LocalFinancialAccountCommandClientTest {
     void returnsSameNotFoundForActivationFailure() {
         LocalFinancialAccountCommandClient client = newClient(
                 new StubAccountCollectionService(), new StubVirtualAccountRegenerationService(),
-                new StubAccountLifecycleMapper(1, 0), new StubCodefConnectionMapper(), emptyBirthDateProvider()
+                new StubAccountLifecycleMapper(1, 0), new StubCodefConnectionMapper()
         );
 
         ServiceException exception = assertThrows(
@@ -149,20 +232,16 @@ class LocalFinancialAccountCommandClientTest {
             AccountCollectionService collectionService,
             VirtualAccountRegenerationService regenerationService,
             AccountLifecycleMapper lifecycleMapper,
-            CodefConnectionMapper connectionMapper,
-            org.springframework.beans.factory.ObjectProvider<UserBirthDateQueryClient> birthDateProvider
+            CodefConnectionMapper connectionMapper
     ) {
         return new LocalFinancialAccountCommandClient(
-                collectionService, regenerationService, lifecycleMapper, connectionMapper, birthDateProvider
+                collectionService, regenerationService, lifecycleMapper, connectionMapper
         );
-    }
-
-    private static org.springframework.beans.factory.ObjectProvider<UserBirthDateQueryClient> emptyBirthDateProvider() {
-        return new DefaultListableBeanFactory().getBeanProvider(UserBirthDateQueryClient.class);
     }
 
     private static class StubAccountCollectionService extends AccountCollectionService {
         private int registerAndCollectCalls = 0;
+        private String lastBirthDate;
 
         StubAccountCollectionService() {
             super(null, null, null, null, null, null, null);
@@ -173,6 +252,7 @@ class LocalFinancialAccountCommandClientTest {
                                                 String rawPassword, String birthDate,
                                                 LocalDate transactionStartDate, LocalDate transactionEndDate) {
             registerAndCollectCalls++;
+            lastBirthDate = birthDate;
             return List.of(new Account());
         }
     }
