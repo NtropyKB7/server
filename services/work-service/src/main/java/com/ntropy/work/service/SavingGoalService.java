@@ -1,5 +1,7 @@
 package com.ntropy.work.service;
 
+import java.time.YearMonth;
+
 import org.springframework.stereotype.Service;
 
 import com.ntropy.common.exception.ServiceException;
@@ -33,6 +35,35 @@ public class SavingGoalService {
 
         savingGoalMapper.insert(savingGoal);
         return savingGoal;
+    }
+
+    /**
+     * 이번 달(서버 시간 기준) 저축목표를 조회한다. 등록된 게 없으면 null.
+     */
+    public SavingGoal findCurrentMonthGoal(Long userId) {
+        return savingGoalMapper.findByUserIdAndTargetMonth(userId, currentMonth());
+    }
+
+    /**
+     * 이번 달(서버 시간 기준) 저축목표를 수정한다. targetMonth는 수정 대상이 아니다.
+     * 이번 달에 등록된 게 없으면 예외.
+     */
+    public SavingGoal updateCurrentMonthGoal(Long userId, Long targetAmount, Long laborIntensity) {
+        SavingGoal existing = findCurrentMonthGoal(userId);
+        if (existing == null) {
+            throw new ServiceException(WorkErrorCode.SAVING_GOAL_NOT_FOUND, "userId=" + userId);
+        }
+
+        existing.setTargetAmount(targetAmount);
+        existing.setLaborIntensity(laborIntensity);
+        validate(existing);
+
+        savingGoalMapper.update(existing);
+        return existing;
+    }
+
+    private String currentMonth() {
+        return YearMonth.now().toString();
     }
 
     private void validate(SavingGoal savingGoal) {

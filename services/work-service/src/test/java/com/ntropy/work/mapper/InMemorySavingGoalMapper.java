@@ -33,4 +33,9 @@ public class InMemorySavingGoalMapper implements SavingGoalMapper {
         }
         return null;
     }
+
+    @Override
+    public void update(SavingGoal savingGoal) {
+        store.put(savingGoal.getSavingGoalId(), savingGoal);
+    }
 }

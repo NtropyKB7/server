@@ -29,4 +29,11 @@
           AND target_month = #{targetMonth}
     </select>
 
+    <update id="update" parameterType="com.ntropy.work.domain.entity.SavingGoal">
+        UPDATE SAVING_GOAL
+        SET target_amount = #{targetAmount},
+            labor_intensity = #{laborIntensity}
+        WHERE saving_goal_id = #{savingGoalId}
+    </update>
+
 </mapper>

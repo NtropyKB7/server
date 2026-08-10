@@ -37,6 +37,7 @@ public enum WorkErrorCode implements ServiceErrorCode {
     SAVING_GOAL_INVALID_TARGET_AMOUNT(400, "target_amount는 0보다 커야 합니다."),
     SAVING_GOAL_INVALID_LABOR_INTENSITY(400, "labor_intensity는 1~5 사이여야 합니다."),
     SAVING_GOAL_ALREADY_EXISTS(409, "이미 등록된 저축 목표입니다."),
+    SAVING_GOAL_NOT_FOUND(404, "이번 달에 등록된 저축 목표가 없습니다."),
 
     JOB_PLATFORM_MAPPING_ALREADY_EXISTS(409, "이미 등록된 잡-플랫폼 매핑입니다.");
 

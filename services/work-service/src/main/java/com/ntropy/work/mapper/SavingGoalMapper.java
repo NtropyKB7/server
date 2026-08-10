@@ -14,4 +14,6 @@ public interface SavingGoalMapper {
 
     SavingGoal findByUserIdAndTargetMonth(@Param("userId") Long userId,
                                            @Param("targetMonth") String targetMonth);
+
+    void update(SavingGoal savingGoal);
 }
