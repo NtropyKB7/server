@@ -88,4 +88,15 @@
         WHERE refresh_token_hash = #{refreshToken}
     </select>
 
+    <!-- 월간 배치 대상 활성 사용자 ID 조회 -->
+    <select id="findActiveUserIds"
+            resultType="java.lang.Long">
+
+        SELECT user_id
+        FROM USERS
+        WHERE status = 'ACTIVE'
+        ORDER BY user_id
+
+    </select>
+
 </mapper>

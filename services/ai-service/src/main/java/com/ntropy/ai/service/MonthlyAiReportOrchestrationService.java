@@ -4,9 +4,11 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.ntropy.common.client.ActiveUserQueryClient;
 import org.springframework.stereotype.Service;
 
 import com.ntropy.ai.client.fastapi.FastApiTransactionClassificationClient;
@@ -30,6 +32,8 @@ public class MonthlyAiReportOrchestrationService {
 
     private final AccountTransactionAnalysisClient
             accountTransactionAnalysisClient;
+
+    private final ActiveUserQueryClient activeUserQueryClient;
 
     /**
      * 매월 1일 실행되며 지난달 데이터를 처리합니다.
@@ -94,16 +98,31 @@ public class MonthlyAiReportOrchestrationService {
         );
     }
 
-    /**
-     * 현재는 사용자 조회 Client가 연결되지 않아 빈 목록을 반환합니다.
-     */
     private List<Long> findTargetUserIds(String yearMonth) {
+        List<Long> userIds =
+                activeUserQueryClient.findActiveUserIds();
+
+        if (userIds == null) {
+            log.warn(
+                    "[AI 리포트 배치] 활성 사용자 조회 결과가 null입니다 - yearMonth: {}",
+                    yearMonth
+            );
+            return List.of();
+        }
+
+        List<Long> validUserIds = userIds.stream()
+                .filter(Objects::nonNull)
+                .filter(userId -> userId > 0)
+                .distinct()
+                .toList();
+
         log.info(
-                "[AI 리포트 배치] 대상 사용자 조회 연동 대기 중 - yearMonth: {}",
-                yearMonth
+                "[AI 리포트 배치] 활성 사용자 조회 완료 - yearMonth: {}, 대상 사용자 수: {}",
+                yearMonth,
+                validUserIds.size()
         );
 
-        return Collections.emptyList();
+        return validUserIds;
     }
 
     /**

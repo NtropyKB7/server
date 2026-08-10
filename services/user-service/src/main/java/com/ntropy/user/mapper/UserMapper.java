@@ -4,6 +4,7 @@ import com.ntropy.user.domain.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 @Mapper
@@ -26,4 +27,6 @@ public interface UserMapper {
     void invalidateRefreshToken(Long userId);
 
     Optional<User> findByRefreshToken(String refreshToken);
+
+    List<Long> findActiveUserIds();
 }
