@@ -2,6 +2,7 @@ package com.ntropy.work.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -14,10 +15,12 @@ import com.ntropy.work.domain.PlatformMatchResult;
 import com.ntropy.work.domain.PlatformMatcher;
 import com.ntropy.work.domain.SettlementPeriod;
 import com.ntropy.work.domain.SettlementPeriodCalculator;
+import com.ntropy.work.domain.WorkLogSettlementStatusCalculator;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
 import com.ntropy.work.domain.enums.SettlementMatchStatus;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.JobMapper;
@@ -25,6 +28,7 @@ import com.ntropy.work.mapper.JobPlatformMappingMapper;
 import com.ntropy.work.mapper.PlatformMapper;
 import com.ntropy.work.mapper.SettlementMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
+import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +76,7 @@ public class SettlementService {
     private final JobMapper jobMapper;
     private final JobPlatformMappingMapper jobPlatformMappingMapper;
     private final WorkLogMapper workLogMapper;
+    private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private final SettlementMapper settlementMapper;
     private final HolidayService holidayService;
 
@@ -98,13 +103,6 @@ public class SettlementService {
                 }
             }
         }
-    }
-
-    /** 이 잡에 매핑된 platform 중 ON_DEMAND(포인트 적립 후 사용자가 출금 신청하는 방식)가 있는지. */
-    public boolean isOnDemandJob(Long jobId) {
-        return jobPlatformMappingMapper.findByJobId(jobId).stream()
-                .map(mapping -> platformMapper.findById(mapping.getPlatformId()))
-                .anyMatch(platform -> "ON_DEMAND".equals(platform.getSettlementTriggerType()));
     }
 
     public void processSettlement(Long userId, LocalDate processDate) {
@@ -158,9 +156,11 @@ public class SettlementService {
                 : Set.of();
         SettlementPeriod period = SettlementPeriodCalculator.calculate(
                 platform, transaction.transactionDate(), holidays);
-        List<WorkLog> logsInPeriod = findConfirmedLogsInPeriod(jobId, period);
-        long expectedAmount = logsInPeriod.stream()
-                .mapToLong(log -> log.getEstimatedIncome() == null ? 0L : log.getEstimatedIncome())
+        List<WorkLogPlatformIncome> incomesInPeriod = workLogPlatformIncomeMapper
+                .findConfirmedByJobIdAndPlatformIdAndDateRange(
+                        jobId, platform.getPlatformId(), period.start(), period.end());
+        long expectedAmount = incomesInPeriod.stream()
+                .mapToLong(income -> income.getExpectedAmount() == null ? 0L : income.getExpectedAmount())
                 .sum();
 
         Settlement settlement = Settlement.builder()
@@ -178,11 +178,27 @@ public class SettlementService {
                 .build();
         settlementMapper.insert(settlement);
 
-        for (WorkLog log : logsInPeriod) {
-            log.setSettlementStatus(SettlementStatus.COMPLETED);
-            workLogMapper.update(log);
+        Set<Long> affectedLogIds = new LinkedHashSet<>();
+        for (WorkLogPlatformIncome income : incomesInPeriod) {
+            income.setSettlementStatus(SettlementStatus.COMPLETED);
+            workLogPlatformIncomeMapper.update(income);
+            affectedLogIds.add(income.getLogId());
+        }
+        for (Long logId : affectedLogIds) {
+            recomputeWorkLogSettlementStatus(logId);
         }
         return true;
+    }
+
+    /** income 행 하나가 COMPLETED로 바뀌면, 그 부모 WorkLog의 상태도 다시 계산해서 갱신한다. */
+    private void recomputeWorkLogSettlementStatus(Long logId) {
+        WorkLog workLog = workLogMapper.findById(logId);
+        if (workLog == null) {
+            return;
+        }
+        List<WorkLogPlatformIncome> incomes = workLogPlatformIncomeMapper.findByLogId(logId);
+        workLog.setSettlementStatus(WorkLogSettlementStatusCalculator.calculate(incomes));
+        workLogMapper.update(workLog);
     }
 
     /**
@@ -244,14 +260,5 @@ public class SettlementService {
             }
         }
         return null;
-    }
-
-    private List<WorkLog> findConfirmedLogsInPeriod(Long jobId, SettlementPeriod period) {
-        return workLogMapper.findByJobId(jobId).stream()
-                .filter(log -> "CONFIRMED".equals(log.getStatus()))
-                .filter(log -> log.getWorkDate() != null)
-                .filter(log -> !log.getWorkDate().isBefore(period.start())
-                        && !log.getWorkDate().isAfter(period.end()))
-                .toList();
     }
 }

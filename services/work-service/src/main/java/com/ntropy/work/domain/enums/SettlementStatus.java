@@ -7,5 +7,6 @@ package com.ntropy.work.domain.enums;
 public enum SettlementStatus {
     NONE,
     PENDING,
+    PARTIAL,
     COMPLETED
 }

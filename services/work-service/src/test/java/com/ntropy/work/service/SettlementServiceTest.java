@@ -2,7 +2,6 @@ package com.ntropy.work.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +22,7 @@ import com.ntropy.work.domain.entity.JobPlatformMapping;
 import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
 import com.ntropy.work.domain.enums.SettlementMatchStatus;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.InMemoryHolidayMapper;
@@ -31,6 +31,7 @@ import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryPlatformMapper;
 import com.ntropy.work.mapper.InMemorySettlementMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
+import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
 
 class SettlementServiceTest {
 
@@ -44,6 +45,8 @@ class SettlementServiceTest {
     private final InMemoryJobMapper jobMapper = new InMemoryJobMapper();
     private final InMemoryJobPlatformMappingMapper jobPlatformMappingMapper = new InMemoryJobPlatformMappingMapper();
     private final InMemoryWorkLogMapper workLogMapper = new InMemoryWorkLogMapper();
+    private final InMemoryWorkLogPlatformIncomeMapper workLogPlatformIncomeMapper =
+            new InMemoryWorkLogPlatformIncomeMapper(workLogMapper);
     private final InMemorySettlementMapper settlementMapper = new InMemorySettlementMapper();
     private final InMemoryHolidayMapper holidayMapperForTest = new InMemoryHolidayMapper();
     private final HolidayService holidayService =
@@ -64,7 +67,7 @@ class SettlementServiceTest {
         incomingTransactionQueryClient = new StubIncomingTransactionQueryClient();
         service = new SettlementService(
                 incomingTransactionQueryClient, activeUserQueryClient, platformMapper, jobMapper,
-                jobPlatformMappingMapper, workLogMapper, settlementMapper, holidayService);
+                jobPlatformMappingMapper, workLogMapper, workLogPlatformIncomeMapper, settlementMapper, holidayService);
     }
 
     @Test
@@ -77,6 +80,7 @@ class SettlementServiceTest {
         workLogMapper.insert(inPeriodConfirmed);
         workLogMapper.insert(outOfPeriodConfirmed);
         workLogMapper.insert(inPeriodPlanned);
+        insertIncome(inPeriodConfirmed, PLATFORM_ID, 50_000L, SettlementStatus.PENDING);
         incomingTransactionQueryClient.transactions = List.of(transaction(999L, 48_000L));
 
         service.processSettlement(USER_ID, PROCESS_DATE);
@@ -239,22 +243,6 @@ class SettlementServiceTest {
     }
 
     @Test
-    @DisplayName("isOnDemandJob은 매핑된 platform 중 ON_DEMAND가 있으면 true를 반환한다")
-    void isOnDemandJob_returnsTrueWhenMappedPlatformIsOnDemand() {
-        Long onDemandPlatformId = 30L;
-        platformMapper.seed(Platform.builder()
-                .platformId(onDemandPlatformId)
-                .depositName("티맵모빌리티")
-                .settlementCycle("DAILY")
-                .settlementTriggerType("ON_DEMAND")
-                .build());
-        jobPlatformMappingMapper.insert(
-                JobPlatformMapping.builder().jobId(JOB_ID).platformId(onDemandPlatformId).build());
-
-        assertTrue(service.isOnDemandJob(JOB_ID));
-    }
-
-    @Test
     @DisplayName("BUSINESS_DAY 플랫폼은 HolidayService에서 조회한 공휴일까지 건너뛰고 기간을 계산한다")
     void processSettlement_businessDayPlatform_skipsInjectedHoliday() {
         Long businessDayPlatformId = 40L;
@@ -278,6 +266,7 @@ class SettlementServiceTest {
         WorkLog fridayLog = workLog(holiday, "CONFIRMED", 40_000L);
         workLogMapper.insert(expectedLog);
         workLogMapper.insert(fridayLog);
+        insertIncome(expectedLog, businessDayPlatformId, 40_000L, SettlementStatus.PENDING);
         incomingTransactionQueryClient.transactions = List.of(
                 new NormalizedIncomingTransaction(1L, paymentDate, LocalTime.NOON, "배민커넥트테스트", BigDecimal.valueOf(40_000L))
         );
@@ -289,6 +278,32 @@ class SettlementServiceTest {
         assertEquals(expectedWorkDate, settlement.getPeriodEnd());
         assertEquals(SettlementStatus.COMPLETED, workLogMapper.findById(expectedLog.getLogId()).getSettlementStatus());
         assertEquals(SettlementStatus.NONE, workLogMapper.findById(fridayLog.getLogId()).getSettlementStatus());
+    }
+
+    @Test
+    @DisplayName("여러 플랫폼을 동시에 뛴 근무일지는 그중 한 플랫폼만 매칭돼도 WorkLog가 PARTIAL이 된다")
+    void processSettlement_multiPlatformWorkLog_partiallyMatched_becomesPartial() {
+        Long platformBId = 50L;
+        platformMapper.seed(Platform.builder()
+                .platformId(platformBId)
+                .depositName("두번째플랫폼")
+                .settlementCycle("DAILY")
+                .settlementOffsetDay(1)
+                .build());
+        jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
+        jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(platformBId).build());
+
+        WorkLog multiPlatformLog = workLog(PERIOD_DATE, "CONFIRMED", 40_000L);
+        workLogMapper.insert(multiPlatformLog);
+        insertIncome(multiPlatformLog, PLATFORM_ID, 25_000L, SettlementStatus.PENDING);
+        insertIncome(multiPlatformLog, platformBId, 15_000L, SettlementStatus.PENDING);
+
+        // PLATFORM_ID 몫만 입금됨 - platformBId 몫은 아직
+        incomingTransactionQueryClient.transactions = List.of(transaction(999L, 25_000L));
+
+        service.processSettlement(USER_ID, PROCESS_DATE);
+
+        assertEquals(SettlementStatus.PARTIAL, workLogMapper.findById(multiPlatformLog.getLogId()).getSettlementStatus());
     }
 
     @Test
@@ -330,6 +345,15 @@ class SettlementServiceTest {
                 .fatigue(0L)
                 .settlementStatus(SettlementStatus.NONE)
                 .build();
+    }
+
+    private void insertIncome(WorkLog workLog, Long platformId, long amount, SettlementStatus status) {
+        workLogPlatformIncomeMapper.insert(WorkLogPlatformIncome.builder()
+                .logId(workLog.getLogId())
+                .platformId(platformId)
+                .expectedAmount(amount)
+                .settlementStatus(status)
+                .build());
     }
 
     private static NormalizedIncomingTransaction transaction(long transactionId, long amount) {

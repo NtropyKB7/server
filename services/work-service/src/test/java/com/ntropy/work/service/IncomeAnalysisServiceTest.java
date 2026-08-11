@@ -27,6 +27,7 @@ import com.ntropy.work.domain.enums.SettlementMatchStatus;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
+import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
 import com.ntropy.work.mapper.SettlementMapper;
 
 class IncomeAnalysisServiceTest {
@@ -34,19 +35,22 @@ class IncomeAnalysisServiceTest {
     private static final Long USER_ID = 1L;
     private static final Long JOB_A = 100L;
     private static final Long JOB_B = 200L;
+    private static final Long PLATFORM_ID = 900L;
     private static final YearMonth TARGET = YearMonth.of(2026, 7);
     private static final LocalDate TARGET_DATE = LocalDate.of(2026, 7, 10);
     private static final LocalDate PREVIOUS_MONTH_DATE = LocalDate.of(2026, 6, 10);
 
     private final InMemoryJobMapper jobMapper = new InMemoryJobMapper();
     private final InMemoryWorkLogMapper workLogMapper = new InMemoryWorkLogMapper();
+    private final InMemoryWorkLogPlatformIncomeMapper workLogPlatformIncomeMapper =
+            new InMemoryWorkLogPlatformIncomeMapper(workLogMapper);
     private StubSettlementMapper settlementMapper;
     private IncomeAnalysisService service;
 
     @BeforeEach
     void setUp() {
         settlementMapper = new StubSettlementMapper();
-        service = new IncomeAnalysisService(settlementMapper, jobMapper, workLogMapper);
+        service = new IncomeAnalysisService(settlementMapper, jobMapper, workLogMapper, workLogPlatformIncomeMapper);
     }
 
     @Test
@@ -214,16 +218,32 @@ class IncomeAnalysisServiceTest {
     }
 
     @Test
-    @DisplayName("확정됐지만 아직 SETTLEMENT로 완료 처리되지 않은 근무일지의 예상소득은 pendingSettlementIncome에 합산된다")
-    void pendingSettlementIncome_sumsConfirmedButNotYetCompletedWorkLogs() {
+    @DisplayName("확정됐지만 아직 COMPLETED가 아닌 WORK_LOG_PLATFORM_INCOME 행의 소득만 pendingSettlementIncome에 합산된다")
+    void pendingSettlementIncome_sumsConfirmedButNotYetCompletedIncomeRows() {
         jobMapper.seed(Job.builder().jobId(JOB_A).userId(USER_ID).jobName("잡에이").build());
-        workLogMapper.insert(workLog(JOB_A, TARGET_DATE, "CONFIRMED", 30_000L, 3L, SettlementStatus.PENDING));
-        workLogMapper.insert(workLog(JOB_A, TARGET_DATE.plusDays(1), "CONFIRMED", 20_000L, 3L, SettlementStatus.COMPLETED));
-        workLogMapper.insert(workLog(JOB_A, TARGET_DATE.plusDays(2), "PLANNED", 99_999L, 3L, SettlementStatus.NONE));
+
+        WorkLog pendingLog = workLog(JOB_A, TARGET_DATE, "CONFIRMED", 30_000L, 3L, SettlementStatus.PENDING);
+        WorkLog completedLog = workLog(JOB_A, TARGET_DATE.plusDays(1), "CONFIRMED", 20_000L, 3L, SettlementStatus.COMPLETED);
+        WorkLog plannedLog = workLog(JOB_A, TARGET_DATE.plusDays(2), "PLANNED", 99_999L, 3L, SettlementStatus.NONE);
+        workLogMapper.insert(pendingLog);
+        workLogMapper.insert(completedLog);
+        workLogMapper.insert(plannedLog);
+        insertIncome(pendingLog, 30_000L, SettlementStatus.PENDING);
+        insertIncome(completedLog, 20_000L, SettlementStatus.COMPLETED);
+        // plannedLog는 CONFIRMED가 아니라 income 행 자체를 안 만듦 (실제 WorkLogService 동작과 동일)
 
         MonthlyIncomeAnalysisSummary result = service.getMonthlyIncomeAnalysis(USER_ID, TARGET);
 
         assertEquals(30_000L, result.getPendingSettlementIncome());
+    }
+
+    private void insertIncome(WorkLog workLog, long amount, SettlementStatus status) {
+        workLogPlatformIncomeMapper.insert(com.ntropy.work.domain.entity.WorkLogPlatformIncome.builder()
+                .logId(workLog.getLogId())
+                .platformId(PLATFORM_ID)
+                .expectedAmount(amount)
+                .settlementStatus(status)
+                .build());
     }
 
     @Test

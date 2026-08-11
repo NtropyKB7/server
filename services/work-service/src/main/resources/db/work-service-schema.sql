@@ -76,7 +76,7 @@ CREATE TABLE `WORK_LOG` (
 	`fatigue`	BIGINT	NOT NULL,
 	`estimated_income`	BIGINT	NULL,
 	`status`	VARCHAR(20)	NULL	COMMENT 'PLANNED/CONFIRMED',
-	`settlement_status`	VARCHAR(20)	NULL	COMMENT 'NONE/PENDING/COMPLETED',
+	`settlement_status`	VARCHAR(20)	NULL	COMMENT 'NONE/PENDING/PARTIAL/COMPLETED - WORK_LOG_PLATFORM_INCOME 행들 상태로부터 파생 계산됨',
 	PRIMARY KEY (`log_id`)
 );
 
@@ -103,6 +103,17 @@ CREATE TABLE `HOLIDAY` (
 	`holiday_date`	DATE	NOT NULL,
 	`name`	VARCHAR(50)	NOT NULL	COMMENT '공휴일명 (예: 신정, 설날)',
 	PRIMARY KEY (`holiday_date`)
+);
+
+-- 10. WORK_LOG_PLATFORM_INCOME (근무일지 1건의 소득을 플랫폼별로 분배 - 여러 플랫폼을 동시에
+--     운영하는 배달 등에서, 근무일지는 안 쪼개고 소득/정산 상태만 플랫폼별로 추적하기 위함)
+CREATE TABLE `WORK_LOG_PLATFORM_INCOME` (
+	`income_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
+	`log_id`	BIGINT	NOT NULL,
+	`platform_id`	BIGINT	NOT NULL,
+	`expected_amount`	BIGINT	NOT NULL,
+	`settlement_status`	VARCHAR(20)	NOT NULL	COMMENT 'PENDING/COMPLETED (WORK_LOG와 달리 NONE/PARTIAL은 없음 - 확정 시점에만 생성되므로)',
+	PRIMARY KEY (`income_id`)
 );
 
 -- ============================================================
@@ -167,6 +178,20 @@ REFERENCES `JOB` (
 	`job_id`
 );
 
+ALTER TABLE `WORK_LOG_PLATFORM_INCOME` ADD CONSTRAINT `FK_WORK_LOG_TO_WORK_LOG_PLATFORM_INCOME_1` FOREIGN KEY (
+	`log_id`
+)
+REFERENCES `WORK_LOG` (
+	`log_id`
+);
+
+ALTER TABLE `WORK_LOG_PLATFORM_INCOME` ADD CONSTRAINT `FK_PLATFORM_TO_WORK_LOG_PLATFORM_INCOME_1` FOREIGN KEY (
+	`platform_id`
+)
+REFERENCES `PLATFORM` (
+	`platform_id`
+);
+
 ALTER TABLE `ALLOCATION_GOAL` ADD CONSTRAINT `FK_JOB_TO_ALLOCATION_GOAL_1` FOREIGN KEY (
 	`job_id`
 )
@@ -184,6 +209,8 @@ CREATE INDEX `IDX_PLATFORM_CATEGORY_ID` ON `PLATFORM` (`category_id`);
 CREATE INDEX `IDX_JOB_SCHEDULE_JOB_ID` ON `JOB_SCHEDULE` (`job_id`);
 CREATE INDEX `IDX_WORK_LOG_JOB_ID` ON `WORK_LOG` (`job_id`);
 CREATE INDEX `IDX_ALLOCATION_GOAL_JOB_ID` ON `ALLOCATION_GOAL` (`job_id`);
+CREATE INDEX `IDX_WORK_LOG_PLATFORM_INCOME_LOG_ID` ON `WORK_LOG_PLATFORM_INCOME` (`log_id`);
+CREATE INDEX `IDX_WORK_LOG_PLATFORM_INCOME_PLATFORM_ID` ON `WORK_LOG_PLATFORM_INCOME` (`platform_id`);
 
 -- user_id는 크로스 도메인(user-service)이라 FK는 걸지 않되, 조회 성능을 위해 인덱스는 추가
 CREATE INDEX `IDX_JOB_USER_ID` ON `JOB` (`user_id`);
