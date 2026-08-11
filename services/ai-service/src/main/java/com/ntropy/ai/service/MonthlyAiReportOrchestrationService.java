@@ -218,6 +218,15 @@ public class MonthlyAiReportOrchestrationService {
                 buildJobSummaries(income);
 
         /*
+         * FastAPI가 잡 관련 AI 인사이트를 만들 때 사용할 확장 입력입니다.
+         *
+         * jobSummaries는 프론트 표시용이고,
+         * jobInsightInputs는 AI 판단용입니다.
+         */
+        List<Map<String, Object>> jobInsightInputs =
+                buildJobInsightInputs(income);
+
+        /*
          * 카테고리별 소비 Map을 프론트용 List로 변환합니다.
          */
         List<Map<String, Object>> topCategories =
@@ -306,11 +315,7 @@ public class MonthlyAiReportOrchestrationService {
 
                         // 전월 대비 소득 증감률
                         // 0.25 = 25%가 아니라 비율 0.25로 전달
-                        .incomeChangeRate(
-                                income == null
-                                        ? null
-                                        : income.getIncomeChangeRate()
-                        )
+                        .incomeChangeRate(incomeChangeRate)
 
                         // 최근 소득 변동성
                         .incomeVolatility(
@@ -319,19 +324,11 @@ public class MonthlyAiReportOrchestrationService {
                                         : income.getIncomeVolatility()
                         )
 
-                        // 잡별 소득 목록
-                        .jobIncomes(
-                                income == null
-                                        ? List.of()
-                                        : income.getJobIncomes()
-                        )
-
-                        // 잡별 근무시간·피로도 목록
-                        .fatigueSummaries(
-                                income == null
-                                        ? List.of()
-                                        : income.getFatigueSummaries()
-                        )
+                        /*
+                         * FastAPI에는 job_incomes와 fatigue_summaries를 따로 보내지 않고,
+                         * jobId 기준으로 조합된 AI 판단용 입력만 전달합니다.
+                         */
+                        .jobInsightInputs(jobInsightInputs)
 
                         .build();
         /*
@@ -543,6 +540,136 @@ public class MonthlyAiReportOrchestrationService {
 
         return new ArrayList<>(
                 summaryByJob.values()
+        );
+    }
+
+    /**
+     * FastAPI가 잡 관련 AI 인사이트를 생성할 때 사용할 입력 데이터를 만듭니다.
+     *
+     * 프론트 표시용 jobSummaries보다 더 많은 정보를 포함합니다.
+     *
+     * 포함 정보:
+     * - 잡별 소득
+     * - 잡별 소득 비율
+     * - 잡별 총 근무시간
+     * - 잡별 근무일수
+     * - 잡별 평균 피로도
+     * - 잡별 최근 피로도
+     */
+    private List<Map<String, Object>> buildJobInsightInputs(
+            MonthlyIncomeAnalysisSummary income
+    ) {
+        if (income == null) {
+            return List.of();
+        }
+
+        Map<Long, Map<String, Object>> inputByJob =
+                new LinkedHashMap<>();
+
+        /*
+         * 먼저 잡별 소득 정보를 등록합니다.
+         */
+        List<JobIncomeSummary> jobIncomes =
+                income.getJobIncomes();
+
+        if (jobIncomes != null) {
+            for (JobIncomeSummary jobIncome : jobIncomes) {
+                if (jobIncome == null
+                        || jobIncome.getJobId() == null) {
+                    continue;
+                }
+
+                Map<String, Object> input =
+                        inputByJob.computeIfAbsent(
+                                jobIncome.getJobId(),
+                                key -> new LinkedHashMap<>()
+                        );
+
+                input.put(
+                        "jobId",
+                        jobIncome.getJobId()
+                );
+
+                input.put(
+                        "jobName",
+                        jobIncome.getJobName()
+                );
+
+                input.put(
+                        "incomeAmount",
+                        jobIncome.getIncomeAmount()
+                );
+
+                /*
+                 * incomeRatio는 퍼센트가 아니라 0~1 사이 비율입니다.
+                 *
+                 * 예:
+                 * 0.25 = 25%
+                 */
+                input.put(
+                        "incomeRatio",
+                        roundRatio(jobIncome.getIncomeRatio())
+                );
+            }
+        }
+
+        /*
+         * 그 다음 잡별 근무시간과 피로도 정보를 추가합니다.
+         */
+        List<JobFatigueSummary> fatigueSummaries =
+                income.getFatigueSummaries();
+
+        if (fatigueSummaries != null) {
+            for (JobFatigueSummary fatigue : fatigueSummaries) {
+                if (fatigue == null
+                        || fatigue.getJobId() == null) {
+                    continue;
+                }
+
+                Map<String, Object> input =
+                        inputByJob.computeIfAbsent(
+                                fatigue.getJobId(),
+                                key -> new LinkedHashMap<>()
+                        );
+
+                input.put(
+                        "jobId",
+                        fatigue.getJobId()
+                );
+
+                /*
+                 * 소득 목록에 잡 이름이 없을 수도 있으므로,
+                 * 피로도 목록의 잡 이름을 보조로 사용합니다.
+                 */
+                input.putIfAbsent(
+                        "jobName",
+                        fatigue.getJobName()
+                );
+
+                input.put(
+                        "totalWorkMinutes",
+                        fatigue.getTotalWorkMinutes()
+                );
+
+                input.put(
+                        "workDays",
+                        fatigue.getWorkDays()
+                );
+
+                input.put(
+                        "averageFatigue",
+                        fatigue.getAverageFatigue()
+                );
+
+                input.put(
+                        "latestFatigue",
+                        fatigue.getLatestFatigue()
+                );
+            }
+        }
+
+        return new ArrayList<>(
+                inputByJob.values()
         );
     }
 
