@@ -2,6 +2,7 @@ package com.ntropy.work.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -105,7 +106,10 @@ public class SettlementService {
             return true;
         }
 
-        SettlementPeriod period = SettlementPeriodCalculator.calculate(platform, transaction.transactionDate());
+        // TODO: 특일 정보 API 연동 + HOLIDAY 테이블 캐싱이 붙으면 실제 공휴일 Set으로 교체
+        //  (현재는 BUSINESS_DAY 플랫폼도 주말만 건너뛰고 공휴일은 반영되지 않음)
+        SettlementPeriod period = SettlementPeriodCalculator.calculate(
+                platform, transaction.transactionDate(), Collections.emptySet());
         List<WorkLog> logsInPeriod = findConfirmedLogsInPeriod(jobId, period);
         long expectedAmount = logsInPeriod.stream()
                 .mapToLong(log -> log.getEstimatedIncome() == null ? 0L : log.getEstimatedIncome())
