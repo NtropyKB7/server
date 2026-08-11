@@ -240,5 +240,14 @@ class LocalAccountQueryClientTest {
         ) {
             return List.of();
         }
+
+        @Override
+        public List<Long> findValidTransactionIds(
+                Long userId,
+                String yearMonth,
+                List<Long> transactionIds
+        ) {
+            return List.of();
+        }
     }
 }

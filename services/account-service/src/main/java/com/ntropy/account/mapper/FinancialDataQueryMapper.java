@@ -39,4 +39,13 @@ public interface FinancialDataQueryMapper {
             @Param("userId") Long userId,
             @Param("yearMonth") String yearMonth
     );
+
+    /**
+     * 주어진 거래 ID 중, 해당 사용자·연월 기준 분류 대상 조건을 실제로 만족하는 ID만 반환합니다.
+     */
+    List<Long> findValidTransactionIds(
+            @Param("userId") Long userId,
+            @Param("yearMonth") String yearMonth,
+            @Param("transactionIds") List<Long> transactionIds
+    );
 }
