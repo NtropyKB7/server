@@ -194,6 +194,58 @@ class SettlementServiceTest {
         assertEquals(1, settlementMapper.findAll().size());
     }
 
+    @Test
+    @DisplayName("ON_DEMAND 플랫폼 거래는 근무일지 매칭 없이 해당 잡으로 정산 처리된다")
+    void processSettlement_onDemandPlatform_settlesToJobWithoutTouchingWorkLog() {
+        Long onDemandPlatformId = 20L;
+        platformMapper.seed(Platform.builder()
+                .platformId(onDemandPlatformId)
+                .depositName("카카오모빌리티")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("ON_DEMAND")
+                .build());
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(JOB_ID).platformId(onDemandPlatformId).build());
+        // WorkLog 확정 시점에 이미 WorkLogService가 즉시 COMPLETED로 처리해뒀다고 가정 - 이 배치가
+        // 근무일지를 다시 참조/변경하지 않는지가 이 테스트의 핵심이다.
+        WorkLog alreadyCompletedLog = workLog(PERIOD_DATE, "CONFIRMED", 50_000L);
+        alreadyCompletedLog.setSettlementStatus(SettlementStatus.COMPLETED);
+        workLogMapper.insert(alreadyCompletedLog);
+        incomingTransactionQueryClient.transactions = List.of(
+                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "카카오모빌리티", BigDecimal.valueOf(120_000L))
+        );
+
+        service.processSettlement(USER_ID, PROCESS_DATE);
+
+        List<Settlement> settlements = settlementMapper.findAll();
+        assertEquals(1, settlements.size());
+        Settlement settlement = settlements.get(0);
+        assertEquals(SettlementMatchStatus.MATCHED, settlement.getStatus());
+        assertEquals(JOB_ID, settlement.getJobId());
+        assertEquals(120_000L, settlement.getActualAmount());
+        assertEquals(PROCESS_DATE, settlement.getPeriodStart());
+        assertEquals(PROCESS_DATE, settlement.getPeriodEnd());
+        assertEquals(1L, settlement.getAccountTransactionId());
+        // 이 배치는 근무일지를 건드리지 않는다 - 이미 COMPLETED였던 상태 그대로 유지된다.
+        assertEquals(SettlementStatus.COMPLETED, workLogMapper.findById(alreadyCompletedLog.getLogId()).getSettlementStatus());
+    }
+
+    @Test
+    @DisplayName("isOnDemandJob은 매핑된 platform 중 ON_DEMAND가 있으면 true를 반환한다")
+    void isOnDemandJob_returnsTrueWhenMappedPlatformIsOnDemand() {
+        Long onDemandPlatformId = 30L;
+        platformMapper.seed(Platform.builder()
+                .platformId(onDemandPlatformId)
+                .depositName("티맵모빌리티")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("ON_DEMAND")
+                .build());
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(JOB_ID).platformId(onDemandPlatformId).build());
+
+        assertTrue(service.isOnDemandJob(JOB_ID));
+    }
+
     private static WorkLog workLog(LocalDate workDate, String status, long estimatedIncome) {
         return WorkLog.builder()
                 .userId(USER_ID)

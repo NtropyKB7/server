@@ -6,38 +6,69 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.client.IncomingTransactionQueryClient;
+import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.JobPlatformMapping;
+import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
+import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.mapper.InMemoryPlatformMapper;
+import com.ntropy.work.mapper.InMemorySettlementMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 
 class WorkLogServiceTest {
 
     private static final Long USER_ID = 1L;
     private static final LocalDate WORK_DATE = LocalDate.of(2026, 8, 3);
+    private static final Long ON_DEMAND_PLATFORM_ID = 900L;
 
     private InMemoryJobMapper jobMapper;
     private InMemoryWorkLogMapper workLogMapper;
+    private InMemoryJobPlatformMappingMapper jobPlatformMappingMapper;
+    private InMemorySettlementMapper settlementMapper;
     private WorkLogService workLogService;
 
     @BeforeEach
     void setUp() {
         jobMapper = new InMemoryJobMapper();
         workLogMapper = new InMemoryWorkLogMapper();
+        jobPlatformMappingMapper = new InMemoryJobPlatformMappingMapper();
+        settlementMapper = new InMemorySettlementMapper();
+        InMemoryPlatformMapper platformMapper = new InMemoryPlatformMapper();
+        platformMapper.seed(Platform.builder()
+                .platformId(ON_DEMAND_PLATFORM_ID)
+                .depositName("카카오모빌리티")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("ON_DEMAND")
+                .build());
         JobService jobService = new JobService(
                 jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
-        workLogService = new WorkLogService(workLogMapper, jobService);
+        SettlementService settlementService = new SettlementService(
+                new StubIncomingTransactionQueryClient(), platformMapper, jobMapper, jobPlatformMappingMapper,
+                workLogMapper, settlementMapper);
+        workLogService = new WorkLogService(workLogMapper, jobService, settlementService);
+    }
+
+    private static final class StubIncomingTransactionQueryClient implements IncomingTransactionQueryClient {
+        @Override
+        public List<NormalizedIncomingTransaction> findIncomingTransactions(
+                Long userId, LocalDate startDate, LocalDate endDate) {
+            return List.of();
+        }
     }
 
     private Job hourlyJob() {
@@ -68,6 +99,23 @@ class WorkLogServiceTest {
                 .isActive(true)
                 .build();
         jobMapper.seed(setJobId(job, 200L));
+        return job;
+    }
+
+    private Job onDemandJob() {
+        Job job = Job.builder()
+                .userId(USER_ID)
+                .categoryId(2L)
+                .jobName("카카오T대리")
+                .settlementType(SettlementType.HOURLY)
+                .hourlyWage(10000)
+                .isRegular(false)
+                .baseFatigue(5)
+                .isActive(true)
+                .build();
+        jobMapper.seed(setJobId(job, 300L));
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(ON_DEMAND_PLATFORM_ID).build());
         return job;
     }
 
@@ -286,6 +334,43 @@ class WorkLogServiceTest {
         workLogService.deleteWorkLog(USER_ID, plan.getLogId());
 
         assertThrows(ServiceException.class, () -> workLogService.findById(plan.getLogId()));
+    }
+
+    @Test
+    @DisplayName("ON_DEMAND 플랫폼 잡은 실적 등록 시 PENDING을 거치지 않고 즉시 정산 완료 처리되지만 SETTLEMENT는 생성하지 않는다")
+    void registerActual_onDemandPlatform_completesImmediatelyWithoutCreatingSettlement() {
+        Job job = onDemandJob();
+        WorkLog actual = planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0));
+        actual.setFatigue(4L);
+
+        WorkLog result = workLogService.registerActual(actual);
+
+        assertEquals(SettlementStatus.COMPLETED, result.getSettlementStatus());
+        assertEquals(0, settlementMapper.findAll().size());
+    }
+
+    @Test
+    @DisplayName("자동 정산 플랫폼 잡은 확정해도 SETTLEMENT가 즉시 생성되지 않는다")
+    void confirmWorkLog_autoPlatform_doesNotCreateSettlementImmediately() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+
+        workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        assertEquals(0, settlementMapper.findAll().size());
+    }
+
+    @Test
+    @DisplayName("ON_DEMAND 플랫폼 잡은 확정 시 즉시 정산 완료 처리되지만 SETTLEMENT는 나중에 실제 출금 거래로만 생긴다")
+    void confirmWorkLog_onDemandPlatform_completesImmediatelyWithoutCreatingSettlement() {
+        Job job = onDemandJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0)));
+
+        WorkLog result = workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        assertEquals("CONFIRMED", result.getStatus());
+        assertEquals(SettlementStatus.COMPLETED, result.getSettlementStatus());
+        assertEquals(0, settlementMapper.findAll().size());
     }
 
     @Test

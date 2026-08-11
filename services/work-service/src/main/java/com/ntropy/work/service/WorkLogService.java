@@ -26,6 +26,7 @@ public class WorkLogService {
 
     private final WorkLogMapper workLogMapper;
     private final JobService jobService;
+    private final SettlementService settlementService;
 
     /**
      * 근무 계획 등록. fatigue 미입력 시 job.baseFatigue를 기본값으로 채운다.
@@ -63,7 +64,8 @@ public class WorkLogService {
         workLog.setEstimatedIncome(
                 calculateEstimatedIncome(job, workLog.getStartTime(), workLog.getEndTime(), workLog.getTaskCount()));
         workLog.setStatus(STATUS_CONFIRMED);
-        workLog.setSettlementStatus(SettlementStatus.PENDING);
+        workLog.setSettlementStatus(settlementService.isOnDemandJob(workLog.getJobId())
+                ? SettlementStatus.COMPLETED : SettlementStatus.PENDING);
 
         workLogMapper.insert(workLog);
         return workLog;
@@ -114,7 +116,8 @@ public class WorkLogService {
         existing.setEstimatedIncome(
                 calculateEstimatedIncome(job, existing.getStartTime(), existing.getEndTime(), existing.getTaskCount()));
         existing.setStatus(STATUS_CONFIRMED);
-        existing.setSettlementStatus(SettlementStatus.PENDING);
+        existing.setSettlementStatus(settlementService.isOnDemandJob(existing.getJobId())
+                ? SettlementStatus.COMPLETED : SettlementStatus.PENDING);
 
         workLogMapper.update(existing);
         return existing;

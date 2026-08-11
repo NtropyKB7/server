@@ -36,6 +36,11 @@ import lombok.RequiredArgsConstructor;
  * <p>매칭되지 않은(UNMATCHED) 거래도 버리지 않고, 같은 날짜에 들어온 것들을 합산해
  * status=UNMATCHED(job_id=null) 행 하나로 저장한다. 한 플랫폼에 회원 잡이 여러 개
  * 매핑되는 경우(AMBIGUOUS)는 없다고 가정하고 별도로 다루지 않는다.</p>
+ *
+ * <p>ON_DEMAND(포인트 적립 후 사용자가 임의 시점에 출금 신청) platform은 실제 입금액이
+ * 특정 근무일과 대응되지 않으므로, 매칭돼도 WorkLog는 건드리지 않고 해당 잡으로 SETTLEMENT만
+ * 남긴다. WorkLog.settlementStatus는 확정(CONFIRMED) 시점에 WorkLogService가 이미
+ * 즉시 COMPLETED로 처리한다 - 이 배치와는 독립적이다.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +52,13 @@ public class SettlementService {
     private final JobPlatformMappingMapper jobPlatformMappingMapper;
     private final WorkLogMapper workLogMapper;
     private final SettlementMapper settlementMapper;
+
+    /** 이 잡에 매핑된 platform 중 ON_DEMAND(포인트 적립 후 사용자가 출금 신청하는 방식)가 있는지. */
+    public boolean isOnDemandJob(Long jobId) {
+        return jobPlatformMappingMapper.findByJobId(jobId).stream()
+                .map(mapping -> platformMapper.findById(mapping.getPlatformId()))
+                .anyMatch(platform -> "ON_DEMAND".equals(platform.getSettlementTriggerType()));
+    }
 
     public void processSettlement(Long userId, LocalDate processDate) {
         List<NormalizedIncomingTransaction> transactions =
@@ -88,6 +100,11 @@ public class SettlementService {
             return true;
         }
 
+        if ("ON_DEMAND".equals(platform.getSettlementTriggerType())) {
+            saveOnDemandSettlement(userId, jobId, transaction);
+            return true;
+        }
+
         SettlementPeriod period = SettlementPeriodCalculator.calculate(platform, transaction.transactionDate());
         List<WorkLog> logsInPeriod = findConfirmedLogsInPeriod(jobId, period);
         long expectedAmount = logsInPeriod.stream()
@@ -114,6 +131,29 @@ public class SettlementService {
             workLogMapper.update(log);
         }
         return true;
+    }
+
+    /**
+     * ON_DEMAND는 실제 입금액이 특정 근무일과 대응되지 않으므로(사용자가 임의 시점에 임의
+     * 금액을 출금 신청) 근무일지는 건드리지 않고, 해당 잡으로만 SETTLEMENT를 남긴다.
+     * WorkLog.settlementStatus는 이미 확정(CONFIRMED) 시점에 WorkLogService가 즉시
+     * COMPLETED로 처리해뒀다 (이 메서드와 독립적).
+     */
+    private void saveOnDemandSettlement(Long userId, Long jobId, NormalizedIncomingTransaction transaction) {
+        Settlement settlement = Settlement.builder()
+                .userId(userId)
+                .status(SettlementMatchStatus.MATCHED)
+                .jobId(jobId)
+                .periodStart(transaction.transactionDate())
+                .periodEnd(transaction.transactionDate())
+                .depositDate(transaction.transactionDate())
+                .expectedAmount(0L)
+                .actualAmount(transaction.amount().longValueExact())
+                .transactionCount(1)
+                .accountTransactionId(transaction.transactionId())
+                .matchedAt(LocalDateTime.now())
+                .build();
+        settlementMapper.insert(settlement);
     }
 
     /**

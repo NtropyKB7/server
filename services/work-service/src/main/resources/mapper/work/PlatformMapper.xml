@@ -8,28 +8,32 @@
         <result property="platformName" column="platform_name"/>
         <result property="depositName" column="deposit_name"/>
         <result property="settlementCycle" column="settlement_cycle"/>
+        <result property="settlementTriggerType" column="settlement_trigger_type"/>
         <result property="settlementOffsetDay" column="settlement_offset_day"/>
+        <result property="settlementOffsetUnit" column="settlement_offset_unit"/>
         <result property="settlementDayOfWeek" column="settlement_day_of_week"/>
         <result property="settlementDayOfMonth" column="settlement_day_of_month"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.ntropy.work.domain.entity.Platform">
         INSERT INTO PLATFORM (platform_id, category_id, platform_name, deposit_name, settlement_cycle,
-                               settlement_offset_day, settlement_day_of_week, settlement_day_of_month)
+                               settlement_trigger_type, settlement_offset_day, settlement_offset_unit,
+                               settlement_day_of_week, settlement_day_of_month)
         VALUES (#{platformId}, #{categoryId}, #{platformName}, #{depositName}, #{settlementCycle},
-                #{settlementOffsetDay}, #{settlementDayOfWeek}, #{settlementDayOfMonth})
+                #{settlementTriggerType}, #{settlementOffsetDay}, #{settlementOffsetUnit},
+                #{settlementDayOfWeek}, #{settlementDayOfMonth})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="platformResultMap">
-        SELECT platform_id, category_id, platform_name, deposit_name, settlement_cycle,
-               settlement_offset_day, settlement_day_of_week, settlement_day_of_month
+        SELECT platform_id, category_id, platform_name, deposit_name, settlement_cycle, settlement_trigger_type,
+               settlement_offset_day, settlement_offset_unit, settlement_day_of_week, settlement_day_of_month
         FROM PLATFORM
         WHERE platform_id = #{platformId}
     </select>
 
     <select id="findAll" resultMap="platformResultMap">
-        SELECT platform_id, category_id, platform_name, deposit_name, settlement_cycle,
-               settlement_offset_day, settlement_day_of_week, settlement_day_of_month
+        SELECT platform_id, category_id, platform_name, deposit_name, settlement_cycle, settlement_trigger_type,
+               settlement_offset_day, settlement_offset_unit, settlement_day_of_week, settlement_day_of_month
         FROM PLATFORM
     </select>
 
@@ -39,7 +43,9 @@
             platform_name = #{platformName},
             deposit_name = #{depositName},
             settlement_cycle = #{settlementCycle},
+            settlement_trigger_type = #{settlementTriggerType},
             settlement_offset_day = #{settlementOffsetDay},
+            settlement_offset_unit = #{settlementOffsetUnit},
             settlement_day_of_week = #{settlementDayOfWeek},
             settlement_day_of_month = #{settlementDayOfMonth}
         WHERE platform_id = #{platformId}

@@ -19,7 +19,9 @@ CREATE TABLE `PLATFORM` (
 	`platform_name`	VARCHAR(50)	NOT NULL	COMMENT '플랫폼명 (배달의민족/카카오T대리 등)',
 	`deposit_name`	VARCHAR(100)	NOT NULL	COMMENT '입금 거래내역 대조용 입금처명',
 	`settlement_cycle`	VARCHAR(20)	NOT NULL	COMMENT '정산주기 (DAILY/WEEKLY/MONTHLY)',
-	`settlement_offset_day`	INT	NULL	COMMENT 'DAILY 전용: 정산까지 며칠 (달력일 기준, 예: 익일=1)',
+	`settlement_trigger_type`	VARCHAR(20)	NOT NULL	DEFAULT 'AUTO'	COMMENT '정산 트리거 방식: AUTO(플랫폼이 주기에 따라 자동 입금)/ON_DEMAND(포인트 적립 후 사용자가 출금 신청해야 계좌 입금 - 실거래 매칭 불가, 확정 시점에 즉시 정산완료 처리)',
+	`settlement_offset_day`	INT	NULL	COMMENT '정산 기간 종료일로부터 입금일까지 며칠인지 (DAILY/WEEKLY 공용)',
+	`settlement_offset_unit`	VARCHAR(20)	NOT NULL	DEFAULT 'CALENDAR_DAY'	COMMENT 'settlement_offset_day의 단위: CALENDAR_DAY(달력일)/BUSINESS_DAY(영업일). WEEKLY/MONTHLY 요일·일자 고정형은 미사용(기본값)',
 	`settlement_day_of_week`	VARCHAR(20)	NULL	COMMENT 'WEEKLY 전용: MON~SUN',
 	`settlement_day_of_month`	INT	NULL	COMMENT 'MONTHLY 전용: 1~31'
 );
