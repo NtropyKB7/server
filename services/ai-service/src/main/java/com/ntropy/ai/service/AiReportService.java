@@ -8,6 +8,8 @@ import com.ntropy.ai.mapper.AiReportMapper;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 /**
@@ -95,6 +97,7 @@ public class AiReportService {
      *
      * @param aiReport 저장 또는 갱신할 AI 리포트 객체
      */
+    @Transactional
     public void upsert(AiReport aiReport) {
         if (aiReport == null) {
             throw new ServiceException(
