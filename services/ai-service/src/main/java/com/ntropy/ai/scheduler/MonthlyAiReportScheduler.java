@@ -23,14 +23,14 @@ public class MonthlyAiReportScheduler {
     private final MonthlyAiReportOrchestrationService orchestrationService;
 
     /**
-     * 매월 1일 자정, 한국 시간 기준으로 실행됩니다.
+     * 매월 1일 새벽 2시, 한국 시간 기준으로 실행됩니다.
      *
      * 기본 크론 표현식:
      * 초 분 시 일 월 요일
-     * 0  0  0  1  *  ?
+     * 0  0  2  1  *  ?
      */
     @Scheduled(
-            cron = "${ai-report.scheduler.monthly-cron:0 0 0 1 * ?}",
+            cron = "${ai-report.scheduler.monthly-cron:0 0 2 1 * ?}",
             zone = "Asia/Seoul"
     )
     public void runMonthlyAiReportBatch() {
