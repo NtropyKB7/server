@@ -35,6 +35,7 @@ public class RootConfig {
         config.setUsername(System.getenv("DB_USERNAME"));
         config.setPassword(System.getenv("DB_PASSWORD"));
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        config.setConnectionInitSql("SET time_zone = '+09:00'");
         return new HikariDataSource(config);
     }
 

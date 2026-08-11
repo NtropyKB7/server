@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.FinancialCommitmentMapper">
+
+    <!--
+        적금 계좌(deposit_type_code=12)와, 있다면 가장 최근 INSTALLMENT 거래 1건을 함께 반환한다.
+        이력이 없는 계좌도 expectedAmount=null로 결과에 포함된다(INSUFFICIENT 판정은 Service 담당).
+    -->
+    <select id="findSavingCommitmentCandidates"
+            resultType="com.ntropy.account.mapper.projection.SavingCommitmentCandidateRow">
+        SELECT account_row.account_id AS accountId,
+               account_row.account_name AS productName,
+               account_row.next_payment_date AS nextPaymentDate,
+               latest_tx.in_amount AS expectedAmount
+        FROM ACCOUNT account_row
+                 LEFT JOIN ACCOUNT_TRANSACTION latest_tx
+                           ON latest_tx.account_transaction_id = (
+                               SELECT installment_row.account_transaction_id
+                               FROM ACCOUNT_TRANSACTION installment_row
+                               WHERE installment_row.account_id = account_row.account_id
+                                 AND installment_row.transaction_category = 'INSTALLMENT'
+                               ORDER BY installment_row.tran_date DESC,
+                                        installment_row.tran_time DESC,
+                                        installment_row.account_transaction_id DESC
+                               LIMIT 1
+                           )
+        WHERE account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+          AND account_row.currency_code = 'KRW'
+          AND account_row.deposit_type_code = '12'
+    </select>
+
+    <!--
+        대출 계좌(deposit_type_code=40, account_group=LOAN)와, 있다면 가장 최근 "정상 상환" LOAN 거래 1건을 함께 반환한다.
+        신규·실행·대출실행·증액 거래는 정상 상환 후보에서 제외한다(부분 문자열 포함 기준).
+        거래구분명이 null/blank이면 제외 사유가 없는 것으로 보고 후보로 인정한다.
+    -->
+    <select id="findLoanCommitmentCandidates"
+            resultType="com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow">
+        SELECT account_row.account_id AS accountId,
+               account_row.account_name AS productName,
+               account_row.balance AS outstandingBalance,
+               account_row.next_payment_date AS nextPaymentDate,
+               latest_tx.out_amount AS expectedAmount
+        FROM ACCOUNT account_row
+                 LEFT JOIN ACCOUNT_TRANSACTION latest_tx
+                           ON latest_tx.account_transaction_id = (
+                               SELECT loan_row.account_transaction_id
+                               FROM ACCOUNT_TRANSACTION loan_row
+                               WHERE loan_row.account_id = account_row.account_id
+                                 AND loan_row.transaction_category = 'LOAN'
+                                 AND loan_row.out_amount > 0
+                                 AND (
+                                       loan_row.loan_transaction_type_name IS NULL
+                                       OR (
+                                           loan_row.loan_transaction_type_name NOT LIKE '%신규%'
+                                           AND loan_row.loan_transaction_type_name NOT LIKE '%실행%'
+                                           AND loan_row.loan_transaction_type_name NOT LIKE '%대출실행%'
+                                           AND loan_row.loan_transaction_type_name NOT LIKE '%증액%'
+                                           )
+                                   )
+                               ORDER BY loan_row.tran_date DESC,
+                                        loan_row.tran_time DESC,
+                                        loan_row.account_transaction_id DESC
+                               LIMIT 1
+                           )
+        WHERE account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+          AND account_row.currency_code = 'KRW'
+          AND account_row.deposit_type_code = '40'
+          AND account_row.account_group = 'LOAN'
+    </select>
+
+    <!--
+        수시입출 계좌(deposit_type_code=11)의 관측 기간 내 일반 출금 거래를 반환한다.
+        반복 보험료 그룹핑·판정은 은행별 desc 필드 정규화가 필요해 Service에서 수행한다.
+    -->
+    <select id="findInsuranceOutflowCandidates"
+            resultType="com.ntropy.account.mapper.projection.InsuranceOutflowRow">
+        SELECT account_row.account_id AS accountId,
+               transaction_row.tran_date AS tranDate,
+               transaction_row.out_amount AS outAmount,
+               transaction_row.desc1,
+               transaction_row.desc2,
+               transaction_row.desc3,
+               transaction_row.desc4
+        FROM ACCOUNT account_row
+                 INNER JOIN ACCOUNT_TRANSACTION transaction_row
+                            ON transaction_row.account_id = account_row.account_id
+        WHERE account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+          AND account_row.currency_code = 'KRW'
+          AND account_row.deposit_type_code = '11'
+          AND transaction_row.transaction_category = 'ORDINARY'
+          AND transaction_row.out_amount > 0
+          AND transaction_row.tran_date BETWEEN #{observationStartDate} AND #{observationEndDate}
+        ORDER BY account_row.account_id, transaction_row.tran_date
+    </select>
+</mapper>
