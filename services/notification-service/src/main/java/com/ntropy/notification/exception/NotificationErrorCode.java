@@ -7,9 +7,7 @@ import lombok.Getter;
 @Getter
 public enum NotificationErrorCode implements ServiceErrorCode {
 
-    NOTIFICATION_NOT_FOUND(404, "알림을 찾을 수 없습니다."),
-    NOTIFICATION_ACCESS_DENIED(403, "본인의 알림만 처리할 수 있습니다."),
-    DUPLICATE_EVENT(409, "이미 처리된 이벤트입니다.");
+    NOTIFICATION_NOT_FOUND(404, "알림을 찾을 수 없습니다.");
 
     private final int statusCode;
     private final String message;

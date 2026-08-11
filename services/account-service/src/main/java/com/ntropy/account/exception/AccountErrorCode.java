@@ -12,7 +12,8 @@ public enum AccountErrorCode implements ServiceErrorCode {
     BIRTH_DATE_REQUIRED(400, "생년월일이 필요합니다."),
     BIRTH_DATE_INVALID(400, "생년월일 형식이 올바르지 않습니다."),
     BIRTH_DATE_MISMATCH(400, "생년월일이 일치하지 않습니다."),
-    ACCOUNT_NOT_FOUND(404, "계좌를 찾을 수 없습니다.");
+    ACCOUNT_NOT_FOUND(404, "계좌를 찾을 수 없습니다."),
+    TRANSACTION_ANALYSIS_TARGET_INVALID(400, "요청한 거래 중 해당 사용자·연월의 분류 대상이 아닌 거래가 포함되어 있습니다.");
 
     private final int statusCode;
     private final String message;
