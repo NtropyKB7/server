@@ -92,6 +92,16 @@ public class DefenseModeService {
         return defenseMode;
     }
 
+    public List<DefenseMode> getCalendarPeriods(Long userId, LocalDate from, LocalDate to) {
+        if (userId == null || from == null || to == null) {
+            throw new ServiceException(DefenseErrorCode.INVALID_REQUEST);
+        }
+        if (to.isBefore(from)) {
+            throw new ServiceException(DefenseErrorCode.INVALID_PERIOD);
+        }
+        return defenseModeMapper.findCalendarPeriods(userId, from, to);
+    }
+
     public FixedExpenseCheckSummary getFixedExpenseCheck(DefenseMode defenseMode) {
         List<FinancialCommitmentSummary> commitments = financialCommitmentQueryClient.findFinancialCommitments(
                 defenseMode.getUserId(),

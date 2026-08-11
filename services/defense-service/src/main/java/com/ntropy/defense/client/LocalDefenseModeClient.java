@@ -5,6 +5,7 @@ import com.ntropy.common.client.DefenseModeQueryClient;
 import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
 import com.ntropy.common.dto.defense.summary.DefenseChecklistSummary;
+import com.ntropy.common.dto.defense.summary.DefenseCalendarPeriodSummary;
 import com.ntropy.common.dto.defense.summary.DefenseCauseSummary;
 import com.ntropy.common.dto.defense.summary.DefenseModeSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
@@ -12,11 +13,13 @@ import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
 import com.ntropy.common.dto.defense.summary.GrowthModeSummary;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseCause;
+import com.ntropy.defense.domain.DefenseModeStatus;
 import com.ntropy.defense.service.DefenseChecklistCatalog;
 import com.ntropy.defense.service.DefenseModeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,6 +55,18 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
                 "DISPLAY_ONLY",
                 "근무 추천과 자동 저축을 잠시 멈춘 상태입니다.");
         return toSummary(defenseMode, fixedExpenseCheck, expectedIncomeLoss, growthMode);
+    }
+
+    @Override
+    public List<DefenseCalendarPeriodSummary> getCalendarPeriods(Long userId, LocalDate from, LocalDate to) {
+        return defenseModeService.getCalendarPeriods(userId, from, to).stream()
+                .map(mode -> new DefenseCalendarPeriodSummary(
+                        mode.getDefenseId(),
+                        mode.getUnavailableStartDate(),
+                        mode.getStatus() == DefenseModeStatus.RELEASED
+                                ? mode.getReturnDate()
+                                : mode.getExpectedReturnDate()))
+                .collect(Collectors.toList());
     }
 
     @Override
