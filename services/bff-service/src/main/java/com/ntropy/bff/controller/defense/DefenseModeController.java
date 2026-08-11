@@ -4,6 +4,7 @@ import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.bff.dto.defense.request.DefenseModeEnterRequest;
 import com.ntropy.bff.dto.defense.request.DefenseModeReleaseRequest;
 import com.ntropy.bff.dto.defense.response.DefenseCausesResponse;
+import com.ntropy.bff.dto.defense.response.DefenseCalendarResponse;
 import com.ntropy.bff.dto.defense.response.DefenseModeResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.DefenseModeCommandClient;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.YearMonth;
 
 @Api(tags = "방어모드")
 @RestController
@@ -55,6 +58,19 @@ public class DefenseModeController {
     public ApiResponse<DefenseModeResponse> getCurrent(@ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
         return ApiResponse.success(DefenseModeResponse.from(defenseModeQueryClient.getCurrent(userId)));
+    }
+
+    @ApiOperation("캘린더용 방어모드 기간 조회")
+    @GetMapping("/calendar")
+    public ApiResponse<DefenseCalendarResponse> getCalendar(
+            @ApiParam(hidden = true) Authentication authentication,
+            @RequestParam int year,
+            @RequestParam int month) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        YearMonth targetMonth = YearMonth.of(year, month);
+        return ApiResponse.success(new DefenseCalendarResponse(
+                defenseModeQueryClient.getCalendarPeriods(
+                        userId, targetMonth.atDay(1), targetMonth.atEndOfMonth())));
     }
 
     @ApiOperation("방어모드 해제")

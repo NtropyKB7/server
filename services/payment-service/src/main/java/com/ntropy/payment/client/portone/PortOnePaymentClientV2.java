@@ -78,15 +78,6 @@ public class PortOnePaymentClientV2 implements PortOnePaymentClient {
         return verifyPayment(paymentId);
     }
 
-    /**
-     * ⚠️⚠️ 아직 라이브로 검증 안 됨 ⚠️⚠️
-     * 엔드포인트(POST /payments/{id}/schedule, 단수형 "schedule"), 요청 바디가
-     * payment 객체로 한 번 감싸지는 구조({ payment: {...}, timeToPay })는 포트원
-     * 공식 문서(PG별 연동 가이드)에서 확인한 형태를 그대로 따랐다. 다만 그 문서 예시는
-     * billing_key처럼 snake_case였는데, 이미 라이브로 검증된 payWithBillingKey가
-     * camelCase(billingKey)로 정상 동작했던 것과 일관되게 camelCase로 짰다 -
-     * 실제로 맞는지는 아직 안 찍어봤다. 실제 예약 걸어보고 안 되면 이 메서드만 고치면 된다.
-     */
     @Override
     public boolean schedulePayment(String paymentId, String billingKey, long amount, String orderName, LocalDateTime timeToPay) {
         HttpHeaders headers = new HttpHeaders();

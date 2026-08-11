@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,6 +155,21 @@ class DefenseModeServiceTest {
             return data.values().stream()
                     .filter(mode -> userId.equals(mode.getUserId()) && mode.getStatus() == DefenseModeStatus.ACTIVE)
                     .findFirst().orElse(null);
+        }
+
+        @Override
+        public List<DefenseMode> findCalendarPeriods(Long userId, LocalDate from, LocalDate to) {
+            return data.values().stream()
+                    .filter(mode -> userId.equals(mode.getUserId()))
+                    .filter(mode -> !mode.getUnavailableStartDate().isAfter(to))
+                    .filter(mode -> {
+                        LocalDate endDate = mode.getStatus() == DefenseModeStatus.RELEASED
+                                ? mode.getReturnDate()
+                                : mode.getExpectedReturnDate();
+                        return endDate != null && !endDate.isBefore(from);
+                    })
+                    .sorted(java.util.Comparator.comparing(DefenseMode::getUnavailableStartDate))
+                    .collect(java.util.stream.Collectors.toList());
         }
 
         @Override

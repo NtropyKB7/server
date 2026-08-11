@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS DEFENSE_MODE
 (
     defense_id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id               BIGINT      NOT NULL COMMENT 'user-service USER 참조 (크로스 도메인 FK 없음)',
-    cause_code            VARCHAR(30) NOT NULL COMMENT 'ACCIDENT_INJURY, ILLNESS, PLATFORM_RESTRICTION, EQUIPMENT_FAILURE, FAMILY_CARE_CRISIS, OTHER',
+    cause_code            VARCHAR(30) NOT NULL COMMENT 'ACCIDENT_INJURY, ILLNESS, PHYSICAL_RECOVERY, PLATFORM_RESTRICTION, FAMILY_CARE_CRISIS, OTHER',
     unavailable_start_date DATE       NOT NULL COMMENT '근무불가 시작일',
     expected_return_date  DATE        NOT NULL COMMENT '예상 복귀일',
     return_date           DATE        NULL COMMENT '사용자가 선언한 실제 복귀일',
