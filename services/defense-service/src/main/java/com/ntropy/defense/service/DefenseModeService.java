@@ -196,7 +196,11 @@ public class DefenseModeService {
 
     private DefenseCause parseCause(String causeCode) {
         try {
-            return DefenseCause.valueOf(causeCode);
+            DefenseCause cause = DefenseCause.valueOf(causeCode);
+            if (!cause.isSelectable()) {
+                throw new ServiceException(DefenseErrorCode.INVALID_CAUSE);
+            }
+            return cause;
         } catch (IllegalArgumentException e) {
             throw new ServiceException(DefenseErrorCode.INVALID_CAUSE);
         }

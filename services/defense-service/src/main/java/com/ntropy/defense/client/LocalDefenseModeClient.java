@@ -31,6 +31,7 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
     @Override
     public List<DefenseCauseSummary> getCauses() {
         return java.util.Arrays.stream(DefenseCause.values())
+                .filter(DefenseCause::isSelectable)
                 .map(cause -> new DefenseCauseSummary(
                         cause.name(), cause.getCauseGroup(), cause.getCauseName(),
                         DefenseChecklistCatalog.findBy(cause).stream()
