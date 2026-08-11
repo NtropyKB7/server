@@ -7,14 +7,10 @@
 INSERT INTO `CATEGORY` (category_id, name) VALUES
 (1, '배달'),
 (2, '대리운전'),
-(3, '퀵서비스'),
-(4, '택배/물류 상하차'),
-(5, '가사·청소 도우미'),
-(6, '아르바이트'),
-(8, '콜센터·CS상담'),
-(9, '펫시터·돌봄'),
-(10, '콘텐츠 제작'),
-(11, '설문·리서치 참여');
+(3, '택배/물류 상하차'),
+(4, '가사·청소 도우미'),
+(5, '펫시터·돌봄'),
+(6, '콘텐츠 제작');
 
 -- deposit_name은 입금 거래내역과 대조되는 실제 정산처명 기준.
 -- category_id: 플랫폼이 속한 카테고리 FK (배달의민족/쿠팡이츠/요기요=배달, 카카오T대리=대리운전 등)
@@ -42,7 +38,7 @@ INSERT INTO `CATEGORY` (category_id, name) VALUES
 -- 입금처명이 "n.a."로 표시된 플랫폼(요기요라이더/티맵 대리/청소연구소/케어닥/펫플래닛)은
 --   운영사명 기준 추정치이며 실제 마이데이터 연동 후 확인 필요.
 -- 로지올은 실제로는 실시간 정산 + 온디맨드 출금 구조라 WEEKLY 모델과 안 맞아 시딩에서 제외함
--- 콜센터·CS상담(외주) 카테고리는 마땅한 매칭 플랫폼이 없어 시딩 보류
+-- category_id는 위 CATEGORY 6개 기준 (1배달/2대리운전/3택배·물류 상하차/4가사·청소 도우미/5펫시터·돌봄/6콘텐츠 제작)
 INSERT INTO `PLATFORM`
     (platform_id, category_id, platform_name, deposit_name, settlement_cycle, settlement_trigger_type,
      settlement_offset_day, settlement_offset_unit, settlement_day_of_week, settlement_day_of_month)
@@ -51,14 +47,14 @@ VALUES
 (2, 1, '쿠팡이츠 배달파트너', '쿠팡이츠정산', 'WEEKLY', 'AUTO', 3, 'BUSINESS_DAY', 'FRI', NULL),
 (3, 1, '요기요라이더', '위대한상상', 'WEEKLY', 'AUTO', 15, 'CALENDAR_DAY', 'MON', NULL),
 (4, 2, '카카오T대리', '카카오모빌리티', 'DAILY', 'ON_DEMAND', 1, 'CALENDAR_DAY', NULL, NULL),
-(5, 10, '유튜브', 'GOOGLE', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 21),
-(7, 4, '쿠팡플렉스', '쿠팡-용역비', 'WEEKLY', 'AUTO', 4, 'CALENDAR_DAY', 'FRI', NULL),
+(5, 6, '유튜브', 'GOOGLE', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 21),
+(7, 3, '쿠팡플렉스', '쿠팡-용역비', 'WEEKLY', 'AUTO', 4, 'CALENDAR_DAY', 'FRI', NULL),
 (8, 2, '티맵 대리', '티맵모빌리티', 'DAILY', 'ON_DEMAND', 1, 'CALENDAR_DAY', NULL, NULL),
-(9, 4, 'CJ대한통운 상하차', 'CJ대한통운', 'DAILY', 'AUTO', 1, 'CALENDAR_DAY', NULL, NULL),
-(10, 4, '로젠택배', '로젠택배', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 5),
-(11, 5, '청소연구소(청연)', '생활연구소', 'DAILY', 'AUTO', 1, 'CALENDAR_DAY', NULL, NULL),
-(12, 5, '미소', '유한회사미소', 'DAILY', 'AUTO', 1, 'CALENDAR_DAY', NULL, NULL),
-(13, 9, '케어닥', '케어닥', 'WEEKLY', 'AUTO', 1, 'CALENDAR_DAY', 'MON', NULL),
-(14, 9, '펫플래닛', '펫피플', 'WEEKLY', 'AUTO', 3, 'CALENDAR_DAY', 'WED', NULL),
-(15, 10, '틱톡', 'PAYPAL', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 15),
-(16, 10, '네이버TV', '네이버', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 6);
+(9, 3, 'CJ대한통운 상하차', 'CJ대한통운', 'DAILY', 'AUTO', 1, 'CALENDAR_DAY', NULL, NULL),
+(10, 3, '로젠택배', '로젠택배', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 5),
+(11, 4, '청소연구소(청연)', '생활연구소', 'DAILY', 'AUTO', 1, 'CALENDAR_DAY', NULL, NULL),
+(12, 4, '미소', '유한회사미소', 'DAILY', 'AUTO', 1, 'CALENDAR_DAY', NULL, NULL),
+(13, 5, '케어닥', '케어닥', 'WEEKLY', 'AUTO', 1, 'CALENDAR_DAY', 'MON', NULL),
+(14, 5, '펫플래닛', '펫피플', 'WEEKLY', 'AUTO', 3, 'CALENDAR_DAY', 'WED', NULL),
+(15, 6, '틱톡', 'PAYPAL', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 15),
+(16, 6, '네이버TV', '네이버', 'MONTHLY', 'AUTO', NULL, 'CALENDAR_DAY', NULL, 6);

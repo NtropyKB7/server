@@ -6,7 +6,7 @@
 -- ============================================================
 
 -- user-service
--- SOURCE services/user-service/src/main/resources/db/user-service-schema.sql;
+SOURCE services/user-service/src/main/resources/db/user-service-schema.sql;
 
 -- account-service
 SOURCE services/account-service/src/main/resources/db/account-service-schema.sql;
@@ -16,7 +16,7 @@ SOURCE services/work-service/src/main/resources/db/work-service-schema.sql;
 SOURCE services/work-service/src/main/resources/db/work-service-seed.sql;
 
 -- diagnosis-service
--- SOURCE services/diagnosis-service/src/main/resources/db/diagnosis-service-schema.sql;
+SOURCE services/diagnosis-service/src/main/resources/db/diagnosis-service-schema.sql;
 
 -- defense-service
 SOURCE services/defense-service/src/main/resources/db/defense-service-schema.sql;
