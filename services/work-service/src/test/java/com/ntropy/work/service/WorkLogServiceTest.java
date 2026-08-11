@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.exception.ServiceException;
@@ -61,9 +62,10 @@ class WorkLogServiceTest {
         );
         HolidayService holidayService =
                 new HolidayService(new HolidayApiClient(null, null), new InMemoryHolidayMapper());
+        ActiveUserQueryClient activeUserQueryClient = List::of;
         SettlementService settlementService = new SettlementService(
-                new StubIncomingTransactionQueryClient(), platformMapper, jobMapper, jobPlatformMappingMapper,
-                workLogMapper, settlementMapper, holidayService);
+                new StubIncomingTransactionQueryClient(), activeUserQueryClient, platformMapper, jobMapper,
+                jobPlatformMappingMapper, workLogMapper, settlementMapper, holidayService);
         workLogService = new WorkLogService(workLogMapper, jobService, settlementService);
     }
 

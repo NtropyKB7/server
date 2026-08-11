@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.work.client.holiday.HolidayApiClient;
@@ -47,6 +48,7 @@ class SettlementServiceTest {
     private final InMemoryHolidayMapper holidayMapperForTest = new InMemoryHolidayMapper();
     private final HolidayService holidayService =
             new HolidayService(new HolidayApiClient(null, null), holidayMapperForTest);
+    private final StubActiveUserQueryClient activeUserQueryClient = new StubActiveUserQueryClient();
     private StubIncomingTransactionQueryClient incomingTransactionQueryClient;
     private SettlementService service;
 
@@ -61,8 +63,8 @@ class SettlementServiceTest {
         jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).build());
         incomingTransactionQueryClient = new StubIncomingTransactionQueryClient();
         service = new SettlementService(
-                incomingTransactionQueryClient, platformMapper, jobMapper, jobPlatformMappingMapper,
-                workLogMapper, settlementMapper, holidayService);
+                incomingTransactionQueryClient, activeUserQueryClient, platformMapper, jobMapper,
+                jobPlatformMappingMapper, workLogMapper, settlementMapper, holidayService);
     }
 
     @Test
@@ -289,6 +291,35 @@ class SettlementServiceTest {
         assertEquals(SettlementStatus.NONE, workLogMapper.findById(fridayLog.getLogId()).getSettlementStatus());
     }
 
+    @Test
+    @DisplayName("runDailyBatch는 활성 사용자 전원에 대해 최근 BACKFILL_DAYS일씩 정산을 재확인한다")
+    void runDailyBatch_processesActiveUsersAndRecentDays() {
+        jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
+        activeUserQueryClient.userIds = List.of(USER_ID);
+        LocalDate today = LocalDate.now();
+        WorkLog logForYesterday = workLog(today.minusDays(2), "CONFIRMED", 48_000L); // offset=1이라 today-1 입금 시 today-2가 근무일
+        workLogMapper.insert(logForYesterday);
+        incomingTransactionQueryClient.transactions = List.of(
+                new NormalizedIncomingTransaction(555L, today.minusDays(1), LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(48_000L))
+        );
+
+        service.runDailyBatch();
+
+        List<Settlement> settlements = settlementMapper.findAll();
+        assertEquals(1, settlements.size());
+        assertEquals(555L, settlements.get(0).getAccountTransactionId());
+    }
+
+    @Test
+    @DisplayName("runDailyBatch는 활성 사용자가 없으면 아무것도 처리하지 않는다")
+    void runDailyBatch_noActiveUsers_doesNothing() {
+        activeUserQueryClient.userIds = List.of();
+
+        service.runDailyBatch();
+
+        assertEquals(0, settlementMapper.findAll().size());
+    }
+
     private static WorkLog workLog(LocalDate workDate, String status, long estimatedIncome) {
         return WorkLog.builder()
                 .userId(USER_ID)
@@ -313,6 +344,15 @@ class SettlementServiceTest {
         public List<NormalizedIncomingTransaction> findIncomingTransactions(
                 Long userId, LocalDate startDate, LocalDate endDate) {
             return transactions;
+        }
+    }
+
+    private static final class StubActiveUserQueryClient implements ActiveUserQueryClient {
+        private List<Long> userIds = List.of();
+
+        @Override
+        public List<Long> findActiveUserIds() {
+            return userIds;
         }
     }
 }
