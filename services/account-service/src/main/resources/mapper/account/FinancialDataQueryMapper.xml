@@ -93,6 +93,14 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <sql id="classificationTargetFilter">
+        account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+          AND transaction_row.transaction_category = 'ORDINARY'
+          AND transaction_row.out_amount > 0
+          AND DATE_FORMAT(transaction_row.tran_date, '%Y-%m') = #{yearMonth}
+    </sql>
+
     <select id="findClassificationTargets"
             resultType="com.ntropy.common.dto.account.ClassificationTargetTransaction">
 
@@ -113,14 +121,22 @@
         FROM ACCOUNT account_row
             INNER JOIN ACCOUNT_TRANSACTION transaction_row
         ON transaction_row.account_id = account_row.account_id
-        WHERE account_row.user_id = #{userId}
-          AND account_row.status = 'ACTIVE'
-          AND transaction_row.transaction_category = 'ORDINARY'
-          AND transaction_row.out_amount > 0
-          AND DATE_FORMAT(transaction_row.tran_date, '%Y-%m') = #{yearMonth}
+        WHERE <include refid="classificationTargetFilter"/>
         ORDER BY
             transaction_row.tran_date,
             transaction_row.tran_time,
             transaction_row.account_transaction_id
+    </select>
+
+    <select id="findValidTransactionIds" resultType="java.lang.Long">
+        SELECT transaction_row.account_transaction_id
+        FROM ACCOUNT account_row
+            INNER JOIN ACCOUNT_TRANSACTION transaction_row
+        ON transaction_row.account_id = account_row.account_id
+        WHERE <include refid="classificationTargetFilter"/>
+          AND transaction_row.account_transaction_id IN
+          <foreach collection="transactionIds" item="id" open="(" separator="," close=")">
+              #{id}
+          </foreach>
     </select>
 </mapper>

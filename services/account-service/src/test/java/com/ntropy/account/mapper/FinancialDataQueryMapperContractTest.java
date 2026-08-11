@@ -37,6 +37,33 @@ class FinancialDataQueryMapperContractTest {
         assertFalse(pageQuery.contains("EXISTS"));
     }
 
+    @Test
+    void classificationTargetFilterCoversOwnershipAndActiveOrdinaryOutflowConditions() throws IOException {
+        String filter = sqlFragmentBody(readMapper(), "classificationTargetFilter");
+
+        assertTrue(filter.contains("account_row.user_id = #{userId}"));
+        assertTrue(filter.contains("account_row.status = 'ACTIVE'"));
+        assertTrue(filter.contains("transaction_row.transaction_category = 'ORDINARY'"));
+        assertTrue(filter.contains("transaction_row.out_amount > 0"));
+        assertTrue(filter.contains("DATE_FORMAT(transaction_row.tran_date, '%Y-%m') = #{yearMonth}"));
+    }
+
+    @Test
+    void classificationTargetsAndValidTransactionIdsShareTheSameFilter() throws IOException {
+        String targetQuery = selectBody(readMapper(), "findClassificationTargets");
+        String validationQuery = selectBody(readMapper(), "findValidTransactionIds");
+
+        assertTrue(targetQuery.contains("<include refid=\"classificationTargetFilter\"/>"));
+        assertTrue(validationQuery.contains("<include refid=\"classificationTargetFilter\"/>"));
+        assertTrue(validationQuery.contains("transaction_row.account_transaction_id IN"));
+    }
+
+    private static String sqlFragmentBody(String mapper, String sqlId) {
+        int start = mapper.indexOf("<sql id=\"" + sqlId + "\"");
+        int end = mapper.indexOf("</sql>", start);
+        return mapper.substring(start, end);
+    }
+
     private static String selectBody(String mapper, String selectId) {
         int start = mapper.indexOf("<select id=\"" + selectId + "\"");
         int end = mapper.indexOf("</select>", start);
