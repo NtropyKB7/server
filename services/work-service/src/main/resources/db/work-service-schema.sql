@@ -98,6 +98,13 @@ CREATE TABLE `SAVING_GOAL` (
 	PRIMARY KEY (`saving_goal_id`)
 );
 
+-- 9. HOLIDAY (특일 정보 API로 조회한 공휴일 캐시 - 연도 단위로 채워짐)
+CREATE TABLE `HOLIDAY` (
+	`holiday_date`	DATE	NOT NULL,
+	`name`	VARCHAR(50)	NOT NULL	COMMENT '공휴일명 (예: 신정, 설날)',
+	PRIMARY KEY (`holiday_date`)
+);
+
 -- ============================================================
 -- Primary Key
 -- ============================================================

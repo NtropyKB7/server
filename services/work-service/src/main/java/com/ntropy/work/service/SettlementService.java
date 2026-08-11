@@ -2,8 +2,8 @@ package com.ntropy.work.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -42,10 +42,18 @@ import lombok.RequiredArgsConstructor;
  * 특정 근무일과 대응되지 않으므로, 매칭돼도 WorkLog는 건드리지 않고 해당 잡으로 SETTLEMENT만
  * 남긴다. WorkLog.settlementStatus는 확정(CONFIRMED) 시점에 WorkLogService가 이미
  * 즉시 COMPLETED로 처리한다 - 이 배치와는 독립적이다.</p>
+ *
+ * <p>settlement_offset_unit이 BUSINESS_DAY인 platform(배민커넥트/쿠팡이츠 배달파트너)만
+ * HolidayService로 공휴일을 조회해 정산 기간 계산에 반영한다. CALENDAR_DAY 플랫폼은 공휴일
+ * 조회 자체를 안 해서 불필요한 DB 조회를 피한다.</p>
  */
 @Service
 @RequiredArgsConstructor
 public class SettlementService {
+
+    /** BUSINESS_DAY 역산 시 조회할 공휴일 범위 버퍼(일). offset이 커져도 여유 있게 잡음. */
+    private static final int HOLIDAY_LOOKBACK_DAYS = 30;
+    private static final String BUSINESS_DAY = "BUSINESS_DAY";
 
     private final IncomingTransactionQueryClient incomingTransactionQueryClient;
     private final PlatformMapper platformMapper;
@@ -53,6 +61,7 @@ public class SettlementService {
     private final JobPlatformMappingMapper jobPlatformMappingMapper;
     private final WorkLogMapper workLogMapper;
     private final SettlementMapper settlementMapper;
+    private final HolidayService holidayService;
 
     /** 이 잡에 매핑된 platform 중 ON_DEMAND(포인트 적립 후 사용자가 출금 신청하는 방식)가 있는지. */
     public boolean isOnDemandJob(Long jobId) {
@@ -106,10 +115,12 @@ public class SettlementService {
             return true;
         }
 
-        // TODO: 특일 정보 API 연동 + HOLIDAY 테이블 캐싱이 붙으면 실제 공휴일 Set으로 교체
-        //  (현재는 BUSINESS_DAY 플랫폼도 주말만 건너뛰고 공휴일은 반영되지 않음)
+        Set<LocalDate> holidays = BUSINESS_DAY.equals(platform.getSettlementOffsetUnit())
+                ? holidayService.getHolidays(
+                        transaction.transactionDate().minusDays(HOLIDAY_LOOKBACK_DAYS), transaction.transactionDate())
+                : Set.of();
         SettlementPeriod period = SettlementPeriodCalculator.calculate(
-                platform, transaction.transactionDate(), Collections.emptySet());
+                platform, transaction.transactionDate(), holidays);
         List<WorkLog> logsInPeriod = findConfirmedLogsInPeriod(jobId, period);
         long expectedAmount = logsInPeriod.stream()
                 .mapToLong(log -> log.getEstimatedIncome() == null ? 0L : log.getEstimatedIncome())

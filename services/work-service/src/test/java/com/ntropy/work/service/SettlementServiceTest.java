@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
+import com.ntropy.work.client.holiday.HolidayApiClient;
+import com.ntropy.work.domain.entity.Holiday;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
 import com.ntropy.work.domain.entity.Platform;
@@ -22,6 +24,7 @@ import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementMatchStatus;
 import com.ntropy.work.domain.enums.SettlementStatus;
+import com.ntropy.work.mapper.InMemoryHolidayMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryPlatformMapper;
@@ -41,6 +44,9 @@ class SettlementServiceTest {
     private final InMemoryJobPlatformMappingMapper jobPlatformMappingMapper = new InMemoryJobPlatformMappingMapper();
     private final InMemoryWorkLogMapper workLogMapper = new InMemoryWorkLogMapper();
     private final InMemorySettlementMapper settlementMapper = new InMemorySettlementMapper();
+    private final InMemoryHolidayMapper holidayMapperForTest = new InMemoryHolidayMapper();
+    private final HolidayService holidayService =
+            new HolidayService(new HolidayApiClient(null, null), holidayMapperForTest);
     private StubIncomingTransactionQueryClient incomingTransactionQueryClient;
     private SettlementService service;
 
@@ -56,7 +62,7 @@ class SettlementServiceTest {
         incomingTransactionQueryClient = new StubIncomingTransactionQueryClient();
         service = new SettlementService(
                 incomingTransactionQueryClient, platformMapper, jobMapper, jobPlatformMappingMapper,
-                workLogMapper, settlementMapper);
+                workLogMapper, settlementMapper, holidayService);
     }
 
     @Test
@@ -244,6 +250,43 @@ class SettlementServiceTest {
                 JobPlatformMapping.builder().jobId(JOB_ID).platformId(onDemandPlatformId).build());
 
         assertTrue(service.isOnDemandJob(JOB_ID));
+    }
+
+    @Test
+    @DisplayName("BUSINESS_DAY 플랫폼은 HolidayService에서 조회한 공휴일까지 건너뛰고 기간을 계산한다")
+    void processSettlement_businessDayPlatform_skipsInjectedHoliday() {
+        Long businessDayPlatformId = 40L;
+        LocalDate paymentDate = LocalDate.of(2026, 8, 17); // 월요일
+        LocalDate holiday = LocalDate.of(2026, 8, 14); // 금요일 - 공휴일로 주입
+        LocalDate expectedWorkDate = LocalDate.of(2026, 8, 13); // 목요일 - 공휴일까지 건너뛴 결과
+
+        platformMapper.seed(Platform.builder()
+                .platformId(businessDayPlatformId)
+                .depositName("배민커넥트테스트")
+                .settlementCycle("DAILY")
+                .settlementOffsetDay(1)
+                .settlementOffsetUnit("BUSINESS_DAY")
+                .build());
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(JOB_ID).platformId(businessDayPlatformId).build());
+        holidayMapperForTest.seed(Holiday.builder()
+                .holidayDate(holiday).name("임시공휴일").build());
+
+        WorkLog expectedLog = workLog(expectedWorkDate, "CONFIRMED", 40_000L);
+        WorkLog fridayLog = workLog(holiday, "CONFIRMED", 40_000L);
+        workLogMapper.insert(expectedLog);
+        workLogMapper.insert(fridayLog);
+        incomingTransactionQueryClient.transactions = List.of(
+                new NormalizedIncomingTransaction(1L, paymentDate, LocalTime.NOON, "배민커넥트테스트", BigDecimal.valueOf(40_000L))
+        );
+
+        service.processSettlement(USER_ID, paymentDate);
+
+        Settlement settlement = settlementMapper.findAll().get(0);
+        assertEquals(expectedWorkDate, settlement.getPeriodStart());
+        assertEquals(expectedWorkDate, settlement.getPeriodEnd());
+        assertEquals(SettlementStatus.COMPLETED, workLogMapper.findById(expectedLog.getLogId()).getSettlementStatus());
+        assertEquals(SettlementStatus.NONE, workLogMapper.findById(fridayLog.getLogId()).getSettlementStatus());
     }
 
     private static WorkLog workLog(LocalDate workDate, String status, long estimatedIncome) {

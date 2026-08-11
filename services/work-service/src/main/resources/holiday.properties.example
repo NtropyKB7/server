@@ -1,0 +1,10 @@
+# holiday-local.properties로 복사해서 쓰세요 (holiday-local.properties는 git에 커밋되지 않습니다).
+# service-key는 파일에 직접 값을 넣지 말고, weather-local.properties와 동일하게
+# IntelliJ Run Configuration의 Environment variables에 HOLIDAY_SERVICE_KEY를 추가하세요.
+# 공공데이터포털(data.go.kr) 한국천문연구원_특일 정보(getRestDeInfo)에서 발급받은
+# 인증키를 그 값으로 넣으면 됩니다. (기상청 API와는 별도로 활용신청 필요)
+holiday.service-key=${HOLIDAY_SERVICE_KEY}
+holiday.base-url=https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo
+# 외부 특일 정보 API 호출 타임아웃 (밀리초)
+holiday.connect-timeout-ms=5000
+holiday.read-timeout-ms=10000

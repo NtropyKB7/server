@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.work.client.holiday.HolidayApiClient;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
 import com.ntropy.work.domain.entity.Platform;
@@ -22,6 +23,7 @@ import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
+import com.ntropy.work.mapper.InMemoryHolidayMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
@@ -57,9 +59,11 @@ class WorkLogServiceTest {
         JobService jobService = new JobService(
                 jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
+        HolidayService holidayService =
+                new HolidayService(new HolidayApiClient(null, null), new InMemoryHolidayMapper());
         SettlementService settlementService = new SettlementService(
                 new StubIncomingTransactionQueryClient(), platformMapper, jobMapper, jobPlatformMappingMapper,
-                workLogMapper, settlementMapper);
+                workLogMapper, settlementMapper, holidayService);
         workLogService = new WorkLogService(workLogMapper, jobService, settlementService);
     }
 
