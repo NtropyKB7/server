@@ -41,6 +41,18 @@
         LIMIT 1
     </select>
 
+    <select id="findCalendarPeriods" resultMap="defenseModeResultMap">
+        SELECT <include refid="columns"/>
+        FROM DEFENSE_MODE
+        WHERE user_id = #{userId}
+          AND unavailable_start_date &lt;= #{to}
+          AND CASE
+                  WHEN status = 'RELEASED' THEN return_date
+                  ELSE expected_return_date
+              END &gt;= #{from}
+        ORDER BY unavailable_start_date ASC, defense_id ASC
+    </select>
+
     <insert id="insert" parameterType="com.ntropy.defense.domain.DefenseMode"
             useGeneratedKeys="true" keyProperty="defenseId" keyColumn="defense_id">
         INSERT INTO DEFENSE_MODE (

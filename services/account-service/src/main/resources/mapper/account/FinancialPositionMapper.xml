@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.FinancialPositionMapper">
+
+    <!--
+        재무진단용 금융자산·부채 집계 대상 계좌의 원시 잔액을 조회한다.
+        수시입출(11)·정기예금적금(12)·대출(40) 계좌만 대상이며,
+        소수부·null·음수 검증과 원 단위 변환, 합산은 FinancialPositionService에서 수행한다.
+    -->
+    <select id="findFinancialPositionAccounts"
+            resultType="com.ntropy.account.mapper.projection.FinancialPositionAccountRow">
+        SELECT account_row.account_id AS accountId,
+               account_row.deposit_type_code AS depositTypeCode,
+               account_row.account_group AS accountGroup,
+               account_row.overdraft_yn AS overdraftYn,
+               account_row.balance
+        FROM ACCOUNT account_row
+        WHERE account_row.user_id = #{userId}
+          AND account_row.status = 'ACTIVE'
+          AND account_row.currency_code = 'KRW'
+          AND account_row.deposit_type_code IN ('11', '12', '40')
+    </select>
+</mapper>
