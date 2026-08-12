@@ -26,6 +26,7 @@ import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.JobMapper;
 import com.ntropy.work.mapper.SettlementMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
+import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class IncomeAnalysisService {
     private final SettlementMapper settlementMapper;
     private final JobMapper jobMapper;
     private final WorkLogMapper workLogMapper;
+    private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
 
     public MonthlyIncomeAnalysisSummary getMonthlyIncomeAnalysis(Long userId, YearMonth yearMonth) {
         Map<Long, String> jobNames = jobMapper.findByUserId(userId).stream()
@@ -118,15 +120,18 @@ public class IncomeAnalysisService {
     }
 
     /**
-     * 확정(CONFIRMED)됐지만 아직 SETTLEMENT로 매칭되지 않은(=settlement_status가 COMPLETED가
-     * 아닌) 근무일지의 예상소득 합계. 아직 입금이 안 됐거나 배치가 안 돌았을 뿐 소득 자체가
-     * 없는 건 아니므로, 확정된 소득 실적과 별도로 참고용으로 제공한다.
+     * 확정(CONFIRMED)됐지만 아직 COMPLETED가 아닌 WORK_LOG_PLATFORM_INCOME 행들의 합계.
+     * 근무일지 전체가 아니라 income 행 단위로 보는 이유: 여러 플랫폼을 동시에 뛴 근무일지는
+     * 일부 플랫폼만 정산 완료(PARTIAL)될 수 있어서, 아직 안 들어온 플랫폼 몫만 집계해야
+     * 정확하다. 매핑된 플랫폼이 없는 잡의 근무일지(income 행 자체가 없음)는 이 집계에서
+     * 빠진다 - 알려진 한계.
      */
     private Long calculatePendingSettlementIncome(Long userId, YearMonth yearMonth) {
-        return findWorkLogsInMonth(userId, yearMonth).stream()
-                .filter(log -> STATUS_CONFIRMED.equals(log.getStatus()))
-                .filter(log -> log.getSettlementStatus() != SettlementStatus.COMPLETED)
-                .mapToLong(log -> log.getEstimatedIncome() == null ? 0L : log.getEstimatedIncome())
+        return workLogPlatformIncomeMapper.findConfirmedByUserIdAndDateRange(
+                        userId, yearMonth.atDay(1), yearMonth.atEndOfMonth())
+                .stream()
+                .filter(income -> income.getSettlementStatus() != SettlementStatus.COMPLETED)
+                .mapToLong(income -> income.getExpectedAmount() == null ? 0L : income.getExpectedAmount())
                 .sum();
     }
 

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.WorkLogPlatformIncomeMapper">
+
+    <resultMap id="workLogPlatformIncomeResultMap" type="com.ntropy.work.domain.entity.WorkLogPlatformIncome">
+        <id property="incomeId" column="income_id"/>
+        <result property="logId" column="log_id"/>
+        <result property="platformId" column="platform_id"/>
+        <result property="expectedAmount" column="expected_amount"/>
+        <result property="settlementStatus" column="settlement_status"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.WorkLogPlatformIncome"
+            useGeneratedKeys="true" keyProperty="incomeId">
+        INSERT INTO WORK_LOG_PLATFORM_INCOME (log_id, platform_id, expected_amount, settlement_status)
+        VALUES (#{logId}, #{platformId}, #{expectedAmount}, #{settlementStatus})
+    </insert>
+
+    <update id="update" parameterType="com.ntropy.work.domain.entity.WorkLogPlatformIncome">
+        UPDATE WORK_LOG_PLATFORM_INCOME
+        SET expected_amount = #{expectedAmount},
+            settlement_status = #{settlementStatus}
+        WHERE income_id = #{incomeId}
+    </update>
+
+    <select id="findByLogId" parameterType="long" resultMap="workLogPlatformIncomeResultMap">
+        SELECT income_id, log_id, platform_id, expected_amount, settlement_status
+        FROM WORK_LOG_PLATFORM_INCOME
+        WHERE log_id = #{logId}
+    </select>
+
+    <select id="findConfirmedByJobIdAndPlatformIdAndDateRange" resultMap="workLogPlatformIncomeResultMap">
+        SELECT wpi.income_id, wpi.log_id, wpi.platform_id, wpi.expected_amount, wpi.settlement_status
+        FROM WORK_LOG_PLATFORM_INCOME wpi
+        JOIN WORK_LOG wl ON wpi.log_id = wl.log_id
+        WHERE wl.job_id = #{jobId}
+          AND wpi.platform_id = #{platformId}
+          AND wl.status = 'CONFIRMED'
+          AND wl.work_date IS NOT NULL
+          AND wl.work_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <select id="findConfirmedByUserIdAndDateRange" resultMap="workLogPlatformIncomeResultMap">
+        SELECT wpi.income_id, wpi.log_id, wpi.platform_id, wpi.expected_amount, wpi.settlement_status
+        FROM WORK_LOG_PLATFORM_INCOME wpi
+        JOIN WORK_LOG wl ON wpi.log_id = wl.log_id
+        WHERE wl.user_id = #{userId}
+          AND wl.status = 'CONFIRMED'
+          AND wl.work_date IS NOT NULL
+          AND wl.work_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+</mapper>

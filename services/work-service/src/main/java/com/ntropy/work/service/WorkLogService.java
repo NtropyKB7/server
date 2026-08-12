@@ -2,17 +2,26 @@ package com.ntropy.work.service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.work.domain.WorkLogSettlementStatusCalculator;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.JobPlatformMapping;
+import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.exception.WorkErrorCode;
+import com.ntropy.work.mapper.JobPlatformMappingMapper;
+import com.ntropy.work.mapper.PlatformMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
+import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -23,9 +32,13 @@ public class WorkLogService {
 
     private static final String STATUS_PLANNED = "PLANNED";
     private static final String STATUS_CONFIRMED = "CONFIRMED";
+    private static final String TRIGGER_ON_DEMAND = "ON_DEMAND";
 
     private final WorkLogMapper workLogMapper;
     private final JobService jobService;
+    private final JobPlatformMappingMapper jobPlatformMappingMapper;
+    private final PlatformMapper platformMapper;
+    private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
 
     /**
      * 근무 계획 등록. fatigue 미입력 시 job.baseFatigue를 기본값으로 채운다.
@@ -52,6 +65,8 @@ public class WorkLogService {
 
     /**
      * 계획 외 근무일지 등록. 실제 데이터를 받아 즉시 CONFIRMED로 생성한다.
+     * 잡에 매핑된 플랫폼이 여러 개면 소득을 균등 분배한다(예: 2개면 반반) - 프론트에서
+     * 따로 입력받지 않는다.
      */
     @Transactional
     public WorkLog registerActual(WorkLog workLog) {
@@ -63,9 +78,12 @@ public class WorkLogService {
         workLog.setEstimatedIncome(
                 calculateEstimatedIncome(job, workLog.getStartTime(), workLog.getEndTime(), workLog.getTaskCount()));
         workLog.setStatus(STATUS_CONFIRMED);
-        workLog.setSettlementStatus(SettlementStatus.PENDING);
+
+        List<WorkLogPlatformIncome> incomes = resolvePlatformIncomes(job.getJobId(), workLog.getEstimatedIncome());
+        workLog.setSettlementStatus(WorkLogSettlementStatusCalculator.calculate(incomes));
 
         workLogMapper.insert(workLog);
+        saveIncomes(workLog.getLogId(), incomes);
         return workLog;
     }
 
@@ -94,6 +112,8 @@ public class WorkLogService {
     /**
      * 근무일지 확정. PLANNED 상태에서만 가능하다. jobId/시간/건수/피로도를 전부
      * 받아 덮어쓸 수 있고(사진 화면 기준), 최종적으로 CONFIRMED로 전환한다.
+     * 잡에 매핑된 플랫폼이 여러 개면 소득을 균등 분배한다(예: 2개면 반반) - 프론트에서
+     * 따로 입력받지 않는다.
      *
      * @param requesterUserId 요청자 userId. 근무일지 소유자와 다르면 예외
      */
@@ -114,9 +134,12 @@ public class WorkLogService {
         existing.setEstimatedIncome(
                 calculateEstimatedIncome(job, existing.getStartTime(), existing.getEndTime(), existing.getTaskCount()));
         existing.setStatus(STATUS_CONFIRMED);
-        existing.setSettlementStatus(SettlementStatus.PENDING);
+
+        List<WorkLogPlatformIncome> incomes = resolvePlatformIncomes(job.getJobId(), existing.getEstimatedIncome());
+        existing.setSettlementStatus(WorkLogSettlementStatusCalculator.calculate(incomes));
 
         workLogMapper.update(existing);
+        saveIncomes(existing.getLogId(), incomes);
         return existing;
     }
 
@@ -139,6 +162,53 @@ public class WorkLogService {
     private void verifyOwnership(Long requesterUserId, Long ownerUserId, Long logId) {
         if (!ownerUserId.equals(requesterUserId)) {
             throw new ServiceException(WorkErrorCode.WORK_LOG_ACCESS_DENIED, "logId=" + logId);
+        }
+    }
+
+    /**
+     * 잡에 매핑된 플랫폼 기준으로 소득을 균등 분배한다. 매핑된 플랫폼이 없으면 추적 불가라
+     * 빈 리스트, 1개면 전액 그대로, 2개 이상이면 나눠서(나머지는 앞쪽 플랫폼부터 1원씩)
+     * 배정한다.
+     */
+    private List<WorkLogPlatformIncome> resolvePlatformIncomes(Long jobId, Long estimatedIncome) {
+        long totalIncome = estimatedIncome == null ? 0L : estimatedIncome;
+        List<Long> mappedPlatformIds = jobPlatformMappingMapper.findByJobId(jobId).stream()
+                .map(JobPlatformMapping::getPlatformId)
+                .toList();
+
+        if (mappedPlatformIds.isEmpty()) {
+            return List.of();
+        }
+
+        int count = mappedPlatformIds.size();
+        long base = totalIncome / count;
+        long remainder = totalIncome % count;
+
+        List<WorkLogPlatformIncome> incomes = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            long amount = base + (i < remainder ? 1 : 0);
+            incomes.add(toIncome(mappedPlatformIds.get(i), amount));
+        }
+        return incomes;
+    }
+
+    /** ON_DEMAND 플랫폼이면 이 근무일지가 확정되는 시점에 그 행만 즉시 완료로 만든다. */
+    private WorkLogPlatformIncome toIncome(Long platformId, long amount) {
+        Platform platform = platformMapper.findById(platformId);
+        SettlementStatus status = TRIGGER_ON_DEMAND.equals(platform.getSettlementTriggerType())
+                ? SettlementStatus.COMPLETED
+                : SettlementStatus.PENDING;
+        return WorkLogPlatformIncome.builder()
+                .platformId(platformId)
+                .expectedAmount(amount)
+                .settlementStatus(status)
+                .build();
+    }
+
+    private void saveIncomes(Long logId, List<WorkLogPlatformIncome> incomes) {
+        for (WorkLogPlatformIncome income : incomes) {
+            income.setLogId(logId);
+            workLogPlatformIncomeMapper.insert(income);
         }
     }
 

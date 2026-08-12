@@ -19,7 +19,9 @@ CREATE TABLE `PLATFORM` (
 	`platform_name`	VARCHAR(50)	NOT NULL	COMMENT '플랫폼명 (배달의민족/카카오T대리 등)',
 	`deposit_name`	VARCHAR(100)	NOT NULL	COMMENT '입금 거래내역 대조용 입금처명',
 	`settlement_cycle`	VARCHAR(20)	NOT NULL	COMMENT '정산주기 (DAILY/WEEKLY/MONTHLY)',
-	`settlement_offset_day`	INT	NULL	COMMENT 'DAILY 전용: 정산까지 며칠 (달력일 기준, 예: 익일=1)',
+	`settlement_trigger_type`	VARCHAR(20)	NOT NULL	DEFAULT 'AUTO'	COMMENT '정산 트리거 방식: AUTO(플랫폼이 주기에 따라 자동 입금)/ON_DEMAND(포인트 적립 후 사용자가 출금 신청해야 계좌 입금 - 실거래 매칭 불가, 확정 시점에 즉시 정산완료 처리)',
+	`settlement_offset_day`	INT	NULL	COMMENT '정산 기간 종료일로부터 입금일까지 며칠인지 (DAILY/WEEKLY 공용)',
+	`settlement_offset_unit`	VARCHAR(20)	NOT NULL	DEFAULT 'CALENDAR_DAY'	COMMENT 'settlement_offset_day의 단위: CALENDAR_DAY(달력일)/BUSINESS_DAY(영업일). WEEKLY/MONTHLY 요일·일자 고정형은 미사용(기본값)',
 	`settlement_day_of_week`	VARCHAR(20)	NULL	COMMENT 'WEEKLY 전용: MON~SUN',
 	`settlement_day_of_month`	INT	NULL	COMMENT 'MONTHLY 전용: 1~31'
 );
@@ -74,7 +76,7 @@ CREATE TABLE `WORK_LOG` (
 	`fatigue`	BIGINT	NOT NULL,
 	`estimated_income`	BIGINT	NULL,
 	`status`	VARCHAR(20)	NULL	COMMENT 'PLANNED/CONFIRMED',
-	`settlement_status`	VARCHAR(20)	NULL	COMMENT 'NONE/PENDING/COMPLETED',
+	`settlement_status`	VARCHAR(20)	NULL	COMMENT 'NONE/PENDING/PARTIAL/COMPLETED - WORK_LOG_PLATFORM_INCOME 행들 상태로부터 파생 계산됨',
 	PRIMARY KEY (`log_id`)
 );
 
@@ -94,6 +96,43 @@ CREATE TABLE `SAVING_GOAL` (
 	`target_amount`	BIGINT	NOT NULL,
 	`labor_intensity`	BIGINT	NOT NULL	COMMENT '적정 피로도 T, 1~5',
 	PRIMARY KEY (`saving_goal_id`)
+);
+
+-- 9. HOLIDAY (특일 정보 API로 조회한 공휴일 캐시 - 연도 단위로 채워짐)
+CREATE TABLE `HOLIDAY` (
+	`holiday_date`	DATE	NOT NULL,
+	`name`	VARCHAR(50)	NOT NULL	COMMENT '공휴일명 (예: 신정, 설날)',
+	PRIMARY KEY (`holiday_date`)
+);
+
+-- 10. WORK_LOG_PLATFORM_INCOME (근무일지 1건의 소득을 플랫폼별로 분배 - 여러 플랫폼을 동시에
+--     운영하는 배달 등에서, 근무일지는 안 쪼개고 소득/정산 상태만 플랫폼별로 추적하기 위함)
+CREATE TABLE `WORK_LOG_PLATFORM_INCOME` (
+	`income_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
+	`log_id`	BIGINT	NOT NULL,
+	`platform_id`	BIGINT	NOT NULL,
+	`expected_amount`	BIGINT	NOT NULL,
+	`settlement_status`	VARCHAR(20)	NOT NULL	COMMENT 'PENDING/COMPLETED (WORK_LOG와 달리 NONE/PARTIAL은 없음 - 확정 시점에만 생성되므로)',
+	PRIMARY KEY (`income_id`)
+);
+
+-- 11. SETTLEMENT (입금 거래-플랫폼/잡 매칭 결과. 매칭 성공(MATCHED)/실패(UNMATCHED) 모두 기록)
+--     account_transaction_id는 account-service ACCOUNT_TRANSACTION 참조지만 크로스 도메인이라
+--     FK는 걸지 않는다(팀 규칙). SettlementService.saveUnmatchedSettlement 참고.
+CREATE TABLE `SETTLEMENT` (
+	`settlement_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
+	`user_id`	BIGINT	NOT NULL,
+	`status`	VARCHAR(20)	NOT NULL	COMMENT 'MATCHED/UNMATCHED',
+	`job_id`	BIGINT	NULL	COMMENT 'UNMATCHED는 잡을 특정할 수 없어 NULL',
+	`period_start`	DATE	NOT NULL,
+	`period_end`	DATE	NOT NULL,
+	`deposit_date`	DATE	NOT NULL	COMMENT '실제 입금일 (ACCOUNT_TRANSACTION.tran_date)',
+	`expected_amount`	BIGINT	NOT NULL	COMMENT '해당 기간 WORK_LOG_PLATFORM_INCOME 합계 스냅샷 (UNMATCHED는 0)',
+	`actual_amount`	BIGINT	NOT NULL	COMMENT '매칭된 실제 입금액 합계',
+	`transaction_count`	INT	NOT NULL	COMMENT '이 SETTLEMENT 행에 합산된 거래 건수',
+	`account_transaction_id`	BIGINT	NULL	COMMENT 'account-service ACCOUNT_TRANSACTION 참조 (크로스 도메인 FK 없음). UNMATCHED는 NULL',
+	`matched_at`	DATETIME	NOT NULL,
+	PRIMARY KEY (`settlement_id`)
 );
 
 -- ============================================================
@@ -158,6 +197,27 @@ REFERENCES `JOB` (
 	`job_id`
 );
 
+ALTER TABLE `WORK_LOG_PLATFORM_INCOME` ADD CONSTRAINT `FK_WORK_LOG_TO_WORK_LOG_PLATFORM_INCOME_1` FOREIGN KEY (
+	`log_id`
+)
+REFERENCES `WORK_LOG` (
+	`log_id`
+);
+
+ALTER TABLE `WORK_LOG_PLATFORM_INCOME` ADD CONSTRAINT `FK_PLATFORM_TO_WORK_LOG_PLATFORM_INCOME_1` FOREIGN KEY (
+	`platform_id`
+)
+REFERENCES `PLATFORM` (
+	`platform_id`
+);
+
+ALTER TABLE `SETTLEMENT` ADD CONSTRAINT `FK_JOB_TO_SETTLEMENT_1` FOREIGN KEY (
+	`job_id`
+)
+REFERENCES `JOB` (
+	`job_id`
+);
+
 ALTER TABLE `ALLOCATION_GOAL` ADD CONSTRAINT `FK_JOB_TO_ALLOCATION_GOAL_1` FOREIGN KEY (
 	`job_id`
 )
@@ -175,6 +235,11 @@ CREATE INDEX `IDX_PLATFORM_CATEGORY_ID` ON `PLATFORM` (`category_id`);
 CREATE INDEX `IDX_JOB_SCHEDULE_JOB_ID` ON `JOB_SCHEDULE` (`job_id`);
 CREATE INDEX `IDX_WORK_LOG_JOB_ID` ON `WORK_LOG` (`job_id`);
 CREATE INDEX `IDX_ALLOCATION_GOAL_JOB_ID` ON `ALLOCATION_GOAL` (`job_id`);
+CREATE INDEX `IDX_WORK_LOG_PLATFORM_INCOME_LOG_ID` ON `WORK_LOG_PLATFORM_INCOME` (`log_id`);
+CREATE INDEX `IDX_WORK_LOG_PLATFORM_INCOME_PLATFORM_ID` ON `WORK_LOG_PLATFORM_INCOME` (`platform_id`);
+CREATE INDEX `IDX_SETTLEMENT_ACCOUNT_TRANSACTION_ID` ON `SETTLEMENT` (`account_transaction_id`);
+CREATE INDEX `IDX_SETTLEMENT_USER_STATUS_PERIOD` ON `SETTLEMENT` (`user_id`, `status`, `period_start`, `period_end`);
+CREATE INDEX `IDX_SETTLEMENT_USER_DEPOSIT_DATE` ON `SETTLEMENT` (`user_id`, `deposit_date`);
 
 -- user_id는 크로스 도메인(user-service)이라 FK는 걸지 않되, 조회 성능을 위해 인덱스는 추가
 CREATE INDEX `IDX_JOB_USER_ID` ON `JOB` (`user_id`);
