@@ -20,4 +20,39 @@
           AND account_row.currency_code = 'KRW'
           AND account_row.deposit_type_code IN ('11', '12', '40')
     </select>
+
+    <!--
+        기준일(asOf) 이하 계좌별 마지막 거래의 after_balance로 과거 시점 잔액을 복원한다.
+        상관 서브쿼리로 계좌당 정확히 하나의 최신 거래만 선택하고(FinancialCommitmentMapper와
+        동일한 패턴), 그 거래의 after_balance가 null이면 INNER JOIN이 아니라 마지막 조건에서
+        걸러 제외한다 - 더 오래된 거래로 대체하지 않는다.
+        deactivated_at은 기준일 종료 다음날 자정 이후여야 "기준일 당시 활성"으로 본다.
+        기준일 이하 거래가 아예 없는 계좌는 상관 서브쿼리가 NULL을 반환해 INNER JOIN에서
+        자연스럽게 제외된다. status='ACTIVE' 필터는 쓰지 않는다 - 지금은 비활성 상태여도
+        기준일 당시에는 활성이었을 수 있기 때문이다.
+    -->
+    <select id="findFinancialPositionAccountsAsOf"
+            resultType="com.ntropy.account.mapper.projection.FinancialPositionAccountRow">
+        SELECT account_row.account_id AS accountId,
+               account_row.deposit_type_code AS depositTypeCode,
+               account_row.account_group AS accountGroup,
+               account_row.overdraft_yn AS overdraftYn,
+               latest_txn.after_balance AS balance
+        FROM ACCOUNT account_row
+        INNER JOIN ACCOUNT_TRANSACTION latest_txn
+            ON latest_txn.account_transaction_id = (
+                SELECT t.account_transaction_id
+                FROM ACCOUNT_TRANSACTION t
+                WHERE t.account_id = account_row.account_id
+                  AND t.tran_date &lt;= #{asOf}
+                ORDER BY t.tran_date DESC, t.tran_time DESC, t.account_transaction_id DESC
+                LIMIT 1
+            )
+        WHERE account_row.user_id = #{userId}
+          AND account_row.currency_code = 'KRW'
+          AND account_row.deposit_type_code IN ('11', '12', '40')
+          AND (account_row.deactivated_at IS NULL
+               OR account_row.deactivated_at &gt;= DATE_ADD(#{asOf}, INTERVAL 1 DAY))
+          AND latest_txn.after_balance IS NOT NULL
+    </select>
 </mapper>

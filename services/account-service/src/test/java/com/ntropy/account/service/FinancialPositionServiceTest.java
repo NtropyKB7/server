@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -178,6 +179,70 @@ class FinancialPositionServiceTest {
         assertEquals(AccountErrorCode.INVALID_REQUEST.getStatusCode(), zeroUserId.getStatusCode());
     }
 
+    @Test
+    void asOf_aggregatesFromAsOfMapperMethodSeparatelyFromCurrentMethod() {
+        InMemoryFinancialPositionMapper mapper = new InMemoryFinancialPositionMapper();
+        mapper.add(row(1L, "11", AccountGroup.DEPOSIT_TRUST, null, "999999.00"));
+        mapper.addAsOf(row(2L, "12", AccountGroup.DEPOSIT_TRUST, null, "300000.00"));
+        FinancialPositionService service = new FinancialPositionService(mapper);
+
+        FinancialPositionSummary summary = service.findFinancialPosition(1L, LocalDate.of(2026, 6, 30));
+
+        // 현재 잔액 조회용 row(999999)가 아니라 asOf 전용 row(300000)만 반영돼야 한다.
+        assertEquals(300000L, summary.safeAssets());
+        assertEquals(0L, summary.liquidAssets());
+    }
+
+    @Test
+    void asOf_normalizesNegativeLoanBalanceSignInsteadOfRejecting() {
+        InMemoryFinancialPositionMapper mapper = new InMemoryFinancialPositionMapper();
+        mapper.addAsOf(row(1L, "40", AccountGroup.LOAN, null, "-500000.00"));
+        FinancialPositionService service = new FinancialPositionService(mapper);
+
+        FinancialPositionSummary summary = service.findFinancialPosition(1L, LocalDate.of(2026, 6, 30));
+
+        assertEquals(500000L, summary.totalLiabilities());
+    }
+
+    @Test
+    void asOf_stillRejectsNegativeBalanceForNonLoanBucket() {
+        InMemoryFinancialPositionMapper mapper = new InMemoryFinancialPositionMapper();
+        mapper.addAsOf(row(1L, "12", AccountGroup.DEPOSIT_TRUST, null, "-1000.00"));
+        FinancialPositionService service = new FinancialPositionService(mapper);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findFinancialPosition(1L, LocalDate.of(2026, 6, 30)));
+
+        assertEquals(AccountErrorCode.FINANCIAL_POSITION_BALANCE_INVALID.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void asOf_rejectsNullAsOf() {
+        InMemoryFinancialPositionMapper mapper = new InMemoryFinancialPositionMapper();
+        FinancialPositionService service = new FinancialPositionService(mapper);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.findFinancialPosition(1L, null));
+
+        assertEquals(AccountErrorCode.INVALID_REQUEST.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void asOf_rejectsNullOrNonPositiveUserId() {
+        InMemoryFinancialPositionMapper mapper = new InMemoryFinancialPositionMapper();
+        FinancialPositionService service = new FinancialPositionService(mapper);
+        LocalDate asOf = LocalDate.of(2026, 6, 30);
+
+        ServiceException nullUserId = assertThrows(
+                ServiceException.class, () -> service.findFinancialPosition(null, asOf));
+        ServiceException zeroUserId = assertThrows(
+                ServiceException.class, () -> service.findFinancialPosition(0L, asOf));
+
+        assertEquals(AccountErrorCode.INVALID_REQUEST.getStatusCode(), nullUserId.getStatusCode());
+        assertEquals(AccountErrorCode.INVALID_REQUEST.getStatusCode(), zeroUserId.getStatusCode());
+    }
+
     private static FinancialPositionAccountRow row(
             Long accountId, String depositTypeCode, AccountGroup accountGroup, Boolean overdraftYn, String balance
     ) {
@@ -193,14 +258,24 @@ class FinancialPositionServiceTest {
     private static class InMemoryFinancialPositionMapper implements FinancialPositionMapper {
 
         private final List<FinancialPositionAccountRow> rows = new ArrayList<>();
+        private final List<FinancialPositionAccountRow> asOfRows = new ArrayList<>();
 
         void add(FinancialPositionAccountRow row) {
             rows.add(row);
         }
 
+        void addAsOf(FinancialPositionAccountRow row) {
+            asOfRows.add(row);
+        }
+
         @Override
         public List<FinancialPositionAccountRow> findFinancialPositionAccounts(Long userId) {
             return rows;
+        }
+
+        @Override
+        public List<FinancialPositionAccountRow> findFinancialPositionAccountsAsOf(Long userId, LocalDate asOf) {
+            return asOfRows;
         }
     }
 }

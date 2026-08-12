@@ -10,6 +10,8 @@
 
         현재 집계 기준은 TXN_ANALYSIS.is_consumption = TRUE입니다.
         INSTALLMENT, LOAN, 내부이체 여부는 분류 결과에 반영된 값을 따릅니다.
+        거래는 발생 당시 기록을 기준으로 집계하며, 계좌가 이후 비활성화되더라도
+        과거 거래는 계속 포함해야 하므로 account_row.status 필터는 쓰지 않는다.
     -->
     <select id="findTotalExpense"
             resultType="java.lang.Long">
@@ -22,7 +24,6 @@
         ON analysis_row.account_transaction_id =
         transaction_row.account_transaction_id
         WHERE account_row.user_id = #{userId}
-        AND account_row.status = 'ACTIVE'
         AND transaction_row.tran_date >= #{startDate}
         AND transaction_row.tran_date &lt; #{endDate}
         AND analysis_row.is_consumption = TRUE
@@ -30,7 +31,7 @@
     </select>
 
     <!--
-        월별 카테고리 소비 금액을 조회합니다.
+        월별 카테고리 소비 금액을 조회합니다. status 필터를 쓰지 않는 이유는 findTotalExpense와 동일합니다.
     -->
     <select id="findCategoryExpenses"
             resultType="com.ntropy.common.dto.account.CategoryExpenseAmount">
@@ -46,12 +47,32 @@
         ON analysis_row.account_transaction_id =
         transaction_row.account_transaction_id
         WHERE account_row.user_id = #{userId}
-        AND account_row.status = 'ACTIVE'
         AND transaction_row.tran_date >= #{startDate}
         AND transaction_row.tran_date &lt; #{endDate}
         AND analysis_row.is_consumption = TRUE
         GROUP BY analysis_row.category
         ORDER BY analysis_row.category
+
+    </select>
+
+    <!--
+        월별 고정지출 합계를 조회합니다. status 필터를 쓰지 않는 이유는 findTotalExpense와 동일합니다.
+    -->
+    <select id="findFixedExpense"
+            resultType="java.lang.Long">
+
+        SELECT COALESCE(SUM(transaction_row.out_amount), 0)
+        FROM ACCOUNT account_row
+        INNER JOIN ACCOUNT_TRANSACTION transaction_row
+        ON transaction_row.account_id = account_row.account_id
+        INNER JOIN TXN_ANALYSIS analysis_row
+        ON analysis_row.account_transaction_id =
+        transaction_row.account_transaction_id
+        WHERE account_row.user_id = #{userId}
+        AND transaction_row.tran_date >= #{startDate}
+        AND transaction_row.tran_date &lt; #{endDate}
+        AND analysis_row.is_consumption = TRUE
+        AND analysis_row.expense_type = 'FIXED'
 
     </select>
 
