@@ -12,12 +12,16 @@ import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.notification.domain.entity.Notification;
+import com.ntropy.notification.mapper.InMemoryPushSubscriptionMapper;
+import com.ntropy.notification.push.StubWebPushClient;
+import com.ntropy.notification.push.WebPushSender;
 
 class NotificationServiceTest {
 
     private final InMemoryNotificationMapper mapper = new InMemoryNotificationMapper();
     private final StubUserQueryClient userQueryClient = new StubUserQueryClient();
-    private final NotificationService service = new NotificationService(mapper, userQueryClient);
+    private final NotificationService service = new NotificationService(mapper, userQueryClient,
+            new WebPushSender(new InMemoryPushSubscriptionMapper(), new StubWebPushClient()));
 
     @Test
     void createsNotificationWhenAlarmAgreeIsTrue() {
