@@ -1,10 +1,12 @@
 package com.ntropy.notification.service;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.ntropy.common.client.DefenseModeQueryClient;
+import com.ntropy.common.dto.defense.summary.DefenseCalendarPeriodSummary;
 import com.ntropy.common.dto.defense.summary.DefenseCauseSummary;
 import com.ntropy.common.dto.defense.summary.DefenseModeSummary;
 import com.ntropy.common.exception.ServiceErrorCode;
@@ -44,5 +46,10 @@ class StubDefenseModeQueryClient implements DefenseModeQueryClient {
             throw new ServiceException(NOT_FOUND);
         }
         return summary;
+    }
+
+    @Override
+    public List<DefenseCalendarPeriodSummary> getCalendarPeriods(Long userId, LocalDate from, LocalDate to) {
+        return List.of();
     }
 }
