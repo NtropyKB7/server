@@ -5,16 +5,20 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ntropy.bff.dto.common.ApiResponse;
+import com.ntropy.bff.dto.notification.request.PushSubscriptionRequest;
 import com.ntropy.bff.dto.notification.response.NotificationsResponse;
 import com.ntropy.bff.dto.notification.response.UnreadCountResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.client.NotificationQueryClient;
+import com.ntropy.common.client.PushSubscriptionCommandClient;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,7 +33,30 @@ public class NotificationController {
 
     private final NotificationQueryClient notificationQueryClient;
     private final NotificationCommandClient notificationCommandClient;
+    private final PushSubscriptionCommandClient pushSubscriptionCommandClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
+
+    @ApiOperation("웹푸시 구독에 필요한 VAPID 공개키 조회")
+    @GetMapping("/push-public-key")
+    public ApiResponse<String> getPushPublicKey() {
+        return ApiResponse.success(pushSubscriptionCommandClient.getVapidPublicKey());
+    }
+
+    @ApiOperation("웹푸시 구독 등록")
+    @PostMapping("/push-subscriptions")
+    public ApiResponse<Void> subscribePush(@ApiParam(hidden = true) Authentication authentication,
+                                            @RequestBody PushSubscriptionRequest request) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        pushSubscriptionCommandClient.subscribe(request.toCommand(userId));
+        return ApiResponse.success(200, "웹푸시 구독이 등록되었습니다.", null);
+    }
+
+    @ApiOperation("웹푸시 구독 해제")
+    @DeleteMapping("/push-subscriptions")
+    public ApiResponse<Void> unsubscribePush(@RequestParam String endpoint) {
+        pushSubscriptionCommandClient.unsubscribe(endpoint);
+        return ApiResponse.success(200, "웹푸시 구독이 해제되었습니다.", null);
+    }
 
     @ApiOperation("알림 목록 조회")
     @GetMapping
