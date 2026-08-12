@@ -91,4 +91,16 @@
 
     </select>
 
+    <!-- 사용자 기준으로 연월이 최신인 진단 결과부터 최대 limit건을 조회합니다. -->
+    <select id="findLatestByUserId"
+            resultMap="diagnosisResultMap">
+
+        SELECT *
+        FROM DIAGNOSIS_RESULT
+        WHERE user_id = #{userId}
+        ORDER BY year_month DESC
+        LIMIT #{limit}
+
+    </select>
+
 </mapper>

@@ -2,15 +2,22 @@ package com.ntropy.diagnosis.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.dto.DiagnosisCalculationInput;
+import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
 
 /**
@@ -91,6 +98,122 @@ class DiagnosisResultServiceTest {
     }
 
     /**
+     * 저장된 진단 결과가 없으면 DIAGNOSIS_RESULT_NOT_FOUND 예외가 발생하는지 확인합니다.
+     */
+    @Test
+    void findByUserIdAndYearMonth_whenNotFound_throwsNotFound() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findByUserIdAndYearMonth(1L, "2026-07")
+        );
+
+        assertEquals(
+                DiagnosisErrorCode.DIAGNOSIS_RESULT_NOT_FOUND.getStatusCode(),
+                exception.getStatusCode()
+        );
+    }
+
+    /**
+     * "2026-13"처럼 자릿수는 맞지만 실제로는 존재하지 않는 연월을 거부하는지 확인합니다.
+     */
+    @Test
+    void findByUserIdAndYearMonth_whenYearMonthIsCalendarInvalid_throwsInvalidRequest() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findByUserIdAndYearMonth(1L, "2026-13")
+        );
+
+        assertEquals(
+                DiagnosisErrorCode.INVALID_REQUEST.getStatusCode(),
+                exception.getStatusCode()
+        );
+    }
+
+    @Test
+    void findByUserIdAndYearMonth_whenYearUsesIsoExtendedFormat_throwsInvalidRequest() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findByUserIdAndYearMonth(1L, "+10000-01")
+        );
+
+        assertEquals(
+                DiagnosisErrorCode.INVALID_REQUEST.getStatusCode(),
+                exception.getStatusCode()
+        );
+    }
+
+    /**
+     * 저장된 진단 결과가 없으면 findLatestByUserId는 예외 없이 빈 목록을 반환합니다.
+     */
+    @Test
+    void findLatestByUserId_whenNoResults_returnsEmptyList() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        assertTrue(service.findLatestByUserId(1L, 3).isEmpty());
+    }
+
+    @Test
+    void calculateAndUpsert_whenYearMonthIsCalendarInvalid_throwsIllegalArgumentException() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+        DiagnosisCalculationInput input = new DiagnosisCalculationInput(
+                1L,
+                "2026-13",
+                3_000_000L,
+                0L,
+                2_000_000L,
+                600_000L,
+                5_000_000L,
+                3_000_000L,
+                2_000_000L
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> service.calculateAndUpsert(input));
+    }
+
+    @Test
+    void calculateAndUpsert_whenYearUsesIsoExtendedFormat_throwsIllegalArgumentException() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+        DiagnosisCalculationInput input = new DiagnosisCalculationInput(
+                1L,
+                "+10000-01",
+                3_000_000L,
+                0L,
+                2_000_000L,
+                600_000L,
+                5_000_000L,
+                3_000_000L,
+                2_000_000L
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> service.calculateAndUpsert(input));
+    }
+
+    @Test
+    void findLatestByUserId_whenLimitIsNotPositive_throwsInvalidRequest() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findLatestByUserId(1L, 0)
+        );
+
+        assertEquals(DiagnosisErrorCode.INVALID_REQUEST.getStatusCode(), exception.getStatusCode());
+    }
+
+    /**
      * 실제 DB 대신 Map을 사용하여 Mapper 동작을 흉내 내는 테스트용 구현체입니다.
      */
     private static class InMemoryDiagnosisResultMapper
@@ -116,6 +239,21 @@ class DiagnosisResultServiceTest {
                 String yearMonth
         ) {
             return storage.get(userId + "-" + yearMonth);
+        }
+
+        @Override
+        public List<DiagnosisResult> findLatestByUserId(
+                Long userId,
+                int limit
+        ) {
+            return storage.values().stream()
+                    .filter(result -> result.getUserId().equals(userId))
+                    .sorted(
+                            Comparator.comparing(DiagnosisResult::getYearMonth)
+                                    .reversed()
+                    )
+                    .limit(limit)
+                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         }
     }
 }

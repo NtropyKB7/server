@@ -2,12 +2,17 @@ package com.ntropy.diagnosis.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.dto.DiagnosisCalculationInput;
+import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -85,6 +90,8 @@ public class DiagnosisResultService {
     /**
      * 사용자·연월 기준으로 진단 결과를 조회합니다.
      *
+     * userId·yearMonth를 검증하고, 해당 진단 결과가 없으면
+     * DIAGNOSIS_RESULT_NOT_FOUND 예외를 발생시킵니다.
      * 읽기 전용 트랜잭션으로 실행합니다.
      */
     @Transactional(readOnly = true)
@@ -92,10 +99,75 @@ public class DiagnosisResultService {
             Long userId,
             String yearMonth
     ) {
-        return diagnosisResultMapper.findByUserIdAndYearMonth(
+        validateUserId(userId);
+        validateYearMonthForQuery(yearMonth);
+
+        DiagnosisResult result = diagnosisResultMapper.findByUserIdAndYearMonth(
                 userId,
                 yearMonth
         );
+
+        if (result == null) {
+            throw new ServiceException(DiagnosisErrorCode.DIAGNOSIS_RESULT_NOT_FOUND);
+        }
+
+        return result;
+    }
+
+    /**
+     * 사용자 기준으로 연월이 최신인 진단 결과부터 최대 limit건을 조회합니다.
+     *
+     * 결과가 없으면 빈 목록을 반환합니다 (예외를 발생시키지 않습니다).
+     * 읽기 전용 트랜잭션으로 실행합니다.
+     */
+    @Transactional(readOnly = true)
+    public List<DiagnosisResult> findLatestByUserId(
+            Long userId,
+            int limit
+    ) {
+        validateUserId(userId);
+        if (limit <= 0) {
+            throw new ServiceException(
+                    DiagnosisErrorCode.INVALID_REQUEST,
+                    "limit은 양수여야 합니다."
+            );
+        }
+
+        return diagnosisResultMapper.findLatestByUserId(userId, limit);
+    }
+
+    /**
+     * 조회 계약에서 공통으로 사용하는 userId 검증입니다.
+     */
+    private void validateUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new ServiceException(
+                    DiagnosisErrorCode.INVALID_REQUEST,
+                    "userId는 양수여야 합니다."
+            );
+        }
+    }
+
+    /**
+     * 조회 계약에서 사용하는 yearMonth 검증입니다.
+     *
+     * YearMonth.parse()로 파싱해, "2026-13"처럼 자릿수는 맞지만
+     * 실제로는 존재하지 않는 연월도 거부합니다.
+     */
+    private void validateYearMonthForQuery(String yearMonth) {
+        if (yearMonth == null) {
+            throw new ServiceException(
+                    DiagnosisErrorCode.INVALID_REQUEST,
+                    "yearMonth는 필수입니다."
+            );
+        }
+
+        if (!isValidYearMonth(yearMonth)) {
+            throw new ServiceException(
+                    DiagnosisErrorCode.INVALID_REQUEST,
+                    "yearMonth는 YYYY-MM 형식이어야 합니다."
+            );
+        }
     }
 
     /**
@@ -114,8 +186,7 @@ public class DiagnosisResultService {
             );
         }
 
-        if (input.getYearMonth() == null
-                || !input.getYearMonth().matches("\\d{4}-\\d{2}")) {
+        if (!isValidYearMonth(input.getYearMonth())) {
             throw new IllegalArgumentException(
                     "yearMonth는 YYYY-MM 형식이어야 합니다."
             );
@@ -132,6 +203,18 @@ public class DiagnosisResultService {
             throw new IllegalArgumentException(
                     "진단 계산에 필요한 값이 누락되었습니다."
             );
+        }
+    }
+
+    private boolean isValidYearMonth(String yearMonth) {
+        if (yearMonth == null || !yearMonth.matches("[0-9]{4}-[0-9]{2}")) {
+            return false;
+        }
+        try {
+            YearMonth.parse(yearMonth);
+            return true;
+        } catch (DateTimeParseException exception) {
+            return false;
         }
     }
 }
