@@ -38,6 +38,14 @@ public class MonthlyExpenseSummary {
     private Long totalExpense;
 
     /**
+     * 해당 월의 고정지출 합계입니다.
+     *
+     * TXN_ANALYSIS.is_consumption = true이고 expense_type = 'FIXED'인
+     * 거래의 ACCOUNT_TRANSACTION.out_amount를 합산합니다.
+     */
+    private Long fixedExpense;
+
+    /**
      * 카테고리별 소비 금액입니다.
      *
      * 예:

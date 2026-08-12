@@ -31,7 +31,7 @@ class LocalDiagnosisResultQueryClientTest {
                 3_000_000L, 100_000L, 2_000_000L, 1_000_000L,
                 600_000L, BigDecimal.valueOf(0.2),
                 5_000_000L, 3_000_000L, 2_000_000L,
-                calculatedAt, null, null
+                calculatedAt, null, null, null
         );
         InMemoryMapper mapper = new InMemoryMapper();
         mapper.save(saved);

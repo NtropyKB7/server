@@ -1,11 +1,15 @@
 package com.ntropy.diagnosis.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,7 +55,7 @@ class DiagnosisResultServiceTest {
                 );
 
         DiagnosisResult result =
-                service.calculateAndUpsert(input);
+                service.calculateAndUpsert(input, false);
 
         // netCashFlow = 3,000,000 - 2,000,000
         assertEquals(1_000_000L, result.getNetCashFlow());
@@ -61,6 +65,44 @@ class DiagnosisResultServiceTest {
                 BigDecimal.valueOf(0.2).setScale(4),
                 result.getFixedExpenseRatio()
         );
+
+        // finalize=false이므로 임시 스냅샷이며 finalizedAt은 null입니다.
+        assertNull(result.getFinalizedAt());
+    }
+
+    /**
+     * finalize=true로 호출하면 finalizedAt이 채워지는지 확인합니다.
+     */
+    @Test
+    void calculateAndUpsert_whenFinalizeIsTrue_setsFinalizedAt() {
+        InMemoryDiagnosisResultMapper mapper =
+                new InMemoryDiagnosisResultMapper();
+
+        ZoneId seoul = ZoneId.of("Asia/Seoul");
+        LocalDateTime expectedFinalizedAt = LocalDateTime.of(2026, 8, 1, 0, 5);
+        DiagnosisResultService service =
+                new DiagnosisResultService(
+                        mapper,
+                        Clock.fixed(expectedFinalizedAt.atZone(seoul).toInstant(), seoul)
+                );
+
+        DiagnosisCalculationInput input =
+                new DiagnosisCalculationInput(
+                        1L,
+                        "2026-06",
+                        3_000_000L,
+                        100_000L,
+                        2_000_000L,
+                        600_000L,
+                        5_000_000L,
+                        3_000_000L,
+                        2_000_000L
+                );
+
+        DiagnosisResult result =
+                service.calculateAndUpsert(input, true);
+
+        assertEquals(expectedFinalizedAt, result.getFinalizedAt());
     }
 
     /**
@@ -88,7 +130,7 @@ class DiagnosisResultServiceTest {
                 );
 
         DiagnosisResult result =
-                service.calculateAndUpsert(input);
+                service.calculateAndUpsert(input, false);
 
         // 소득이 없어도 순현금흐름은 계산합니다.
         assertEquals(-500_000L, result.getNetCashFlow());
@@ -163,7 +205,7 @@ class DiagnosisResultServiceTest {
     }
 
     @Test
-    void calculateAndUpsert_whenYearMonthIsCalendarInvalid_throwsIllegalArgumentException() {
+    void calculateAndUpsert_whenYearMonthIsCalendarInvalid_throwsInvalidCalculationInput() {
         DiagnosisResultService service =
                 new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
         DiagnosisCalculationInput input = new DiagnosisCalculationInput(
@@ -178,11 +220,13 @@ class DiagnosisResultServiceTest {
                 2_000_000L
         );
 
-        assertThrows(IllegalArgumentException.class, () -> service.calculateAndUpsert(input));
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.calculateAndUpsert(input, false));
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
     }
 
     @Test
-    void calculateAndUpsert_whenYearUsesIsoExtendedFormat_throwsIllegalArgumentException() {
+    void calculateAndUpsert_whenYearUsesIsoExtendedFormat_throwsInvalidCalculationInput() {
         DiagnosisResultService service =
                 new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
         DiagnosisCalculationInput input = new DiagnosisCalculationInput(
@@ -197,7 +241,88 @@ class DiagnosisResultServiceTest {
                 2_000_000L
         );
 
-        assertThrows(IllegalArgumentException.class, () -> service.calculateAndUpsert(input));
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.calculateAndUpsert(input, false));
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void calculateAndUpsert_whenInputIsNull_throwsInvalidCalculationInput() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.calculateAndUpsert(null, false));
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void calculateAndUpsert_whenAnyAmountFieldIsNegative_throwsInvalidCalculationInput() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+        DiagnosisCalculationInput input = new DiagnosisCalculationInput(
+                1L,
+                "2026-07",
+                -1L,
+                0L,
+                2_000_000L,
+                600_000L,
+                5_000_000L,
+                3_000_000L,
+                2_000_000L
+        );
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.calculateAndUpsert(input, false));
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
+    void calculateAndUpsert_whenFixedExpenseExceedsTotalExpense_throwsInvalidCalculationInput() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+        DiagnosisCalculationInput input = new DiagnosisCalculationInput(
+                1L,
+                "2026-07",
+                3_000_000L,
+                0L,
+                2_000_000L,
+                2_000_001L,
+                5_000_000L,
+                3_000_000L,
+                2_000_000L
+        );
+
+        ServiceException exception = assertThrows(
+                ServiceException.class, () -> service.calculateAndUpsert(input, false));
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+    }
+
+    /**
+     * totalIncome·totalExpense는 이미 0 이상으로 검증되므로 둘의 차는 항상 long 범위 안에
+     * 들어온다(음수 쪽 극단값도 -Long.MAX_VALUE로 Long.MIN_VALUE보다 크다). 그래서 실제로
+     * overflow를 발생시키는 입력은 만들 수 없고, Math.subtractExact는 이 경로에서는 도달할
+     * 수 없는 방어 코드다. 그래도 이후 검증 순서가 바뀌는 등의 회귀에 대비해 남겨둔다.
+     */
+    @Test
+    void calculateAndUpsert_netCashFlowAtLongRangeBoundary_doesNotOverflow() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+        DiagnosisCalculationInput input = new DiagnosisCalculationInput(
+                1L,
+                "2026-07",
+                0L,
+                0L,
+                Long.MAX_VALUE,
+                0L,
+                5_000_000L,
+                3_000_000L,
+                2_000_000L
+        );
+
+        DiagnosisResult result = service.calculateAndUpsert(input, false);
+
+        assertEquals(-Long.MAX_VALUE, result.getNetCashFlow());
     }
 
     @Test

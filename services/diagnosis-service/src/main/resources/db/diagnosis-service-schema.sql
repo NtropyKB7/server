@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `DIAGNOSIS_RESULT`
     `liquid_assets` BIGINT NOT NULL COMMENT '즉시 사용할 수 있는 유동자산',
     `safe_assets` BIGINT NOT NULL COMMENT '방어기간에 사용할 수 있는 안전자산',
     `calculated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '최근 배치 계산 완료 시각',
+    `finalized_at` DATETIME NULL COMMENT '월말 기준으로 확정된 시각. 진행 중인 현재 월은 NULL',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ON UPDATE CURRENT_TIMESTAMP,
@@ -23,3 +24,5 @@ CREATE TABLE IF NOT EXISTS `DIAGNOSIS_RESULT`
                                                 )
     ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4;
+
+-- 기존 DB에는 배포 전에 db/issue-138-add-diagnosis-finalized-at.sql을 한 번 적용한다.

@@ -140,7 +140,7 @@ class LocalDiagnosisQueryClientTest {
                 null, 1L, "2026-13",
                 0L, 0L, 500_000L, 0L, 0L, null,
                 800_000L, 500_000L, 300_000L,
-                LocalDateTime.of(2026, 12, 31, 9, 0), null, null
+                LocalDateTime.of(2026, 12, 31, 9, 0), null, null, null
         );
         InMemoryMapper mapper = new InMemoryMapper();
         mapper.save(malformed);
@@ -186,6 +186,7 @@ class LocalDiagnosisQueryClientTest {
                 liquidAssets,
                 safeAssets,
                 calculatedAt,
+                null,
                 null,
                 null
         );
