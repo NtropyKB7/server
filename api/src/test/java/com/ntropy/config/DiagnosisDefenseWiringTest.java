@@ -66,6 +66,7 @@ class DiagnosisDefenseWiringTest {
                     2_000_000L,
                     LocalDateTime.of(completedMonth.getYear(), completedMonth.getMonth(), 1, 9, 0),
                     null,
+                    null,
                     null
             );
 
