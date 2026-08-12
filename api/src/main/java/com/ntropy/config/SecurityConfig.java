@@ -49,6 +49,8 @@ public class SecurityConfig {
                                 "/swagger-resources/**", "/resources/**").permitAll()
                         // 루트 페이지(HomeController)와 헬스체크는 인증 없이 접근한다
                         .antMatchers("/", "/health").permitAll()
+                        // [테스트용] HolidayTestController - 검증 끝나면 이 줄과 컨트롤러 같이 지울 것
+                        .antMatchers("/internal/test/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // httpBasic/formLogin을 모두 끄면 기본 EntryPoint가 403을 반환하므로 401로 교정한다

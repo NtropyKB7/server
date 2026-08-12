@@ -3,9 +3,11 @@ package com.ntropy.work.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,31 +15,70 @@ import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.Job;
+import com.ntropy.work.domain.entity.JobPlatformMapping;
+import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
+import com.ntropy.work.mapper.InMemoryJobPlatformMappingMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.mapper.InMemoryPlatformMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
+import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
 
 class WorkLogServiceTest {
 
     private static final Long USER_ID = 1L;
     private static final LocalDate WORK_DATE = LocalDate.of(2026, 8, 3);
+    private static final Long ON_DEMAND_PLATFORM_ID = 900L;
+    private static final Long AUTO_PLATFORM_A_ID = 910L;
+    private static final Long AUTO_PLATFORM_B_ID = 920L;
 
     private InMemoryJobMapper jobMapper;
     private InMemoryWorkLogMapper workLogMapper;
+    private InMemoryJobPlatformMappingMapper jobPlatformMappingMapper;
+    private InMemoryWorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private WorkLogService workLogService;
 
     @BeforeEach
     void setUp() {
         jobMapper = new InMemoryJobMapper();
         workLogMapper = new InMemoryWorkLogMapper();
+        jobPlatformMappingMapper = new InMemoryJobPlatformMappingMapper();
+        workLogPlatformIncomeMapper = new InMemoryWorkLogPlatformIncomeMapper(workLogMapper);
+        InMemoryPlatformMapper platformMapper = new InMemoryPlatformMapper();
+        platformMapper.seed(Platform.builder()
+                .platformId(ON_DEMAND_PLATFORM_ID)
+                .depositName("카카오모빌리티")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("ON_DEMAND")
+                .build());
+        platformMapper.seed(Platform.builder()
+                .platformId(AUTO_PLATFORM_A_ID)
+                .depositName("배민커넥트테스트")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("AUTO")
+                .build());
+        platformMapper.seed(Platform.builder()
+                .platformId(AUTO_PLATFORM_B_ID)
+                .depositName("쿠팡이츠테스트")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("AUTO")
+                .build());
+        platformMapper.seed(Platform.builder()
+                .platformId(AUTO_PLATFORM_C_ID)
+                .depositName("요기요테스트")
+                .settlementCycle("DAILY")
+                .settlementTriggerType("AUTO")
+                .build());
         JobService jobService = new JobService(
                 jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
         );
-        workLogService = new WorkLogService(workLogMapper, jobService);
+        workLogService = new WorkLogService(
+                workLogMapper, jobService, jobPlatformMappingMapper, platformMapper, workLogPlatformIncomeMapper);
     }
 
     private Job hourlyJob() {
@@ -68,6 +109,65 @@ class WorkLogServiceTest {
                 .isActive(true)
                 .build();
         jobMapper.seed(setJobId(job, 200L));
+        return job;
+    }
+
+    private Job onDemandJob() {
+        Job job = Job.builder()
+                .userId(USER_ID)
+                .categoryId(2L)
+                .jobName("카카오T대리")
+                .settlementType(SettlementType.HOURLY)
+                .hourlyWage(10000)
+                .isRegular(false)
+                .baseFatigue(5)
+                .isActive(true)
+                .build();
+        jobMapper.seed(setJobId(job, 300L));
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(ON_DEMAND_PLATFORM_ID).build());
+        return job;
+    }
+
+    private Job multiPlatformJob() {
+        Job job = Job.builder()
+                .userId(USER_ID)
+                .categoryId(1L)
+                .jobName("배민+쿠팡이츠 배달")
+                .settlementType(SettlementType.HOURLY)
+                .hourlyWage(10000)
+                .isRegular(false)
+                .baseFatigue(3)
+                .isActive(true)
+                .build();
+        jobMapper.seed(setJobId(job, 400L));
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(AUTO_PLATFORM_A_ID).build());
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(AUTO_PLATFORM_B_ID).build());
+        return job;
+    }
+
+    private static final Long AUTO_PLATFORM_C_ID = 930L;
+
+    private Job threePlatformJob() {
+        Job job = Job.builder()
+                .userId(USER_ID)
+                .categoryId(1L)
+                .jobName("세 플랫폼 배달")
+                .settlementType(SettlementType.HOURLY)
+                .hourlyWage(10000)
+                .isRegular(false)
+                .baseFatigue(3)
+                .isActive(true)
+                .build();
+        jobMapper.seed(setJobId(job, 500L));
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(AUTO_PLATFORM_A_ID).build());
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(AUTO_PLATFORM_B_ID).build());
+        jobPlatformMappingMapper.insert(
+                JobPlatformMapping.builder().jobId(job.getJobId()).platformId(AUTO_PLATFORM_C_ID).build());
         return job;
     }
 
@@ -286,6 +386,96 @@ class WorkLogServiceTest {
         workLogService.deleteWorkLog(USER_ID, plan.getLogId());
 
         assertThrows(ServiceException.class, () -> workLogService.findById(plan.getLogId()));
+    }
+
+    @Test
+    @DisplayName("ON_DEMAND 플랫폼 잡은 실적 등록 시 PENDING을 거치지 않고 즉시 정산 완료 처리되고, income 행도 COMPLETED로 생성된다")
+    void registerActual_onDemandPlatform_completesImmediatelyWithCompletedIncome() {
+        Job job = onDemandJob();
+        WorkLog actual = planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0));
+        actual.setFatigue(4L);
+
+        WorkLog result = workLogService.registerActual(actual);
+
+        assertEquals(SettlementStatus.COMPLETED, result.getSettlementStatus());
+        List<WorkLogPlatformIncome> incomes = workLogPlatformIncomeMapper.findByLogId(result.getLogId());
+        assertEquals(1, incomes.size());
+        assertEquals(SettlementStatus.COMPLETED, incomes.get(0).getSettlementStatus());
+        assertEquals(result.getEstimatedIncome(), incomes.get(0).getExpectedAmount());
+    }
+
+    @Test
+    @DisplayName("자동 정산 플랫폼 잡은 확정해도 income 행이 PENDING으로 생성된다")
+    void confirmWorkLog_autoPlatform_createsPendingIncome() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+
+        WorkLog result = workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        // hourlyJob()은 플랫폼 매핑을 안 해뒀으니 income 행 자체가 없음 - 매핑 안 된 잡은 추적 불가로 PENDING 유지
+        assertTrue(workLogPlatformIncomeMapper.findByLogId(result.getLogId()).isEmpty());
+        assertEquals(SettlementStatus.PENDING, result.getSettlementStatus());
+    }
+
+    @Test
+    @DisplayName("ON_DEMAND 플랫폼 잡은 확정 시 즉시 정산 완료 처리된다")
+    void confirmWorkLog_onDemandPlatform_completesImmediately() {
+        Job job = onDemandJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0)));
+
+        WorkLog result = workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        assertEquals("CONFIRMED", result.getStatus());
+        assertEquals(SettlementStatus.COMPLETED, result.getSettlementStatus());
+    }
+
+    @Test
+    @DisplayName("플랫폼이 1개만 매핑된 잡은 platformIncomes 없이도 그 플랫폼에 전액 자동 배정된다")
+    void confirmWorkLog_singleMappedPlatform_autoAssignsFullAmount() {
+        Job job = onDemandJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0)));
+
+        WorkLog result = workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        List<WorkLogPlatformIncome> incomes = workLogPlatformIncomeMapper.findByLogId(result.getLogId());
+        assertEquals(1, incomes.size());
+        assertEquals(ON_DEMAND_PLATFORM_ID, incomes.get(0).getPlatformId());
+        assertEquals(result.getEstimatedIncome(), incomes.get(0).getExpectedAmount());
+    }
+
+    @Test
+    @DisplayName("플랫폼이 여러 개 매핑된 잡은 platformIncomes 없이 확정하면 균등 분배된다")
+    void registerActual_multiPlatformJob_withoutBreakdown_splitsEvenly() {
+        Job job = multiPlatformJob();
+        WorkLog actual = planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)); // 4시간*10000원=40000원
+        actual.setFatigue(4L);
+
+        WorkLog result = workLogService.registerActual(actual);
+
+        assertEquals(SettlementStatus.PENDING, result.getSettlementStatus());
+        List<WorkLogPlatformIncome> incomes = workLogPlatformIncomeMapper.findByLogId(result.getLogId());
+        assertEquals(2, incomes.size());
+        assertTrue(incomes.stream().allMatch(income -> income.getExpectedAmount() == 20000L));
+    }
+
+    @Test
+    @DisplayName("균등 분배 시 나눠떨어지지 않는 나머지는 앞쪽 플랫폼부터 1원씩 배분돼 합계가 정확히 맞는다")
+    void registerActual_threePlatformJob_withoutBreakdown_distributesRemainder() {
+        Job job = threePlatformJob();
+        WorkLog actual = planOf(job.getJobId(), LocalTime.of(10, 0), LocalTime.of(11, 0)); // 1시간*10000원=10000원
+        actual.setFatigue(3L);
+
+        WorkLog result = workLogService.registerActual(actual);
+
+        List<WorkLogPlatformIncome> incomes = workLogPlatformIncomeMapper.findByLogId(result.getLogId());
+        assertEquals(3, incomes.size());
+        long total = incomes.stream().mapToLong(WorkLogPlatformIncome::getExpectedAmount).sum();
+        assertEquals(10000L, total);
+        // 10000/3 = 3333, 나머지 1 -> 첫 번째(AUTO_PLATFORM_A_ID)가 3334, 나머지는 3333
+        long firstPlatformAmount = incomes.stream()
+                .filter(income -> income.getPlatformId().equals(AUTO_PLATFORM_A_ID))
+                .findFirst().orElseThrow().getExpectedAmount();
+        assertEquals(3334L, firstPlatformAmount);
     }
 
     @Test

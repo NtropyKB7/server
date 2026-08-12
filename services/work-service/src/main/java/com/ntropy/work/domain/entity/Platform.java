@@ -18,7 +18,9 @@ public class Platform {
     private String platformName;
     private String depositName;
     private String settlementCycle;
+    private String settlementTriggerType;
     private Integer settlementOffsetDay;
+    private String settlementOffsetUnit;
     private String settlementDayOfWeek;
     private Integer settlementDayOfMonth;
 }

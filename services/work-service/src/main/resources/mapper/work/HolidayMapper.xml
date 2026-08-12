@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.work.mapper.HolidayMapper">
+
+    <resultMap id="holidayResultMap" type="com.ntropy.work.domain.entity.Holiday">
+        <id property="holidayDate" column="holiday_date"/>
+        <result property="name" column="name"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.Holiday">
+        INSERT IGNORE INTO HOLIDAY (holiday_date, name)
+        VALUES (#{holidayDate}, #{name})
+    </insert>
+
+    <select id="countByYear" resultType="int">
+        SELECT COUNT(*)
+        FROM HOLIDAY
+        WHERE YEAR(holiday_date) = #{year}
+    </select>
+
+    <select id="findByDateRange" resultMap="holidayResultMap">
+        SELECT holiday_date, name
+        FROM HOLIDAY
+        WHERE holiday_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+</mapper>
