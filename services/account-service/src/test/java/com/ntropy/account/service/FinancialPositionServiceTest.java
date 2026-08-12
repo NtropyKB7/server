@@ -119,6 +119,20 @@ class FinancialPositionServiceTest {
     }
 
     @Test
+    void current_rejectsNegativeLoanBalanceInsteadOfNormalizingIt() {
+        InMemoryFinancialPositionMapper mapper = new InMemoryFinancialPositionMapper();
+        mapper.add(row(1L, "40", AccountGroup.LOAN, null, "-500000.00"));
+        FinancialPositionService service = new FinancialPositionService(mapper);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findFinancialPosition(1L)
+        );
+
+        assertEquals(AccountErrorCode.FINANCIAL_POSITION_BALANCE_INVALID.getStatusCode(), exception.getStatusCode());
+    }
+
+    @Test
     void rejectsFractionalWonBalance() {
         InMemoryFinancialPositionMapper mapperOneCent = new InMemoryFinancialPositionMapper();
         mapperOneCent.add(row(1L, "11", AccountGroup.DEPOSIT_TRUST, null, "100000.01"));

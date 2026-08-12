@@ -2,11 +2,14 @@ package com.ntropy.diagnosis.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,16 +19,28 @@ import com.ntropy.diagnosis.dto.DiagnosisCalculationInput;
 import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * 월별 재무 진단 계산과 저장·조회를 담당하는 Service입니다.
  */
 @Service
-@RequiredArgsConstructor
 public class DiagnosisResultService {
 
+    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+
     private final DiagnosisResultMapper diagnosisResultMapper;
+    private final Clock clock;
+
+    /** 운영 환경에서는 서비스 표준 시간대(Asia/Seoul)의 시스템 시계를 사용합니다. */
+    @Autowired
+    public DiagnosisResultService(DiagnosisResultMapper diagnosisResultMapper) {
+        this(diagnosisResultMapper, Clock.system(SERVICE_ZONE));
+    }
+
+    /** 확정 시각 테스트에서 고정 시계를 주입하기 위한 생성자입니다. */
+    DiagnosisResultService(DiagnosisResultMapper diagnosisResultMapper, Clock clock) {
+        this.diagnosisResultMapper = diagnosisResultMapper;
+        this.clock = clock;
+    }
 
     /**
      * 입력값을 검증하고 월별 진단 결과를 계산하여 저장합니다.
@@ -75,7 +90,8 @@ public class DiagnosisResultService {
         }
 
         // 계산 결과를 DIAGNOSIS_RESULT 도메인 객체로 생성합니다.
-        // calculatedAt/createdAt/updatedAt은 DB의 CURRENT_TIMESTAMP가 채우므로 null로 둡니다.
+        // calculatedAt/createdAt/updatedAt은 DB의 CURRENT_TIMESTAMP가 채웁니다.
+        // finalizedAt은 서비스 표준 시간대 Clock으로 만들어 DB와 동일한 KST 의미를 유지합니다.
         DiagnosisResult diagnosisResult =
                 new DiagnosisResult(
                         null,
@@ -91,7 +107,7 @@ public class DiagnosisResultService {
                         input.getLiquidAssets(),
                         input.getSafeAssets(),
                         null,
-                        finalize ? LocalDateTime.now() : null,
+                        finalize ? LocalDateTime.now(clock) : null,
                         null,
                         null
                 );

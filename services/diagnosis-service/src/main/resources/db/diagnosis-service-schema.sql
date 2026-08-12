@@ -25,7 +25,4 @@ CREATE TABLE IF NOT EXISTS `DIAGNOSIS_RESULT`
     ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4;
 
--- 기존 DB에 DIAGNOSIS_RESULT가 이미 있다면 수동으로 한 번 실행한다(#138).
--- ALTER TABLE `DIAGNOSIS_RESULT`
---     ADD COLUMN `finalized_at` DATETIME NULL COMMENT '월말 기준으로 확정된 시각. 진행 중인 현재 월은 NULL'
---     AFTER `calculated_at`;
+-- 기존 DB에는 배포 전에 db/issue-138-add-diagnosis-finalized-at.sql을 한 번 적용한다.

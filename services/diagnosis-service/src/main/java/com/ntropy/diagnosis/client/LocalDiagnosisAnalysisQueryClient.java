@@ -10,7 +10,9 @@ import com.ntropy.common.client.MonthlyExpenseQueryClient;
 import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 import com.ntropy.common.dto.diagnosis.CategoryExpenseSummary;
 import com.ntropy.common.dto.diagnosis.DiagnosisAnalysisSummary;
+import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
+import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.service.CategoryExpenseCalculator;
 import com.ntropy.diagnosis.service.DiagnosisResultService;
 
@@ -39,6 +41,9 @@ public class LocalDiagnosisAnalysisQueryClient implements DiagnosisAnalysisQuery
 
         MonthlyExpenseSummary monthlyExpense =
                 monthlyExpenseQueryClient.findMonthlyExpense(userId, yearMonth.toString());
+        if (monthlyExpense == null) {
+            throw new ServiceException(DiagnosisErrorCode.INVALID_CALCULATION_INPUT, "월별 소비 조회 결과가 없습니다.");
+        }
         List<CategoryExpenseSummary> categoryExpenses = categoryExpenseCalculator.calculate(
                 monthlyExpense.getCategoryExpenses(), monthlyExpense.getTotalExpense());
 

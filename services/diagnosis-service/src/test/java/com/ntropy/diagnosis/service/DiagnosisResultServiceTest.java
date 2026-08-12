@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -75,8 +78,13 @@ class DiagnosisResultServiceTest {
         InMemoryDiagnosisResultMapper mapper =
                 new InMemoryDiagnosisResultMapper();
 
+        ZoneId seoul = ZoneId.of("Asia/Seoul");
+        LocalDateTime expectedFinalizedAt = LocalDateTime.of(2026, 8, 1, 0, 5);
         DiagnosisResultService service =
-                new DiagnosisResultService(mapper);
+                new DiagnosisResultService(
+                        mapper,
+                        Clock.fixed(expectedFinalizedAt.atZone(seoul).toInstant(), seoul)
+                );
 
         DiagnosisCalculationInput input =
                 new DiagnosisCalculationInput(
@@ -94,7 +102,7 @@ class DiagnosisResultServiceTest {
         DiagnosisResult result =
                 service.calculateAndUpsert(input, true);
 
-        assertNotNull(result.getFinalizedAt());
+        assertEquals(expectedFinalizedAt, result.getFinalizedAt());
     }
 
     /**

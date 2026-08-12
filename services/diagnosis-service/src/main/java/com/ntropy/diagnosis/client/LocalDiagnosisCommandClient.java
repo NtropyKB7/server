@@ -114,10 +114,21 @@ public class LocalDiagnosisCommandClient implements DiagnosisCommandClient {
     private DiagnosisCalculationInput buildInput(
             Long userId, YearMonth yearMonth, FinancialPositionSummary financialPosition
     ) {
+        if (financialPosition == null) {
+            throw invalidCalculationSource("금융자산 조회 결과가 없습니다.");
+        }
+
         MonthlyIncomeAnalysisSummary incomeAnalysis =
                 incomeAnalysisQueryClient.getMonthlyIncomeAnalysis(userId, yearMonth);
+        if (incomeAnalysis == null) {
+            throw invalidCalculationSource("소득분석 조회 결과가 없습니다.");
+        }
+
         MonthlyExpenseSummary monthlyExpense =
                 monthlyExpenseQueryClient.findMonthlyExpense(userId, yearMonth.toString());
+        if (monthlyExpense == null) {
+            throw invalidCalculationSource("월별 소비 조회 결과가 없습니다.");
+        }
 
         return new DiagnosisCalculationInput(
                 userId,
@@ -130,5 +141,9 @@ public class LocalDiagnosisCommandClient implements DiagnosisCommandClient {
                 financialPosition.liquidAssets(),
                 financialPosition.safeAssets()
         );
+    }
+
+    private ServiceException invalidCalculationSource(String detail) {
+        return new ServiceException(DiagnosisErrorCode.INVALID_CALCULATION_INPUT, detail);
     }
 }

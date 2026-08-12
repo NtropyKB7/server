@@ -107,6 +107,22 @@ class LocalDiagnosisAnalysisQueryClientTest {
         assertThrows(RuntimeException.class, () -> client.getMonthlyAnalysis(USER_ID, YearMonth.of(2026, 7)));
     }
 
+    @Test
+    void nullMonthlyExpenseResult_throwsInvalidCalculationInput() {
+        InMemoryMapper mapper = new InMemoryMapper();
+        mapper.save(diagnosisResult(LocalDateTime.of(2026, 7, 15, 9, 0), null));
+        StubMonthlyExpenseQueryClient expense = new StubMonthlyExpenseQueryClient();
+        expense.returnNull = true;
+        LocalDiagnosisAnalysisQueryClient client = clientWith(mapper, expense);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.getMonthlyAnalysis(USER_ID, YearMonth.of(2026, 7))
+        );
+
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+    }
+
     private static LocalDiagnosisAnalysisQueryClient clientWith(
             InMemoryMapper mapper, MonthlyExpenseQueryClient expenseQueryClient
     ) {
@@ -140,6 +156,7 @@ class LocalDiagnosisAnalysisQueryClientTest {
 
     private static class StubMonthlyExpenseQueryClient implements MonthlyExpenseQueryClient {
         RuntimeException toThrow;
+        boolean returnNull;
         Long totalExpense = 0L;
         Long fixedExpense = 0L;
         Map<String, Long> categoryExpenses = Map.of();
@@ -148,6 +165,9 @@ class LocalDiagnosisAnalysisQueryClientTest {
         public MonthlyExpenseSummary findMonthlyExpense(Long userId, String yearMonth) {
             if (toThrow != null) {
                 throw toThrow;
+            }
+            if (returnNull) {
+                return null;
             }
             return new MonthlyExpenseSummary(userId, yearMonth, totalExpense, fixedExpense, categoryExpenses);
         }

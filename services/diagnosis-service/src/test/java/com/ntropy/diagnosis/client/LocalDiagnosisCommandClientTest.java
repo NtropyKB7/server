@@ -162,6 +162,57 @@ class LocalDiagnosisCommandClientTest {
         assertNull(mapper.findByUserIdAndYearMonth(USER_ID, "2026-07"));
     }
 
+    @Test
+    void nullFinancialPositionResult_throwsInvalidCalculationInputAndDoesNotUpsert() {
+        Clock clock = fixedClock(2026, 7, 15);
+        InMemoryDiagnosisResultMapper mapper = new InMemoryDiagnosisResultMapper();
+        Fixtures fixtures = new Fixtures();
+        fixtures.financialPosition.summary = null;
+        LocalDiagnosisCommandClient client = clientWith(mapper, fixtures, clock);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.recalculate(USER_ID, YearMonth.of(2026, 7))
+        );
+
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+        assertNull(mapper.findByUserIdAndYearMonth(USER_ID, "2026-07"));
+    }
+
+    @Test
+    void nullIncomeAnalysisResult_throwsInvalidCalculationInputAndDoesNotUpsert() {
+        Clock clock = fixedClock(2026, 7, 15);
+        InMemoryDiagnosisResultMapper mapper = new InMemoryDiagnosisResultMapper();
+        Fixtures fixtures = new Fixtures();
+        fixtures.income.returnNull = true;
+        LocalDiagnosisCommandClient client = clientWith(mapper, fixtures, clock);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.recalculate(USER_ID, YearMonth.of(2026, 7))
+        );
+
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+        assertNull(mapper.findByUserIdAndYearMonth(USER_ID, "2026-07"));
+    }
+
+    @Test
+    void nullMonthlyExpenseResult_throwsInvalidCalculationInputAndDoesNotUpsert() {
+        Clock clock = fixedClock(2026, 7, 15);
+        InMemoryDiagnosisResultMapper mapper = new InMemoryDiagnosisResultMapper();
+        Fixtures fixtures = new Fixtures();
+        fixtures.expense.returnNull = true;
+        LocalDiagnosisCommandClient client = clientWith(mapper, fixtures, clock);
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> client.recalculate(USER_ID, YearMonth.of(2026, 7))
+        );
+
+        assertEquals(DiagnosisErrorCode.INVALID_CALCULATION_INPUT.getStatusCode(), exception.getStatusCode());
+        assertNull(mapper.findByUserIdAndYearMonth(USER_ID, "2026-07"));
+    }
+
     /**
      * UTC 기준으론 8/31이지만 서울 기준으론 9/1인 시각을 고정 Clock으로 주입한다.
      * 타임존을 잘못 적용했으면 8월을 "현재 월"로 오판해 임시 스냅샷 경로(finalize=false)를
@@ -235,6 +286,7 @@ class LocalDiagnosisCommandClientTest {
 
     private static class StubIncomeAnalysisQueryClient implements IncomeAnalysisQueryClient {
         boolean called;
+        boolean returnNull;
         RuntimeException toThrow;
         Long totalIncome = 0L;
         Long unmatchedIncome = 0L;
@@ -244,6 +296,9 @@ class LocalDiagnosisCommandClientTest {
             called = true;
             if (toThrow != null) {
                 throw toThrow;
+            }
+            if (returnNull) {
+                return null;
             }
             return MonthlyIncomeAnalysisSummary.builder()
                     .userId(userId)
@@ -256,6 +311,7 @@ class LocalDiagnosisCommandClientTest {
 
     private static class StubMonthlyExpenseQueryClient implements MonthlyExpenseQueryClient {
         boolean called;
+        boolean returnNull;
         RuntimeException toThrow;
         Long totalExpense = 0L;
         Long fixedExpense = 0L;
@@ -265,6 +321,9 @@ class LocalDiagnosisCommandClientTest {
             called = true;
             if (toThrow != null) {
                 throw toThrow;
+            }
+            if (returnNull) {
+                return null;
             }
             return new MonthlyExpenseSummary(userId, yearMonth, totalExpense, fixedExpense, Map.of());
         }

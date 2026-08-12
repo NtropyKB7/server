@@ -35,7 +35,7 @@ public class FinancialPositionService {
         }
 
         List<FinancialPositionAccountRow> rows = financialPositionMapper.findFinancialPositionAccounts(userId);
-        return aggregate(rows);
+        return aggregate(rows, false);
     }
 
     /**
@@ -53,10 +53,13 @@ public class FinancialPositionService {
 
         List<FinancialPositionAccountRow> rows =
                 financialPositionMapper.findFinancialPositionAccountsAsOf(userId, asOf);
-        return aggregate(rows);
+        return aggregate(rows, true);
     }
 
-    private FinancialPositionSummary aggregate(List<FinancialPositionAccountRow> rows) {
+    private FinancialPositionSummary aggregate(
+            List<FinancialPositionAccountRow> rows,
+            boolean normalizeHistoricalLoanSign
+    ) {
         long liquidAssets = 0L;
         long safeAssets = 0L;
         long totalLiabilities = 0L;
@@ -72,10 +75,12 @@ public class FinancialPositionService {
             } else if (DEPOSIT_TYPE_SAVINGS.equals(depositTypeCode)) {
                 safeAssets = addWon(safeAssets, toWon(row, false));
             } else if (DEPOSIT_TYPE_LOAN.equals(depositTypeCode) && row.getAccountGroup() == AccountGroup.LOAN) {
-                // CODEF resLoanBalance는 음수로 내려올 수 있다(AccountResponseParser의 detail
-                // balance는 .abs()로 정규화하지만, 거래내역의 after_balance는 원문 그대로 저장돼
-                // 있어 여기서 정규화한다).
-                totalLiabilities = addWon(totalLiabilities, toWon(row, true));
+                // 현재 ACCOUNT.balance는 수집 시 이미 양수로 정규화되므로 음수면 무결성 오류다.
+                // 과거 거래의 after_balance만 원문 부호가 남을 수 있어 과거 조회에서만 정규화한다.
+                totalLiabilities = addWon(
+                        totalLiabilities,
+                        toWon(row, normalizeHistoricalLoanSign)
+                );
             }
         }
 
