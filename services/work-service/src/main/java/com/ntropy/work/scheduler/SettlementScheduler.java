@@ -1,5 +1,7 @@
 package com.ntropy.work.scheduler;
 
+import java.time.LocalDateTime;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -37,14 +39,15 @@ public class SettlementScheduler {
             zone = "Asia/Seoul"
     )
     public void runDailySettlementBatch() {
-        log.info("[정산 배치] 일일 정산 배치 스케줄 실행 시작");
+        log.info("[정산 배치] 일일 정산 배치 스케줄 실행 시작 (실행시각: {})", LocalDateTime.now());
 
         try {
             settlementService.runDailyBatch();
-            log.info("[정산 배치] 일일 정산 배치 스케줄 실행 완료");
+            log.info("[정산 배치] 일일 정산 배치 스케줄 실행 완료 (실행시각: {})", LocalDateTime.now());
         } catch (Exception exception) {
             // 예상하지 못한 예외가 발생해도 스케줄러 스레드가 죽지 않도록 기록합니다.
-            log.error("[정산 배치] 일일 정산 배치 스케줄 실행 중 예상하지 못한 오류 발생", exception);
+            log.error("[정산 배치] 일일 정산 배치 스케줄 실행 중 예상하지 못한 오류 발생 (실행시각: {})",
+                    LocalDateTime.now(), exception);
         }
     }
 }

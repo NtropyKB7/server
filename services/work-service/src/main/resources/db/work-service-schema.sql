@@ -116,6 +116,25 @@ CREATE TABLE `WORK_LOG_PLATFORM_INCOME` (
 	PRIMARY KEY (`income_id`)
 );
 
+-- 11. SETTLEMENT (입금 거래-플랫폼/잡 매칭 결과. 매칭 성공(MATCHED)/실패(UNMATCHED) 모두 기록)
+--     account_transaction_id는 account-service ACCOUNT_TRANSACTION 참조지만 크로스 도메인이라
+--     FK는 걸지 않는다(팀 규칙). SettlementService.saveUnmatchedSettlement 참고.
+CREATE TABLE `SETTLEMENT` (
+	`settlement_id`	BIGINT	NOT NULL	AUTO_INCREMENT,
+	`user_id`	BIGINT	NOT NULL,
+	`status`	VARCHAR(20)	NOT NULL	COMMENT 'MATCHED/UNMATCHED',
+	`job_id`	BIGINT	NULL	COMMENT 'UNMATCHED는 잡을 특정할 수 없어 NULL',
+	`period_start`	DATE	NOT NULL,
+	`period_end`	DATE	NOT NULL,
+	`deposit_date`	DATE	NOT NULL	COMMENT '실제 입금일 (ACCOUNT_TRANSACTION.tran_date)',
+	`expected_amount`	BIGINT	NOT NULL	COMMENT '해당 기간 WORK_LOG_PLATFORM_INCOME 합계 스냅샷 (UNMATCHED는 0)',
+	`actual_amount`	BIGINT	NOT NULL	COMMENT '매칭된 실제 입금액 합계',
+	`transaction_count`	INT	NOT NULL	COMMENT '이 SETTLEMENT 행에 합산된 거래 건수',
+	`account_transaction_id`	BIGINT	NULL	COMMENT 'account-service ACCOUNT_TRANSACTION 참조 (크로스 도메인 FK 없음). UNMATCHED는 NULL',
+	`matched_at`	DATETIME	NOT NULL,
+	PRIMARY KEY (`settlement_id`)
+);
+
 -- ============================================================
 -- Primary Key
 -- ============================================================
@@ -192,6 +211,13 @@ REFERENCES `PLATFORM` (
 	`platform_id`
 );
 
+ALTER TABLE `SETTLEMENT` ADD CONSTRAINT `FK_JOB_TO_SETTLEMENT_1` FOREIGN KEY (
+	`job_id`
+)
+REFERENCES `JOB` (
+	`job_id`
+);
+
 ALTER TABLE `ALLOCATION_GOAL` ADD CONSTRAINT `FK_JOB_TO_ALLOCATION_GOAL_1` FOREIGN KEY (
 	`job_id`
 )
@@ -211,6 +237,9 @@ CREATE INDEX `IDX_WORK_LOG_JOB_ID` ON `WORK_LOG` (`job_id`);
 CREATE INDEX `IDX_ALLOCATION_GOAL_JOB_ID` ON `ALLOCATION_GOAL` (`job_id`);
 CREATE INDEX `IDX_WORK_LOG_PLATFORM_INCOME_LOG_ID` ON `WORK_LOG_PLATFORM_INCOME` (`log_id`);
 CREATE INDEX `IDX_WORK_LOG_PLATFORM_INCOME_PLATFORM_ID` ON `WORK_LOG_PLATFORM_INCOME` (`platform_id`);
+CREATE INDEX `IDX_SETTLEMENT_ACCOUNT_TRANSACTION_ID` ON `SETTLEMENT` (`account_transaction_id`);
+CREATE INDEX `IDX_SETTLEMENT_USER_STATUS_PERIOD` ON `SETTLEMENT` (`user_id`, `status`, `period_start`, `period_end`);
+CREATE INDEX `IDX_SETTLEMENT_USER_DEPOSIT_DATE` ON `SETTLEMENT` (`user_id`, `deposit_date`);
 
 -- user_id는 크로스 도메인(user-service)이라 FK는 걸지 않되, 조회 성능을 위해 인덱스는 추가
 CREATE INDEX `IDX_JOB_USER_ID` ON `JOB` (`user_id`);
