@@ -1,21 +1,18 @@
 package com.ntropy.bff.dto.dashboard.response;
 
-import com.ntropy.common.dto.user.UserSummary;
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 홈 대시보드 응답. 필드는 각 도메인의 조회 계약(FatigueQueryClient, DiagnosisQueryClient 등)이
- * 붙는 대로 하나씩 늘어난다. 계약이 없는 필드는 임의 값을 채우지 않고 아예 비워둔다.
+ * 홈 대시보드 응답. realWage(실질 시급)는 계산 공식이 아직 정의되지 않아 제외한다.
+ * jobRecommendations(ROI 추천)는 AI-service의 별도 엔드포인트(/api/dashboard/recommendation-hours) 몫이라 여기 없다.
  */
 @Getter
 @AllArgsConstructor
 public class DashboardResponse {
 
     private String greetingName;
-
-    public static DashboardResponse from(UserSummary summary) {
-        return new DashboardResponse(summary.name());
-    }
+    private DashboardHoursResponse goalHours;
+    private DashboardIncomeResponse goalIncome;
+    private Integer fatigueScore;
 }
