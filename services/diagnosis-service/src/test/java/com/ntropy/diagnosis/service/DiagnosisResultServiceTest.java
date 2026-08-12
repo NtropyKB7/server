@@ -135,6 +135,22 @@ class DiagnosisResultServiceTest {
         );
     }
 
+    @Test
+    void findByUserIdAndYearMonth_whenYearUsesIsoExtendedFormat_throwsInvalidRequest() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+
+        ServiceException exception = assertThrows(
+                ServiceException.class,
+                () -> service.findByUserIdAndYearMonth(1L, "+10000-01")
+        );
+
+        assertEquals(
+                DiagnosisErrorCode.INVALID_REQUEST.getStatusCode(),
+                exception.getStatusCode()
+        );
+    }
+
     /**
      * 저장된 진단 결과가 없으면 findLatestByUserId는 예외 없이 빈 목록을 반환합니다.
      */
@@ -153,6 +169,25 @@ class DiagnosisResultServiceTest {
         DiagnosisCalculationInput input = new DiagnosisCalculationInput(
                 1L,
                 "2026-13",
+                3_000_000L,
+                0L,
+                2_000_000L,
+                600_000L,
+                5_000_000L,
+                3_000_000L,
+                2_000_000L
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> service.calculateAndUpsert(input));
+    }
+
+    @Test
+    void calculateAndUpsert_whenYearUsesIsoExtendedFormat_throwsIllegalArgumentException() {
+        DiagnosisResultService service =
+                new DiagnosisResultService(new InMemoryDiagnosisResultMapper());
+        DiagnosisCalculationInput input = new DiagnosisCalculationInput(
+                1L,
+                "+10000-01",
                 3_000_000L,
                 0L,
                 2_000_000L,

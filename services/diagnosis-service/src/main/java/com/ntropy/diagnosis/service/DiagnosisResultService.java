@@ -162,9 +162,7 @@ public class DiagnosisResultService {
             );
         }
 
-        try {
-            YearMonth.parse(yearMonth);
-        } catch (DateTimeParseException e) {
+        if (!isValidYearMonth(yearMonth)) {
             throw new ServiceException(
                     DiagnosisErrorCode.INVALID_REQUEST,
                     "yearMonth는 YYYY-MM 형식이어야 합니다."
@@ -209,7 +207,7 @@ public class DiagnosisResultService {
     }
 
     private boolean isValidYearMonth(String yearMonth) {
-        if (yearMonth == null) {
+        if (yearMonth == null || !yearMonth.matches("[0-9]{4}-[0-9]{2}")) {
             return false;
         }
         try {
