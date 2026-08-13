@@ -58,6 +58,12 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class MonthlyAiReportOrchestrationService {
 
+    private static final String SOURCE_ETC_CATEGORY = "ETC";
+    private static final String AGGREGATED_OTHER_CATEGORY =
+            "AGGREGATED_OTHER";
+    private static final String AGGREGATED_OTHER_DISPLAY_NAME =
+            "기타";
+
     /**
      * 배치 대상 활성 사용자를 조회하는 Client입니다.
      */
@@ -227,8 +233,12 @@ public class MonthlyAiReportOrchestrationService {
                 buildJobInsightInputs(income);
 
         /*
-         * 카테고리별 소비 Map을 프론트용 List로 변환합니다.
+         * FastAPI 추천 입력에는 전체 원천 카테고리를 유지하고,
+         * 프론트 표시용 데이터는 상위 3개와 기타로 축약합니다.
          */
+        List<Map<String, Object>> categoryExpenses =
+                buildCategoryExpenses(currentExpense);
+
         List<Map<String, Object>> topCategories =
                 buildTopCategories(currentExpense);
 
@@ -269,7 +279,7 @@ public class MonthlyAiReportOrchestrationService {
          * FastAPI에는 카테고리 List를 JSON 문자열로 전달합니다.
          */
         String categoryExpensesJson =
-                toJson(topCategories);
+                toJson(categoryExpenses);
 
         /**
          * FastAPI 추천 요청 DTO를 생성합니다.
@@ -674,7 +684,33 @@ public class MonthlyAiReportOrchestrationService {
     }
 
     /**
-     * 카테고리별 소비 Map을 프론트용 List로 변환합니다.
+     * FastAPI 추천 입력용 전체 카테고리 목록을 생성합니다.
+     *
+     * <p>
+     * 원천 ETC를 포함한 유효 카테고리를 모두 유지하며,
+     * 프론트 표시용 AGGREGATED_OTHER는 포함하지 않습니다.
+     * </p>
+     */
+    List<Map<String, Object>> buildCategoryExpenses(
+            MonthlyExpenseSummary expense
+    ) {
+        if (!hasValidExpense(expense)) {
+            return List.of();
+        }
+
+        long totalExpense = expense.getTotalExpense();
+
+        return getValidCategoryEntries(expense).stream()
+                .map(entry -> createCategorySummary(
+                        entry.getKey(),
+                        entry.getValue(),
+                        totalExpense
+                ))
+                .toList();
+    }
+
+    /**
+     * 카테고리별 소비를 프론트 표시용 상위 목록으로 변환합니다.
      *
      * <p>결과 예시:</p>
      *
@@ -689,73 +725,180 @@ public class MonthlyAiReportOrchestrationService {
      * ]
      * </pre>
      */
-    private List<Map<String, Object>> buildTopCategories(
+    List<Map<String, Object>> buildTopCategories(
             MonthlyExpenseSummary expense
     ) {
-        if (expense == null
-                || expense.getCategoryExpenses() == null) {
+        if (!hasValidExpense(expense)) {
             return List.of();
         }
 
-        long totalExpense =
-                expense.getTotalExpense() == null
-                        ? 0L
-                        : expense.getTotalExpense();
+        long totalExpense = expense.getTotalExpense();
+        List<Map.Entry<String, Long>> validEntries =
+                getValidCategoryEntries(expense);
+
+        long categorizedExpense = validEntries.stream()
+                .mapToLong(Map.Entry::getValue)
+                .sum();
+
+        if (categorizedExpense != totalExpense) {
+            log.warn(
+                    "[AI 리포트] 카테고리 합계와 총소비가 일치하지 않습니다. "
+                            + "totalExpense={}, categorizedExpense={}",
+                    totalExpense,
+                    categorizedExpense
+            );
+        }
+
+        List<Map.Entry<String, Long>> topThree = validEntries.stream()
+                .filter(entry -> !SOURCE_ETC_CATEGORY.equals(entry.getKey()))
+                .limit(3)
+                .toList();
 
         List<Map<String, Object>> result =
                 new ArrayList<>();
 
-        for (Map.Entry<String, Long> entry :
-                expense.getCategoryExpenses().entrySet()) {
-
-            String category =
-                    entry.getKey();
-
-            long amount =
-                    entry.getValue() == null
-                            ? 0L
-                            : entry.getValue();
-
-            Map<String, Object> categorySummary =
-                    new LinkedHashMap<>();
-
-            categorySummary.put(
-                    "category",
-                    category
-            );
-
-            categorySummary.put(
-                    "displayName",
-                    resolveCategoryDisplayName(category)
-            );
-
-            categorySummary.put(
-                    "amount",
-                    amount
-            );
-
-            /*
-             * 카테고리 비율도 0~1 사이의 소수로 전달합니다.
-             *
-             * 예:
-             * 8,000 / 58,000 = 0.1379
-             */
-            Double ratio =
-                    totalExpense == 0
-                            ? null
-                            : roundRatio(
-                            (double) amount / totalExpense
-                    );
-
-            categorySummary.put(
-                    "ratio",
-                    ratio
-            );
-
-            result.add(categorySummary);
+        for (Map.Entry<String, Long> entry : topThree) {
+            result.add(createCategorySummary(
+                    entry.getKey(),
+                    entry.getValue(),
+                    totalExpense
+            ));
         }
 
+        long topThreeAmount = topThree.stream()
+                .mapToLong(Map.Entry::getValue)
+                .sum();
+
+        /*
+         * totalExpense와 상위 3개 금액의 차이를 기타로 사용합니다.
+         * 이 금액에는 원천 ETC, 상위 3개 외 카테고리와
+         * 원천 집계에서 누락된 차액이 포함됩니다.
+         */
+        long aggregatedOtherAmount =
+                Math.max(0L, totalExpense - topThreeAmount);
+
+        if (aggregatedOtherAmount > 0L) {
+            result.add(createCategorySummary(
+                    AGGREGATED_OTHER_CATEGORY,
+                    AGGREGATED_OTHER_DISPLAY_NAME,
+                    aggregatedOtherAmount,
+                    totalExpense
+            ));
+        }
+
+        correctRatioRoundingError(result, totalExpense);
+
         return result;
+    }
+
+    private boolean hasValidExpense(
+            MonthlyExpenseSummary expense
+    ) {
+        return expense != null
+                && expense.getTotalExpense() != null
+                && expense.getTotalExpense() > 0L
+                && expense.getCategoryExpenses() != null;
+    }
+
+    /**
+     * 금액이 있는 원천 카테고리를 금액 내림차순으로 정렬합니다.
+     * 같은 금액이면 카테고리 코드 오름차순으로 정렬합니다.
+     */
+    private List<Map.Entry<String, Long>> getValidCategoryEntries(
+            MonthlyExpenseSummary expense
+    ) {
+        return expense.getCategoryExpenses().entrySet().stream()
+                .filter(entry -> entry.getKey() != null)
+                .filter(entry -> !entry.getKey().isBlank())
+                .filter(entry -> entry.getValue() != null)
+                .filter(entry -> entry.getValue() > 0L)
+                .sorted(
+                        Map.Entry.<String, Long>comparingByValue()
+                                .reversed()
+                                .thenComparing(Map.Entry.comparingByKey())
+                )
+                .toList();
+    }
+
+    private Map<String, Object> createCategorySummary(
+            String category,
+            long amount,
+            long totalExpense
+    ) {
+        return createCategorySummary(
+                category,
+                resolveCategoryDisplayName(category),
+                amount,
+                totalExpense
+        );
+    }
+
+    private Map<String, Object> createCategorySummary(
+            String category,
+            String displayName,
+            long amount,
+            long totalExpense
+    ) {
+        Map<String, Object> categorySummary =
+                new LinkedHashMap<>();
+
+        categorySummary.put("category", category);
+        categorySummary.put("displayName", displayName);
+        categorySummary.put("amount", amount);
+        categorySummary.put(
+                "ratio",
+                roundRatio((double) amount / totalExpense)
+        );
+
+        return categorySummary;
+    }
+
+    /**
+     * 소수 넷째 자리 반올림으로 생긴 차이를 마지막 항목에 반영합니다.
+     */
+    private void correctRatioRoundingError(
+            List<Map<String, Object>> categories,
+            long totalExpense
+    ) {
+        if (categories.isEmpty()) {
+            return;
+        }
+
+        long returnedAmount = categories.stream()
+                .mapToLong(category ->
+                        ((Number) category.get("amount")).longValue()
+                )
+                .sum();
+
+        if (returnedAmount != totalExpense) {
+            log.warn(
+                    "[AI 리포트] topCategories 합계와 총소비가 일치하지 않아 "
+                            + "비율 오차를 보정하지 않습니다. "
+                            + "totalExpense={}, returnedAmount={}",
+                    totalExpense,
+                    returnedAmount
+            );
+            return;
+        }
+
+        BigDecimal precedingRatioSum = BigDecimal.ZERO;
+
+        for (int index = 0; index < categories.size() - 1; index++) {
+            Number ratio = (Number) categories.get(index).get("ratio");
+            precedingRatioSum = precedingRatioSum.add(
+                    BigDecimal.valueOf(ratio.doubleValue())
+            );
+        }
+
+        double correctedLastRatio = BigDecimal.ONE
+                .subtract(precedingRatioSum)
+                .setScale(4, RoundingMode.HALF_UP)
+                .doubleValue();
+
+        categories.get(categories.size() - 1).put(
+                "ratio",
+                correctedLastRatio
+        );
     }
 
     /**
