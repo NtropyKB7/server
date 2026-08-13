@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.ntropy.common.dto.account.ClassificationTargetTransaction;
+import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -47,5 +48,13 @@ public interface FinancialDataQueryMapper {
             @Param("userId") Long userId,
             @Param("yearMonth") String yearMonth,
             @Param("transactionIds") List<Long> transactionIds
+    );
+
+    /**
+     * TXN_ANALYSIS가 아직 생성되지 않은 일간 소비 분석 대상 거래를
+     * 조회합니다.
+     */
+    List<DailyClassificationTargetTransaction> findUnanalyzedTransactions(
+            @Param("limit") int limit
     );
 }
