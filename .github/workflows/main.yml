@@ -70,7 +70,18 @@ jobs:
 
       - name: Deploy via SSM
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["~/deploy.sh"]'
+            --parameters 'commands=["/home/ubuntu/deploy.sh"]' \
+            --query "Command.CommandId" --output text)
+
+          echo "Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID }}
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID }}
