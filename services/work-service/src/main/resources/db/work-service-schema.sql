@@ -82,10 +82,10 @@ CREATE TABLE `WORK_LOG` (
 
 -- 7. ALLOCATION_GOAL (잡별 근무시간 배분 추천)
 CREATE TABLE `ALLOCATION_GOAL` (
-	`allocation_goal_id`	BIGINT	NOT NULL,
+	`allocation_goal_id`	BIGINT	NOT NULL AUTO_INCREMENT,
 	`job_id`	BIGINT	NOT NULL,
-	`target_month`	VARCHAR(7)	NULL,
-	`recommend_hour`	BIGINT	NULL
+	`target_month`	VARCHAR(7)	NOT NULL,
+	`recommend_hour`	BIGINT	NOT NULL
 );
 
 -- 8. SAVING_GOAL (월별 저축 목표: 목표 소득액 + 적정 피로도)
@@ -248,3 +248,7 @@ CREATE INDEX `IDX_SAVING_GOAL_USER_ID` ON `SAVING_GOAL` (`user_id`);
 
 -- 캘린더 월별 조회 시 자주 쓰이는 조합이라 함께 추가
 CREATE INDEX `IDX_WORK_LOG_USER_DATE` ON `WORK_LOG` (`user_id`, `work_date`);
+
+
+CREATE UNIQUE INDEX `UK_ALLOCATION_GOAL_JOB_MONTH`
+    ON `ALLOCATION_GOAL` (`job_id`, `target_month`);

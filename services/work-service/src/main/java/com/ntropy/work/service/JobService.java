@@ -1,6 +1,7 @@
 package com.ntropy.work.service;
 
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -15,6 +16,7 @@ import com.ntropy.work.domain.entity.JobSchedule;
 import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.JobMapper;
 import com.ntropy.work.mapper.JobScheduleMapper;
+import com.ntropy.work.mapper.AllocationGoalMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class JobService {
     private final JobMapper jobMapper;
     private final JobScheduleMapper jobScheduleMapper;
     private final CategoryService categoryService;
+    private final AllocationGoalMapper allocationGoalMapper;
 
     /**
      * 잡 등록. 정기근무 스케줄이 있으면 같이 등록한다(둘 다 성공하거나 둘 다 롤백).
@@ -54,6 +57,9 @@ public class JobService {
             schedule.setJobId(job.getJobId());
             jobScheduleMapper.insert(schedule);
         }
+
+        // 잡이 추가되면 기존 이번 달 추천 결과는 더 이상 최신이 아니므로 무효화합니다.
+        allocationGoalMapper.deleteByUserIdAndTargetMonth(job.getUserId(), currentMonth());
 
         return job;
     }
@@ -104,6 +110,9 @@ public class JobService {
             jobScheduleMapper.insert(schedule);
         }
 
+        // 시급·정산 방식·피로도·활성 상태 등이 변경될 수 있으므로 재계산을 유도합니다.
+        allocationGoalMapper.deleteByUserIdAndTargetMonth(existing.getUserId(), currentMonth());
+
         return job;
     }
 
@@ -114,6 +123,7 @@ public class JobService {
         job.setIsActive(false);
         job.setUpdatedAt(LocalDateTime.now());
         jobMapper.update(job);
+        allocationGoalMapper.deleteByUserIdAndTargetMonth(job.getUserId(), currentMonth());
     }
 
     /** 요청자가 이 잡의 소유자가 아니면 예외를 던진다. */
@@ -169,6 +179,10 @@ public class JobService {
 
     private List<JobSchedule> safe(List<JobSchedule> schedules) {
         return schedules == null ? Collections.emptyList() : schedules;
+    }
+
+    private String currentMonth() {
+        return YearMonth.now().toString();
     }
 
     /**
