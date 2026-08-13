@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.YearMonth;
 
+import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class SavingGoalServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SavingGoalService(new InMemorySavingGoalMapper());
+        service = new SavingGoalService(new InMemorySavingGoalMapper(), new InMemoryAllocationGoalMapper());
     }
 
     private SavingGoal.SavingGoalBuilder validGoal() {

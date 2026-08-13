@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class LocalExpectedIncomeLossQueryClientTest {
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
         JobService jobService = new JobService(
-                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(categoryMapper));
+                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(categoryMapper), new InMemoryAllocationGoalMapper());
         client = new LocalExpectedIncomeLossQueryClient(jobService);
     }
 

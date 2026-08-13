@@ -54,7 +54,7 @@ class CalendarServiceTest {
         allocationGoalMapper = new InMemoryAllocationGoalMapper();
         savingGoalMapper = new InMemorySavingGoalMapper();
         jobService = new JobService(
-                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
+                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()), new InMemoryAllocationGoalMapper()
         );
 
         calendarService = new CalendarService(
@@ -206,7 +206,7 @@ class CalendarServiceTest {
     void dailySummary_attachesFatigueGaugeFromFatigueService() {
         CalendarFatigueGauge gauge = new CalendarFatigueGauge(42, "LOW", false);
         JobService jobService = new JobService(
-                new InMemoryJobMapper(), new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
+                new InMemoryJobMapper(), new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()), new InMemoryAllocationGoalMapper()
         );
         CalendarService service = new CalendarService(
                 workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(gauge),
