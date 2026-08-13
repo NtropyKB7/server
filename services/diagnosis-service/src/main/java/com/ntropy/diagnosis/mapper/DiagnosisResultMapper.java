@@ -1,5 +1,7 @@
 package com.ntropy.diagnosis.mapper;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -29,5 +31,17 @@ public interface DiagnosisResultMapper {
     DiagnosisResult findByUserIdAndYearMonth(
             @Param("userId") Long userId,
             @Param("yearMonth") String yearMonth
+    );
+
+    /**
+     * 사용자 기준으로 연월이 최신인 진단 결과부터 최대 limit건을 조회합니다.
+     *
+     * @param userId 사용자 ID
+     * @param limit 조회할 최대 건수
+     * @return year_month 내림차순으로 정렬된 진단 결과 목록
+     */
+    List<DiagnosisResult> findLatestByUserId(
+            @Param("userId") Long userId,
+            @Param("limit") int limit
     );
 }

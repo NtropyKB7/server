@@ -32,6 +32,35 @@ class FinancialPositionMapperContractTest {
         assertTrue(query.contains("account_row.balance"));
     }
 
+    @Test
+    void asOfQuerySelectsLatestTransactionOnOrBeforeCutoffWithDeterministicTieBreak() throws IOException {
+        String query = selectBody(readMapper(), "findFinancialPositionAccountsAsOf");
+
+        assertTrue(query.contains("t.tran_date &lt;= #{asOf}"));
+        assertTrue(query.contains("ORDER BY t.tran_date DESC, t.tran_time DESC, t.account_transaction_id DESC"));
+        assertTrue(query.contains("LIMIT 1"));
+        assertTrue(query.contains("latest_txn.after_balance AS balance"));
+        assertTrue(query.contains("latest_txn.after_balance IS NOT NULL"));
+    }
+
+    @Test
+    void asOfQueryDoesNotFilterByCurrentAccountStatus() throws IOException {
+        String query = selectBody(readMapper(), "findFinancialPositionAccountsAsOf");
+
+        assertTrue(!query.contains("status = 'ACTIVE'"));
+        assertTrue(query.contains("account_row.deactivated_at IS NULL"));
+        assertTrue(query.contains("account_row.deactivated_at &gt;= DATE_ADD(#{asOf}, INTERVAL 1 DAY)"));
+    }
+
+    @Test
+    void asOfQueryScopesByOwnerCurrencyAndDepositTypeCode() throws IOException {
+        String query = selectBody(readMapper(), "findFinancialPositionAccountsAsOf");
+
+        assertTrue(query.contains("account_row.user_id = #{userId}"));
+        assertTrue(query.contains("account_row.currency_code = 'KRW'"));
+        assertTrue(query.contains("account_row.deposit_type_code IN ('11', '12', '40')"));
+    }
+
     private static String selectBody(String mapper, String selectId) {
         int start = mapper.indexOf("<select id=\"" + selectId + "\"");
         int end = mapper.indexOf("</select>", start);

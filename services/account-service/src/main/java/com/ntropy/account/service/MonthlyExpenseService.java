@@ -61,6 +61,13 @@ public class MonthlyExpenseService {
                         endDate
                 );
 
+        Long fixedExpense =
+                monthlyExpenseMapper.findFixedExpense(
+                        userId,
+                        startDate,
+                        endDate
+                );
+
         List<CategoryExpenseAmount> rows =
                 monthlyExpenseMapper.findCategoryExpenses(
                         userId,
@@ -107,6 +114,7 @@ public class MonthlyExpenseService {
                 userId,
                 yearMonth,
                 totalExpense == null ? 0L : totalExpense,
+                fixedExpense == null ? 0L : fixedExpense,
                 categoryExpenses
         );
     }

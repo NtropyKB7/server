@@ -8,6 +8,7 @@ import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.exception.WorkErrorCode;
 import com.ntropy.work.mapper.SavingGoalMapper;
+import com.ntropy.work.mapper.AllocationGoalMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,6 +20,7 @@ public class SavingGoalService {
     private static final long MAX_LABOR_INTENSITY = 5;
 
     private final SavingGoalMapper savingGoalMapper;
+    private final AllocationGoalMapper allocationGoalMapper;
 
     /**
      * 월별 저축 목표 등록. 같은 유저가 같은 달에 중복 등록할 수 없다.
@@ -59,6 +61,8 @@ public class SavingGoalService {
         validate(existing);
 
         savingGoalMapper.update(existing);
+        // 목표 금액·희망 노동 강도가 바뀌면 이번 달 추천 결과도 다시 계산해야 합니다.
+        allocationGoalMapper.deleteByUserIdAndTargetMonth(userId, existing.getTargetMonth());
         return existing;
     }
 

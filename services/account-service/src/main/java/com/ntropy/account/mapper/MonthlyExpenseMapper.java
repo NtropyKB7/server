@@ -31,4 +31,13 @@ public interface MonthlyExpenseMapper {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    /**
+     * 특정 기간의 고정지출 합계를 조회합니다.
+     */
+    Long findFixedExpense(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

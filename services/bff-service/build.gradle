@@ -14,4 +14,7 @@ dependencies {
     implementation "org.springframework.security:spring-security-core:${securityVersion}"
     compileOnly 'io.swagger:swagger-annotations:1.5.20'
     compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
+
+    testImplementation "org.springframework:spring-test:${springVersion}"
+    testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
 }

@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.IncomingTransactionQueryClient;
+import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
+import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.work.domain.PlatformMatchResult;
 import com.ntropy.work.domain.PlatformMatcher;
 import com.ntropy.work.domain.SettlementPeriod;
@@ -79,6 +81,7 @@ public class SettlementService {
     private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private final SettlementMapper settlementMapper;
     private final HolidayService holidayService;
+    private final NotificationCommandClient notificationCommandClient;
 
     /**
      * 전체 활성 사용자를 대상으로, 오늘부터 최근 BACKFILL_DAYS일을 매번 재확인하는 배치.
@@ -94,60 +97,76 @@ public class SettlementService {
 
         LocalDate today = LocalDate.now();
         for (Long userId : userIds) {
+            boolean settlementCreated = false;
             for (int i = 0; i < BACKFILL_DAYS; i++) {
                 LocalDate processDate = today.minusDays(i);
                 try {
-                    processSettlement(userId, processDate);
+                    if (processSettlement(userId, processDate)) {
+                        settlementCreated = true;
+                    }
                 } catch (Exception e) {
                     log.error("[정산 배치] 사용자 처리 실패. userId={}, processDate={}", userId, processDate, e);
                 }
             }
+            if (settlementCreated) {
+                notifySettlementCompleted(userId, today);
+            }
         }
     }
 
-    public void processSettlement(Long userId, LocalDate processDate) {
+    /** 이번 호출에서 SETTLEMENT가 새로 생성됐으면 true. runDailyBatch가 유저당 알림 발송 여부를 판단하는 데 사용한다. */
+    public boolean processSettlement(Long userId, LocalDate processDate) {
         List<NormalizedIncomingTransaction> transactions =
                 incomingTransactionQueryClient.findIncomingTransactions(userId, processDate, processDate);
         if (transactions.isEmpty()) {
-            return;
+            return false;
         }
 
         List<Platform> platforms = platformMapper.findAll();
         List<Job> jobs = jobMapper.findByUserId(userId);
 
+        boolean settlementCreated = false;
         long unmatchedAmount = 0;
         int unmatchedCount = 0;
         for (NormalizedIncomingTransaction transaction : transactions) {
-            if (!processMatchedTransaction(userId, transaction, platforms, jobs)) {
+            MatchOutcome outcome = processMatchedTransaction(userId, transaction, platforms, jobs);
+            if (outcome == MatchOutcome.UNMATCHED) {
                 unmatchedAmount += transaction.amount().longValueExact();
                 unmatchedCount++;
+            } else if (outcome == MatchOutcome.CREATED) {
+                settlementCreated = true;
             }
         }
         if (unmatchedCount > 0) {
             saveUnmatchedSettlement(userId, processDate, unmatchedAmount, unmatchedCount);
         }
+        return settlementCreated;
     }
 
-    /** 매칭에 성공해 SETTLEMENT를 만들었거나 이미 이 거래로 만들어져 있으면 true. */
-    private boolean processMatchedTransaction(Long userId, NormalizedIncomingTransaction transaction,
-                                               List<Platform> platforms, List<Job> jobs) {
+    /** processMatchedTransaction의 결과. 이미 처리된 거래(ALREADY_PROCESSED)는 알림 대상에서 제외하기 위해 CREATED와 구분한다. */
+    private enum MatchOutcome {
+        UNMATCHED, ALREADY_PROCESSED, CREATED
+    }
+
+    private MatchOutcome processMatchedTransaction(Long userId, NormalizedIncomingTransaction transaction,
+                                                     List<Platform> platforms, List<Job> jobs) {
         PlatformMatchResult result = PlatformMatcher.match(transaction.counterpartyName(), platforms);
         if (!(result instanceof PlatformMatchResult.Matched matched)) {
-            return false;
+            return MatchOutcome.UNMATCHED;
         }
         Platform platform = matched.platform();
         Long jobId = resolveJobId(platform.getPlatformId(), jobs);
         if (jobId == null) {
-            return false;
+            return MatchOutcome.UNMATCHED;
         }
 
         if (settlementMapper.existsByAccountTransactionId(transaction.transactionId())) {
-            return true;
+            return MatchOutcome.ALREADY_PROCESSED;
         }
 
         if ("ON_DEMAND".equals(platform.getSettlementTriggerType())) {
             saveOnDemandSettlement(userId, jobId, transaction);
-            return true;
+            return MatchOutcome.CREATED;
         }
 
         Set<LocalDate> holidays = BUSINESS_DAY.equals(platform.getSettlementOffsetUnit())
@@ -187,7 +206,7 @@ public class SettlementService {
         for (Long logId : affectedLogIds) {
             recomputeWorkLogSettlementStatus(logId);
         }
-        return true;
+        return MatchOutcome.CREATED;
     }
 
     /** income 행 하나가 COMPLETED로 바뀌면, 그 부모 WorkLog의 상태도 다시 계산해서 갱신한다. */
@@ -249,6 +268,18 @@ public class SettlementService {
                 .matchedAt(LocalDateTime.now())
                 .build();
         settlementMapper.insert(settlement);
+    }
+
+    /** 유저당 배치 실행(runDailyBatch 1회) 기준 1건만 보낸다. eventId를 (userId, today) 기준으로 잡아
+     *  배치가 같은 날 재실행돼도 중복 발송되지 않게 한다. */
+    private void notifySettlementCompleted(Long userId, LocalDate today) {
+        notificationCommandClient.create(new NotificationCreateCommand(
+                userId,
+                "settlement-completed-" + userId + "-" + today,
+                "WORK",
+                "정산이 완료되었습니다",
+                "오늘 정산 처리가 완료됐어요. 확인해보세요."
+        ));
     }
 
     private Long resolveJobId(Long platformId, List<Job> jobs) {

@@ -22,4 +22,10 @@ public interface AllocationGoalMapper {
     void update(AllocationGoal allocationGoal);
 
     void deleteById(Long allocationGoalId);
+
+    List<AllocationGoal> findByUserIdAndTargetMonth(@Param("userId") Long userId,
+                                                    @Param("targetMonth") String targetMonth);
+
+    void deleteByUserIdAndTargetMonth(@Param("userId") Long userId,
+                                      @Param("targetMonth") String targetMonth);
 }

@@ -32,10 +32,19 @@ public class MonthlyExpenseSummary {
     /**
      * 해당 월의 총소비 금액입니다.
      *
-     * TXN_ANALYSIS.is_consumption = true인 거래의
-     * ACCOUNT_TRANSACTION.out_amount를 합산합니다.
+     * 소비로 분류된 비대출 거래의 out_amount와
+     * 정상 대출 상환 거래의 loan_interest_amount를 합산합니다.
+     * 대출 원금과 대출 실행·증액 거래는 제외합니다.
      */
     private Long totalExpense;
+
+    /**
+     * 해당 월의 고정지출 합계입니다.
+     *
+     * 소비로 분류된 비대출 고정지출의 out_amount와
+     * 정상 대출 상환 거래의 loan_interest_amount를 합산합니다.
+     */
+    private Long fixedExpense;
 
     /**
      * 카테고리별 소비 금액입니다.

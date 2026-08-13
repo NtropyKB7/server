@@ -28,6 +28,7 @@ import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
 import com.ntropy.work.mapper.InMemoryPlatformMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
+import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
 
 class WorkLogServiceTest {
 
@@ -75,7 +76,7 @@ class WorkLogServiceTest {
                 .settlementTriggerType("AUTO")
                 .build());
         JobService jobService = new JobService(
-                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper())
+                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()), new InMemoryAllocationGoalMapper()
         );
         workLogService = new WorkLogService(
                 workLogMapper, jobService, jobPlatformMappingMapper, platformMapper, workLogPlatformIncomeMapper);

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.LocalTime;
 import java.util.List;
 
+import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class JobServiceTest {
         jobScheduleMapper = new InMemoryJobScheduleMapper();
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
-        jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper));
+        jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper), new InMemoryAllocationGoalMapper());
     }
 
     private Job.JobBuilder baseJob() {

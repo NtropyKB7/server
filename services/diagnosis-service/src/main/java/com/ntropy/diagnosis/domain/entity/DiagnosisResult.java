@@ -56,6 +56,9 @@ public class DiagnosisResult {
     /** 최근 진단 계산 완료 시각 */
     private LocalDateTime calculatedAt;
 
+    /** 월말 기준으로 확정된 시각. 진행 중인 현재 월은 null이다. */
+    private LocalDateTime finalizedAt;
+
     /** 최초 생성 시각 */
     private LocalDateTime createdAt;
 

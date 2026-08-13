@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ntropy.notification.mapper.PushSubscriptionMapper">
+
+    <resultMap id="pushSubscriptionResultMap" type="com.ntropy.notification.domain.entity.PushSubscription">
+        <id property="subscriptionId" column="subscription_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="endpoint" column="endpoint"/>
+        <result property="p256dh" column="p256dh"/>
+        <result property="auth" column="auth"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 구독 등록. 같은 endpoint로 재구독하는 경우(브라우저 갱신 등)는 갱신한다 -->
+    <insert id="insert" parameterType="com.ntropy.notification.domain.entity.PushSubscription"
+            useGeneratedKeys="true" keyProperty="subscriptionId">
+        INSERT INTO PUSH_SUBSCRIPTION (
+            user_id, endpoint, p256dh, auth, created_at
+        ) VALUES (
+                     #{userId}, #{endpoint}, #{p256dh}, #{auth}, NOW()
+                 )
+        ON DUPLICATE KEY UPDATE
+            user_id = #{userId}, p256dh = #{p256dh}, auth = #{auth}
+    </insert>
+
+    <select id="findByUserId" resultMap="pushSubscriptionResultMap">
+        SELECT *
+        FROM PUSH_SUBSCRIPTION
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="findByEndpoint" resultMap="pushSubscriptionResultMap">
+        SELECT *
+        FROM PUSH_SUBSCRIPTION
+        WHERE endpoint = #{endpoint}
+    </select>
+
+    <delete id="deleteByEndpoint">
+        DELETE FROM PUSH_SUBSCRIPTION
+        WHERE endpoint = #{endpoint}
+    </delete>
+
+</mapper>

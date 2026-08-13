@@ -1,6 +1,7 @@
 package com.ntropy.notification.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import com.ntropy.common.exception.ServiceException;
 import com.ntropy.notification.domain.entity.Notification;
 import com.ntropy.notification.exception.NotificationErrorCode;
 import com.ntropy.notification.mapper.NotificationMapper;
+import com.ntropy.notification.push.WebPushSender;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ public class NotificationService {
 
     private final NotificationMapper notificationMapper;
     private final UserQueryClient userQueryClient;
+    private final WebPushSender webPushSender;
 
     /** 알림 수신 동의(alarm_agree)가 꺼져 있으면 발송(=생성) 자체를 건너뛴다. null은 존재하지 않는 회원이므로 발송하지 않는다. */
     @Transactional
@@ -48,6 +51,12 @@ public class NotificationService {
                 .build();
 
         notificationMapper.insertNotification(notification);
+        webPushSender.sendToUser(userId, Map.of(
+                "notificationId", notification.getNotificationId(),
+                "notificationType", notification.getNotificationType(),
+                "title", notification.getTitle(),
+                "body", notification.getBody()
+        ));
         return Optional.of(notification);
     }
 

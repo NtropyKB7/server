@@ -1,5 +1,7 @@
 package com.ntropy.account.client;
 
+import java.time.LocalDate;
+
 import org.springframework.stereotype.Component;
 
 import com.ntropy.account.service.FinancialPositionService;
@@ -18,5 +20,10 @@ public class LocalFinancialPositionQueryClient implements FinancialPositionQuery
     @Override
     public FinancialPositionSummary findFinancialPosition(Long userId) {
         return financialPositionService.findFinancialPosition(userId);
+    }
+
+    @Override
+    public FinancialPositionSummary findFinancialPosition(Long userId, LocalDate asOf) {
+        return financialPositionService.findFinancialPosition(userId, asOf);
     }
 }

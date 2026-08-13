@@ -12,3 +12,17 @@ CREATE TABLE NOTIFICATION (
                               deleted_at DATETIME NULL,                            -- 삭제(soft delete) 일시
                               INDEX idx_notification_user (user_id, created_at)
 );
+
+DROP TABLE IF EXISTS PUSH_SUBSCRIPTION;
+
+CREATE TABLE PUSH_SUBSCRIPTION (
+                                   subscription_id BIGINT AUTO_INCREMENT PRIMARY KEY,   -- 구독 고유 번호
+                                   user_id BIGINT NOT NULL,                             -- 구독한 회원 번호
+                                   endpoint VARCHAR(500) NOT NULL,                      -- 브라우저 푸시 서비스 endpoint URL (구독 단위 식별자)
+                                   p256dh VARCHAR(200) NOT NULL,                        -- 암호화 공개키
+                                   auth VARCHAR(100) NOT NULL,                          -- 인증 시크릿
+                                   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,       -- 구독 등록 일시
+                                   CONSTRAINT uq_push_subscription_endpoint UNIQUE (endpoint),
+                                   INDEX idx_push_subscription_user (user_id)
+);
+

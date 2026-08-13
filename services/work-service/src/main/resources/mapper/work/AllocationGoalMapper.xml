@@ -9,9 +9,10 @@
         <result property="recommendHour" column="recommend_hour"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.ntropy.work.domain.entity.AllocationGoal">
-        INSERT INTO ALLOCATION_GOAL (allocation_goal_id, job_id, target_month, recommend_hour)
-        VALUES (#{allocationGoalId}, #{jobId}, #{targetMonth}, #{recommendHour})
+    <insert id="insert" parameterType="com.ntropy.work.domain.entity.AllocationGoal"
+            useGeneratedKeys="true" keyProperty="allocationGoalId">
+        INSERT INTO ALLOCATION_GOAL (job_id, target_month, recommend_hour)
+        VALUES (#{jobId}, #{targetMonth}, #{recommendHour})
     </insert>
 
     <select id="findById" parameterType="long" resultMap="allocationGoalResultMap">
@@ -19,6 +20,23 @@
         FROM ALLOCATION_GOAL
         WHERE allocation_goal_id = #{allocationGoalId}
     </select>
+
+    <select id="findByUserIdAndTargetMonth" resultMap="allocationGoalResultMap">
+        SELECT ag.allocation_goal_id, ag.job_id, ag.target_month, ag.recommend_hour
+        FROM ALLOCATION_GOAL ag
+        INNER JOIN JOB j ON j.job_id = ag.job_id
+        WHERE j.user_id = #{userId}
+        AND ag.target_month = #{targetMonth}
+        ORDER BY ag.job_id
+    </select>
+
+    <delete id="deleteByUserIdAndTargetMonth">
+        DELETE ag
+        FROM ALLOCATION_GOAL ag
+        INNER JOIN JOB j ON j.job_id = ag.job_id
+        WHERE j.user_id = #{userId}
+        AND ag.target_month = #{targetMonth}
+    </delete>
 
     <select id="findByJobId" parameterType="long" resultMap="allocationGoalResultMap">
         SELECT allocation_goal_id, job_id, target_month, recommend_hour
