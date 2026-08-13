@@ -10,6 +10,7 @@ CREATE TABLE NOTIFICATION (
                               read_at DATETIME NULL,                               -- 읽음 처리 일시
                               created_at DATETIME DEFAULT CURRENT_TIMESTAMP,       -- 생성 일시
                               deleted_at DATETIME NULL,                            -- 삭제(soft delete) 일시
+                              CONSTRAINT uq_notification_event UNIQUE (event_id),
                               INDEX idx_notification_user (user_id, created_at)
 );
 
