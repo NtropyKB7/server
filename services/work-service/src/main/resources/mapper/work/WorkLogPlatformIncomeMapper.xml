@@ -50,4 +50,17 @@
           AND wl.work_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
+    <select id="findConfirmedByUserIdInAndDateRange" resultMap="workLogPlatformIncomeResultMap">
+        SELECT wpi.income_id, wpi.log_id, wpi.platform_id, wpi.expected_amount, wpi.settlement_status
+        FROM WORK_LOG_PLATFORM_INCOME wpi
+        JOIN WORK_LOG wl ON wpi.log_id = wl.log_id
+        WHERE wl.user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        AND wl.status = 'CONFIRMED'
+        AND wl.work_date IS NOT NULL
+        AND wl.work_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
 </mapper>

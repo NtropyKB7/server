@@ -36,4 +36,14 @@ public interface WorkLogPlatformIncomeMapper {
             @Param("userId") Long userId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    /**
+     * AI 리포트 배치용 벌크 조회: 여러 사용자의 확정(CONFIRMED) WORK_LOG_PLATFORM_INCOME을
+     * 한 번에 조회한다. 이 엔티티에는 userId가 없으므로, 결과를 사용자별로 나누려면
+     * 같은 기간에 벌크 조회한 WorkLog 목록(logId → userId)을 호출부에서 함께 이용해야 한다.
+     */
+    List<WorkLogPlatformIncome> findConfirmedByUserIdInAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }
