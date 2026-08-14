@@ -1,6 +1,7 @@
 package com.ntropy.account.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,6 +12,8 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +59,8 @@ class FinancialCommitmentServiceTest {
         assertEquals("ESTIMATED", summary.getAmountStatus());
         assertEquals("ESTIMATED", summary.getDateStatus());
         assertEquals(null, summary.getOutstandingBalance());
+        assertNull(summary.getExpectedPrincipalAmount());
+        assertNull(summary.getExpectedInterestAmount());
     }
 
     @Test
@@ -137,6 +142,85 @@ class FinancialCommitmentServiceTest {
         assertEquals(null, summary.getExpectedAmount());
         assertEquals("INSUFFICIENT", summary.getAmountStatus());
         assertEquals(3000000L, summary.getOutstandingBalance());
+        assertNull(summary.getExpectedPrincipalAmount());
+        assertNull(summary.getExpectedInterestAmount());
+    }
+
+    @Test
+    void loanSplitsTotalIntoPrincipalAndInterestWhenBothAvailable() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.loans.add(loan(20L, "대출계좌", "3000000.00", LocalDate.of(2026, 8, 25),
+                "250000.00", "200000.00", "50000.00"));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        FinancialCommitmentSummary summary = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)).get(0);
+
+        assertEquals(250000L, summary.getExpectedAmount());
+        assertEquals(200000L, summary.getExpectedPrincipalAmount());
+        assertEquals(50000L, summary.getExpectedInterestAmount());
+    }
+
+    @Test
+    void loanTotalFallsBackToPrincipalPlusInterestWhenTotalColumnIsUnresolvable() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.loans.add(loan(20L, "대출계좌", "3000000.00", LocalDate.of(2026, 8, 25),
+                null, "200000.00", "50000.00"));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        FinancialCommitmentSummary summary = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)).get(0);
+
+        assertEquals(250000L, summary.getExpectedAmount());
+        assertEquals("ESTIMATED", summary.getAmountStatus());
+        assertEquals(200000L, summary.getExpectedPrincipalAmount());
+        assertEquals(50000L, summary.getExpectedInterestAmount());
+    }
+
+    @Test
+    void loanTotalStaysInsufficientWhenColumnMissingAndOnlyOneOfPrincipalOrInterestAvailable() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.loans.add(loan(20L, "대출계좌", "3000000.00", LocalDate.of(2026, 8, 25),
+                null, "200000.00", null));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        FinancialCommitmentSummary summary = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)).get(0);
+
+        assertEquals(null, summary.getExpectedAmount());
+        assertEquals("INSUFFICIENT", summary.getAmountStatus());
+        assertEquals(200000L, summary.getExpectedPrincipalAmount());
+        assertNull(summary.getExpectedInterestAmount());
+    }
+
+    @Test
+    void loanMissingPrincipalDoesNotBorrowFromTotalRepaymentAmount() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.loans.add(loan(20L, "대출계좌", "3000000.00", LocalDate.of(2026, 8, 25),
+                "250000.00", null, "50000.00"));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        FinancialCommitmentSummary summary = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)).get(0);
+
+        assertEquals(250000L, summary.getExpectedAmount());
+        assertEquals("ESTIMATED", summary.getAmountStatus());
+        assertNull(summary.getExpectedPrincipalAmount());
+        assertEquals(50000L, summary.getExpectedInterestAmount());
+    }
+
+    @Test
+    void loanZeroPrincipalOrInterestIsPreservedNotTreatedAsInsufficient() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.loans.add(loan(20L, "대출계좌", "3000000.00", LocalDate.of(2026, 8, 25),
+                "250000.00", "0.00", "250000.00"));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        FinancialCommitmentSummary summary = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)).get(0);
+
+        assertEquals(0L, summary.getExpectedPrincipalAmount());
+        assertEquals(250000L, summary.getExpectedInterestAmount());
     }
 
     @Test
@@ -161,10 +245,9 @@ class FinancialCommitmentServiceTest {
     }
 
     @Test
-    void insuranceRequiresTwoDistinctTranDatesToBeRecognizedAsRepeating() {
+    void insuranceSingleOccurrenceWithKnownInsurerNameIsReportedImmediately() {
         InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 6, 5), "50000.00", "삼성생명", null, null, null));
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명보험", null, null, null));
         FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
 
         List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
@@ -173,44 +256,37 @@ class FinancialCommitmentServiceTest {
         assertEquals(1, result.size());
         FinancialCommitmentSummary summary = result.get(0);
         assertEquals("INSURANCE_PREMIUM", summary.getExpenseType());
+        assertEquals("삼성생명", summary.getProductName());
         assertEquals(50000L, summary.getExpectedAmount());
         assertEquals(LocalDate.of(2026, 8, 5), summary.getNextPaymentDate());
-        assertEquals("삼성생명", summary.getProductName());
+        assertNull(summary.getAccountId());
         assertEquals("ESTIMATED", summary.getAmountStatus());
         assertEquals("ESTIMATED", summary.getDateStatus());
     }
 
     @Test
-    void insuranceSameDateOccurrencesAreNotCountedAsRepeating() {
+    void insuranceSumsMultipleContractsAndWithdrawalAccountsForSameInsurerInLatestMonth() {
         InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명", null, null, null));
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 3), "50000.00", "삼성생명보험", null, null, null));
+        mapper.insurance.add(insuranceRow(31L, LocalDate.of(2026, 7, 20), "30000.00", "삼성생명", null, null, null));
         FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
 
         List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
                 1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
 
-        assertEquals(List.of(), result);
+        assertEquals(1, result.size());
+        FinancialCommitmentSummary summary = result.get(0);
+        assertEquals("삼성생명", summary.getProductName());
+        assertEquals(80000L, summary.getExpectedAmount());
+        assertEquals(LocalDate.of(2026, 8, 20), summary.getNextPaymentDate());
+        assertNull(summary.getAccountId());
     }
 
     @Test
-    void insuranceSingleOccurrenceIsNotReported() {
+    void insuranceOnlySumsSameCalendarMonthAsLatestOccurrence() {
         InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명", null, null, null));
-        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
-
-        List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
-                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
-
-        assertEquals(List.of(), result);
-    }
-
-    @Test
-    void insuranceGroupKeyIgnoresWhitespaceAndCaseButAmountMustMatchExactly() {
-        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 6, 5), "50000.00", "  samsung Life ", null, null, null));
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "SAMSUNG   LIFE", null, null, null));
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 20), "50001.00", "SAMSUNG LIFE", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 6, 5), "999999.00", "삼성생명", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 20), "50000.00", "삼성생명", null, null, null));
         FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
 
         List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
@@ -218,6 +294,55 @@ class FinancialCommitmentServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(50000L, result.get(0).getExpectedAmount());
+        assertEquals(LocalDate.of(2026, 8, 20), result.get(0).getNextPaymentDate());
+    }
+
+    @Test
+    void insuranceKeepsDifferentInsurersSeparate() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명보험", null, null, null));
+        mapper.insurance.add(insuranceRow(31L, LocalDate.of(2026, 7, 10), "40000.00", "DB손해보험㈜", null, null, null));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(2, result.size());
+        FinancialCommitmentSummary samsung = result.stream()
+                .filter(s -> "삼성생명".equals(s.getProductName())).findFirst().orElseThrow();
+        FinancialCommitmentSummary db = result.stream()
+                .filter(s -> "DB손보".equals(s.getProductName())).findFirst().orElseThrow();
+        assertEquals(50000L, samsung.getExpectedAmount());
+        assertEquals(40000L, db.getExpectedAmount());
+    }
+
+    @Test
+    void insurancePublicInsuranceIsIncludedAsInsurancePremium() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "112000.00", "국민건강보험공단", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "47000.00", "국민연금", null, null, null));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().allMatch(s -> "INSURANCE_PREMIUM".equals(s.getExpenseType())));
+        assertEquals(Set.of("국민건강보험", "국민연금"),
+                result.stream().map(FinancialCommitmentSummary::getProductName).collect(Collectors.toSet()));
+    }
+
+    @Test
+    void insuranceExcludesNonInsurerRecurringPaymentsEvenWhenRepeatedWithSameAmount() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "체크카드승인", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 20), "50000.00", "FBS 출금", null, null, null));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(List.of(), result);
     }
 
     @Test
@@ -285,6 +410,22 @@ class FinancialCommitmentServiceTest {
     }
 
     @Test
+    void insuranceItemsWithNullAccountIdAndSameNextPaymentDateAreSortedByProductName() {
+        InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 5), "50000.00", "삼성생명보험", null, null, null));
+        mapper.insurance.add(insuranceRow(31L, LocalDate.of(2026, 7, 5), "40000.00", "DB손해보험", null, null, null));
+        FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
+
+        List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
+                1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().allMatch(s -> s.getAccountId() == null));
+        assertEquals(List.of("DB손보", "삼성생명"),
+                result.stream().map(FinancialCommitmentSummary::getProductName).toList());
+    }
+
+    @Test
     void rejectsNullOrNonPositiveUserId() {
         InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
         FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
@@ -331,12 +472,20 @@ class FinancialCommitmentServiceTest {
     private static LoanCommitmentCandidateRow loan(
             Long accountId, String productName, String outstandingBalance,
             LocalDate nextPaymentDate, String expectedAmount) {
+        return loan(accountId, productName, outstandingBalance, nextPaymentDate, expectedAmount, null, null);
+    }
+
+    private static LoanCommitmentCandidateRow loan(
+            Long accountId, String productName, String outstandingBalance, LocalDate nextPaymentDate,
+            String expectedAmount, String expectedPrincipalAmount, String expectedInterestAmount) {
         LoanCommitmentCandidateRow row = new LoanCommitmentCandidateRow();
         row.setAccountId(accountId);
         row.setProductName(productName);
         row.setOutstandingBalance(outstandingBalance == null ? null : new BigDecimal(outstandingBalance));
         row.setNextPaymentDate(nextPaymentDate);
         row.setExpectedAmount(expectedAmount == null ? null : new BigDecimal(expectedAmount));
+        row.setExpectedPrincipalAmount(expectedPrincipalAmount == null ? null : new BigDecimal(expectedPrincipalAmount));
+        row.setExpectedInterestAmount(expectedInterestAmount == null ? null : new BigDecimal(expectedInterestAmount));
         return row;
     }
 
