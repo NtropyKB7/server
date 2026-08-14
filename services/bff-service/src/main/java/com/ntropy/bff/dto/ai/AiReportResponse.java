@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ntropy.bff.util.JsonNamingConverter;
+import com.ntropy.common.dto.ai.AiReportDetailSummary;
 import com.ntropy.common.dto.ai.AiReportSummary;
 
 import lombok.Getter;
@@ -61,6 +61,12 @@ public class AiReportResponse {
     public static AiReportResponse from(
             AiReportSummary summary
     ) {
+        return from(AiReportDetailSummary.from(summary));
+    }
+
+    public static AiReportResponse from(
+            AiReportDetailSummary summary
+    ) {
         AiReportResponse response =
                 new AiReportResponse();
 
@@ -74,19 +80,13 @@ public class AiReportResponse {
          * 재무 요약 JSON도 과거 snake_case 데이터가 있을 수 있으므로
          * camelCase로 변환합니다.
          */
-        response.financialSummary =
-                JsonNamingConverter.toCamelCase(
-                        summary.financialSummary()
-                );
+        response.financialSummary = summary.financialSummary();
 
         /*
          * FastAPI 추천 응답은 snake_case이므로
          * 프론트엔드 응답 전에 camelCase로 변환합니다.
          */
-        response.recommendation =
-                JsonNamingConverter.toCamelCase(
-                        summary.recommendation()
-                );
+        response.recommendation = summary.recommendation();
 
         response.createdAt =
                 summary.createdAt();

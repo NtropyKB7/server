@@ -1,6 +1,8 @@
 package com.ntropy.work.client;
 
 import java.time.YearMonth;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
@@ -19,5 +21,11 @@ public class LocalIncomeAnalysisQueryClient implements IncomeAnalysisQueryClient
     @Override
     public MonthlyIncomeAnalysisSummary getMonthlyIncomeAnalysis(Long userId, YearMonth yearMonth) {
         return incomeAnalysisService.getMonthlyIncomeAnalysis(userId, yearMonth);
+    }
+
+    @Override
+    public Map<Long, MonthlyIncomeAnalysisSummary> getMonthlyIncomeAnalysisBulk(
+            List<Long> userIds, YearMonth yearMonth) {
+        return incomeAnalysisService.getMonthlyIncomeAnalysisBulk(userIds, yearMonth);
     }
 }

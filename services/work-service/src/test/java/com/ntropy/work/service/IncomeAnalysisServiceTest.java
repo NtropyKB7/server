@@ -375,5 +375,17 @@ class IncomeAnalysisServiceTest {
                     .filter(s -> !s.getDepositDate().isBefore(startDate) && !s.getDepositDate().isAfter(endDate))
                     .toList();
         }
+
+        @Override
+        public List<Settlement> findByUserIdInAndDepositDateRange(List<Long> userIds, LocalDate startDate,
+                                                                    LocalDate endDate) {
+            if (failingMonths.contains(YearMonth.from(startDate))) {
+                throw new RuntimeException("조회 실패 (테스트용)");
+            }
+            return all.stream()
+                    .filter(s -> userIds.contains(s.getUserId()))
+                    .filter(s -> !s.getDepositDate().isBefore(startDate) && !s.getDepositDate().isAfter(endDate))
+                    .toList();
+        }
     }
 }

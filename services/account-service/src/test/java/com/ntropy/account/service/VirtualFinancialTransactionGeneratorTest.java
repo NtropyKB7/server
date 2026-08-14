@@ -29,14 +29,18 @@ class VirtualFinancialTransactionGeneratorTest {
             "KB손해보험 암보험", "교보생명 종신보험", "한화생명 연금보험"
     );
     private static final Set<String> INCOME_COUNTERPARTY_NAMES = Set.of(
-            "우아한형제들", "쿠팡이츠", "위대한상상", "카카오모빌리티", "구글코리아",
-            "로지올", "쿠팡풀필먼트서비스", "미소", "알바몬", "도그메이트", "엠브레인패널파워"
+            "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "GOOGLE",
+            "쿠팡-용역비", "티맵모빌리티", "CJ대한통운", "로젠택배", "생활연구소",
+            "유한회사미소", "케어닥", "펫피플", "PAYPAL", "네이버"
     );
     // work-service PLATFORM.platform_name 시드값 중 deposit_name과 다른 것들.
-    // (쿠팡이츠는 platform_name==deposit_name이라 제외 — 정산 수입에 정상적으로 등장한다.)
+    // (로젠택배·케어닥은 platform_name==deposit_name이라 제외, 미소는 platform_name "미소"가
+    // deposit_name "유한회사미소"의 부분 문자열이라 contains 오탐이 생겨 제외 — 정산 수입에 정상적으로 등장한다.)
     // 거래 상대방명에는 플랫폼 표시명 대신 실제 정산처명이 저장돼야 한다.
     private static final Set<String> PLATFORM_DISPLAY_NAME_TOKENS = Set.of(
-            "배달의민족", "요기요", "카카오T", "유튜브", "쿠팡플렉스"
+            "배민커넥트", "쿠팡이츠 배달파트너", "요기요라이더", "카카오T대리", "유튜브",
+            "쿠팡플렉스", "티맵 대리", "CJ대한통운 상하차", "청소연구소(청연)", "펫플래닛", "틱톡",
+            "네이버TV"
     );
     private static final Set<String> MEDIUM_PREFIXES = Set.of(
             "KG이니시스_", "토스페이_", "네이버페이_", "카카오페이_", "나이스페이_", "NHN페이코_"
@@ -79,10 +83,11 @@ class VirtualFinancialTransactionGeneratorTest {
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getInAmount().signum() > 0));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getOutAmount().signum() > 0));
         List<AccountTransaction> incomeTransactions = generated.transactions().stream()
+                .filter(transaction -> transaction.getInAmount().signum() > 0)
                 .filter(transaction -> INCOME_COUNTERPARTY_NAMES.contains(transaction.getDesc3()))
                 .toList();
         assertEquals(30, incomeTransactions.size());
-        assertEquals(Set.of("우아한형제들", "카카오모빌리티"), incomeTransactions.stream()
+        assertEquals(Set.of("우아한청년들", "카카오모빌리티"), incomeTransactions.stream()
                 .map(AccountTransaction::getDesc3).collect(Collectors.toSet()));
     }
 
@@ -95,6 +100,7 @@ class VirtualFinancialTransactionGeneratorTest {
 
         assertEquals(3, generated.userIncomeCounterpartyCount());
         assertEquals(3, generated.transactions().stream()
+                .filter(transaction -> transaction.getInAmount().signum() > 0)
                 .map(AccountTransaction::getDesc3).filter(INCOME_COUNTERPARTY_NAMES::contains).distinct().count());
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.LOAN));
         assertTrue(generated.transactions().stream()
@@ -139,6 +145,7 @@ class VirtualFinancialTransactionGeneratorTest {
         );
         assertTrue(ibk.transactions().stream().allMatch(transaction -> transaction.getDesc4() == null));
         assertTrue(ibk.transactions().stream()
+                .filter(transaction -> transaction.getInAmount().signum() > 0)
                 .filter(transaction -> INCOME_COUNTERPARTY_NAMES.contains(transaction.getDesc3()))
                 .allMatch(transaction -> transaction.getDesc1() != null));
         assertNull(ibk.transactions().get(0).getDesc4());
@@ -356,6 +363,24 @@ class VirtualFinancialTransactionGeneratorTest {
                                     .anyMatch(transaction.getDesc3()::contains)),
                     "userOrdinal=" + userOrdinal);
         }
+    }
+
+    @Test
+    void generatesAllConfirmedSeedDepositNamesAcrossFiftyUsers() {
+        Set<String> observedIncomeCounterparties = new java.util.HashSet<>();
+        for (int userOrdinal = 1; userOrdinal <= 50; userOrdinal++) {
+            GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
+                    userOrdinal, PersonalBank.SHINHAN_BANK,
+                    account(200L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
+                    account(300L + userOrdinal, AccountGroup.DEPOSIT_TRUST)
+            );
+            generated.transactions().stream()
+                    .filter(transaction -> transaction.getInAmount().signum() > 0)
+                    .map(AccountTransaction::getDesc3)
+                    .filter(INCOME_COUNTERPARTY_NAMES::contains)
+                    .forEach(observedIncomeCounterparties::add);
+        }
+        assertEquals(INCOME_COUNTERPARTY_NAMES, observedIncomeCounterparties);
     }
 
     @Test

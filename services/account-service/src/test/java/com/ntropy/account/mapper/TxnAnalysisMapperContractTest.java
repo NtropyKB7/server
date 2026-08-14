@@ -25,6 +25,7 @@ class TxnAnalysisMapperContractTest {
 
         assertTrue(mapper.contains("<insert id=\"upsert\""));
         assertTrue(mapper.contains("<insert id=\"upsertAnalyses\""));
+        assertTrue(mapper.contains("<insert id=\"upsertDailyAnalyses\""));
         assertTrue(mapper.contains("INSERT INTO TXN_ANALYSIS"));
     }
 

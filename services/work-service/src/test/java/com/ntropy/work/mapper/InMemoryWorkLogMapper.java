@@ -63,6 +63,19 @@ public class InMemoryWorkLogMapper implements WorkLogMapper {
     }
 
     @Override
+    public List<WorkLog> findByUserIdInAndDateRange(List<Long> userIds, LocalDate startDate, LocalDate endDate) {
+        List<WorkLog> result = new ArrayList<>();
+        for (WorkLog workLog : store.values()) {
+            if (userIds.contains(workLog.getUserId())
+                    && !workLog.getWorkDate().isBefore(startDate)
+                    && !workLog.getWorkDate().isAfter(endDate)) {
+                result.add(workLog);
+            }
+        }
+        return result;
+    }
+
+    @Override
     public void update(WorkLog workLog) {
         store.put(workLog.getLogId(), workLog);
     }

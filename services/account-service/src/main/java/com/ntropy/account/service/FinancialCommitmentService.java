@@ -4,16 +4,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.account.domain.InsuranceCompany;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.projection.InsuranceOutflowRow;
@@ -51,7 +52,8 @@ public class FinancialCommitmentService {
         commitments.sort(Comparator
                 .comparing(FinancialCommitmentSummary::getNextPaymentDate, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(FinancialCommitmentSummary::getExpenseType)
-                .thenComparing(FinancialCommitmentSummary::getAccountId));
+                .thenComparing(FinancialCommitmentSummary::getAccountId, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(FinancialCommitmentSummary::getProductName, Comparator.nullsLast(Comparator.naturalOrder())));
         return commitments;
     }
 
@@ -77,7 +79,7 @@ public class FinancialCommitmentService {
             DateResolution date = resolveDate(row.getNextPaymentDate());
             result.add(new FinancialCommitmentSummary(
                     null, row.getAccountId(), EXPENSE_TYPE_SAVING, row.getProductName(),
-                    null, amount.amount(), date.date(), amount.status(), date.status()
+                    null, amount.amount(), null, null, date.date(), amount.status(), date.status()
             ));
         }
         return result;
@@ -89,17 +91,24 @@ public class FinancialCommitmentService {
             if (!withinRangeOrUnknown(row.getNextPaymentDate(), fromDate, toDate)) {
                 continue;
             }
-            AmountResolution amount = resolveExpectedAmount(row.getExpectedAmount());
+            AmountResolution principal = resolveAmount(row.getExpectedPrincipalAmount());
+            AmountResolution interest = resolveAmount(row.getExpectedInterestAmount());
+            AmountResolution total = resolveTotalAmount(row.getExpectedAmount(), principal.amount(), interest.amount());
             DateResolution date = resolveDate(row.getNextPaymentDate());
             Long outstandingBalance = resolveAmount(row.getOutstandingBalance()).amount();
             result.add(new FinancialCommitmentSummary(
                     null, row.getAccountId(), EXPENSE_TYPE_LOAN, row.getProductName(),
-                    outstandingBalance, amount.amount(), date.date(), amount.status(), date.status()
+                    outstandingBalance, total.amount(), principal.amount(), interest.amount(),
+                    date.date(), total.status(), date.status()
             ));
         }
         return result;
     }
 
+    /**
+     * 보험사 법인명·축약명 registry로 판정한 후보를 사용자별 표준 보험사명 하나로 묶는다.
+     * 출금계좌·계약·금액이 달라도 같은 보험사면 하나의 항목으로 합산하며, 반복 횟수나 동일 금액은 요구하지 않는다.
+     */
     private List<FinancialCommitmentSummary> buildInsuranceCommitments(Long userId, LocalDate fromDate, LocalDate toDate) {
         LocalDate today = LocalDate.now(clock);
         LocalDate observationEnd = toDate.isBefore(today) ? toDate : today;
@@ -108,44 +117,46 @@ public class FinancialCommitmentService {
         List<InsuranceOutflowRow> rows = financialCommitmentMapper.findInsuranceOutflowCandidates(
                 userId, observationStart, observationEnd);
 
-        Map<InsuranceGroupKey, List<InsuranceOutflowRow>> grouped = new LinkedHashMap<>();
+        Map<String, List<InsuranceOutflowRow>> occurrencesByInsurer = new LinkedHashMap<>();
         for (InsuranceOutflowRow row : rows) {
-            String rawGroupKey = buildRawGroupKey(row);
-            if (rawGroupKey == null || row.getOutAmount() == null) {
+            String combinedDescription = combineDescriptions(row);
+            if (combinedDescription == null || row.getOutAmount() == null) {
                 continue;
             }
-            InsuranceGroupKey key = new InsuranceGroupKey(row.getAccountId(), normalize(rawGroupKey), row.getOutAmount());
-            grouped.computeIfAbsent(key, unused -> new ArrayList<>()).add(row);
+            InsuranceCompany.matchStandardName(combinedDescription).ifPresent(standardName ->
+                    occurrencesByInsurer.computeIfAbsent(standardName, unused -> new ArrayList<>()).add(row));
         }
 
         List<FinancialCommitmentSummary> result = new ArrayList<>();
-        for (Map.Entry<InsuranceGroupKey, List<InsuranceOutflowRow>> entry : grouped.entrySet()) {
+        for (Map.Entry<String, List<InsuranceOutflowRow>> entry : occurrencesByInsurer.entrySet()) {
             List<InsuranceOutflowRow> occurrences = entry.getValue();
-            long distinctTranDates = occurrences.stream().map(InsuranceOutflowRow::getTranDate).distinct().count();
-            if (distinctTranDates < 2) {
-                continue;
-            }
 
-            InsuranceOutflowRow latest = occurrences.stream()
-                    .max(Comparator.comparing(InsuranceOutflowRow::getTranDate))
+            LocalDate latestTranDate = occurrences.stream()
+                    .map(InsuranceOutflowRow::getTranDate)
+                    .max(Comparator.naturalOrder())
                     .orElseThrow();
-            LocalDate nextPaymentDate = latest.getTranDate().plusMonths(1);
+            LocalDate nextPaymentDate = latestTranDate.plusMonths(1);
             if (!withinRangeOrUnknown(nextPaymentDate, fromDate, toDate)) {
                 continue;
             }
 
-            AmountResolution amount = resolveExpectedAmount(entry.getKey().amount());
-            String productName = firstNonBlank(latest.getDesc1(), latest.getDesc2(), latest.getDesc3(), latest.getDesc4());
+            YearMonth latestMonth = YearMonth.from(latestTranDate);
+            BigDecimal monthlyTotal = occurrences.stream()
+                    .filter(row -> YearMonth.from(row.getTranDate()).equals(latestMonth))
+                    .map(InsuranceOutflowRow::getOutAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            AmountResolution amount = resolveExpectedAmount(monthlyTotal);
             result.add(new FinancialCommitmentSummary(
-                    null, entry.getKey().accountId(), EXPENSE_TYPE_INSURANCE, productName,
-                    null, amount.amount(), nextPaymentDate, amount.status(), STATUS_ESTIMATED
+                    null, null, EXPENSE_TYPE_INSURANCE, entry.getKey(),
+                    null, amount.amount(), null, null, nextPaymentDate, amount.status(), STATUS_ESTIMATED
             ));
         }
         return result;
     }
 
     /** desc1→desc2→desc3→desc4 순서로 trim한 비어 있지 않은 값을 |로 결합한다. 전부 비어 있으면 null. */
-    private static String buildRawGroupKey(InsuranceOutflowRow row) {
+    private static String combineDescriptions(InsuranceOutflowRow row) {
         List<String> parts = new ArrayList<>();
         for (String value : new String[]{row.getDesc1(), row.getDesc2(), row.getDesc3(), row.getDesc4()}) {
             if (value != null) {
@@ -156,22 +167,6 @@ public class FinancialCommitmentService {
             }
         }
         return parts.isEmpty() ? null : String.join("|", parts);
-    }
-
-    private static String normalize(String rawGroupKey) {
-        return rawGroupKey.replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
-    }
-
-    private static String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (value != null) {
-                String trimmed = value.trim();
-                if (!trimmed.isEmpty()) {
-                    return trimmed;
-                }
-            }
-        }
-        return null;
     }
 
     /** nextPaymentDate가 없으면 기간과 무관하게 포함하고, 있으면 [fromDate, toDate]에 포함될 때만 포함한다. */
@@ -206,11 +201,25 @@ public class FinancialCommitmentService {
                 : resolution;
     }
 
-    private static DateResolution resolveDate(LocalDate date) {
-        return date == null ? DateResolution.insufficient() : DateResolution.estimated(date);
+    /**
+     * 대출 총상환액은 최근 정상 상환 거래의 원시값(out_amount)이 있으면 그 값을 그대로 사용한다.
+     * 원시값을 산출할 수 없을 때만 원금과 이자의 합계로 대체하며, 원금·이자 중 하나라도 없으면 대체하지 않는다.
+     * 원금·이자 각 필드는 이 총상환액과 무관하게 항상 자신의 원본 컬럼에서만 산출한다.
+     */
+    private static AmountResolution resolveTotalAmount(BigDecimal totalRaw, Long principal, Long interest) {
+        AmountResolution total = resolveExpectedAmount(totalRaw);
+        if (total.amount() != null) {
+            return total;
+        }
+        if (principal == null || interest == null) {
+            return total;
+        }
+        long sum = principal + interest;
+        return sum > 0 ? AmountResolution.estimated(sum) : AmountResolution.insufficient();
     }
 
-    private record InsuranceGroupKey(Long accountId, String normalizedKey, BigDecimal amount) {
+    private static DateResolution resolveDate(LocalDate date) {
+        return date == null ? DateResolution.insufficient() : DateResolution.estimated(date);
     }
 
     private record AmountResolution(Long amount, String status) {

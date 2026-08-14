@@ -9,28 +9,31 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 매월 AI 리포트 배치를 실행하는 스케줄러입니다.
+ * 매월 AI 리포트 배치를 실행하는 Scheduler입니다.
  *
- * 실제 처리 순서는 MonthlyAiReportOrchestrationService에 맡기고,
- * 이 클래스는 정해진 시각에 배치를 시작하는 역할만 담당합니다.
+ * 실제 처리 과정은 MonthlyAiReportOrchestrationService가 담당하고,
+ * 이 클래스는 정해진 시각에 배치를 시작합니다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class MonthlyAiReportScheduler {
 
-    // 월간 리포트 전체 흐름을 처리하는 서비스입니다.
-    private final MonthlyAiReportOrchestrationService orchestrationService;
+    private final MonthlyAiReportOrchestrationService
+            orchestrationService;
 
     /**
-     * 매월 1일 새벽 2시, 한국 시간 기준으로 실행됩니다.
+     * 매월 1일 새벽 3시, 한국 시간 기준으로 실행합니다.
+     *
+     * 매일 새벽 2시에 실행되는 일간 소비 분류 배치 이후
+     * 전월 TXN_ANALYSIS 데이터를 이용해 AI 리포트를 생성합니다.
      *
      * 기본 크론 표현식:
      * 초 분 시 일 월 요일
-     * 0  0  2  1  *  ?
+     * 0  0  3  1  *  ?
      */
     @Scheduled(
-            cron = "${ai-report.scheduler.monthly-cron:0 0 2 1 * ?}",
+            cron = "${ai-report.scheduler.monthly-cron:0 0 3 1 * ?}",
             zone = "Asia/Seoul"
     )
     public void runMonthlyAiReportBatch() {
@@ -41,9 +44,13 @@ public class MonthlyAiReportScheduler {
 
             log.info("[AI 리포트 배치] 월간 배치 스케줄 실행 완료");
         } catch (Exception exception) {
-            // 예상하지 못한 예외가 발생해도 스케줄러 스레드가 죽지 않도록 기록합니다.
+            /*
+             * 예상하지 못한 예외가 발생해도 Scheduler 스레드가
+             * 종료되지 않도록 오류를 기록합니다.
+             */
             log.error(
-                    "[AI 리포트 배치] 월간 배치 스케줄 실행 중 예상하지 못한 오류 발생",
+                    "[AI 리포트 배치] 월간 배치 스케줄 실행 중 "
+                            + "예상하지 못한 오류 발생",
                     exception
             );
         }

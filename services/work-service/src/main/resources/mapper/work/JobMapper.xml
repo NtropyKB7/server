@@ -46,6 +46,17 @@
         WHERE user_id = #{userId}
     </select>
 
+    <select id="findByUserIdIn" resultMap="jobResultMap">
+        SELECT job_id, user_id, category_id, job_name, settlement_type, hourly_wage,
+               monthly_wage, per_task_wage, task_per_hour, is_regular, base_fatigue,
+               monthly_expected_income, created_at, updated_at, is_active
+        FROM JOB
+        WHERE user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </select>
+
     <update id="update" parameterType="com.ntropy.work.domain.entity.Job">
         UPDATE JOB
         SET category_id = #{categoryId},

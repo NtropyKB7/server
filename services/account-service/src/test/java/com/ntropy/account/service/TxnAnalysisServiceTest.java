@@ -19,6 +19,7 @@ import com.ntropy.account.mapper.TxnAnalysisMapper;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
 import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
 import com.ntropy.common.dto.account.ClassificationTargetTransaction;
+import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
 import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
 import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
 import com.ntropy.common.exception.ServiceException;
@@ -189,6 +190,111 @@ class TxnAnalysisServiceTest {
         assertEquals(0, txnAnalysisMapper.upsertAnalysesCalls);
     }
 
+    @Test
+    void savesCompletedConsumptionAndNonConsumptionDailyResults() {
+        InMemoryFinancialDataQueryMapper queryMapper =
+                new InMemoryFinancialDataQueryMapper();
+
+        InMemoryTxnAnalysisMapper analysisMapper =
+                new InMemoryTxnAnalysisMapper();
+
+        TxnAnalysisService service =
+                new TxnAnalysisService(
+                        analysisMapper,
+                        queryMapper
+                );
+
+        service.saveDailyAnalyses(
+                List.of(
+                        new TransactionAnalysisSaveItem(
+                                1L,
+                                true,
+                                "FOOD",
+                                "VARIABLE"
+                        ),
+                        new TransactionAnalysisSaveItem(
+                                2L,
+                                false,
+                                null,
+                                null
+                        )
+                )
+        );
+
+        assertEquals(
+                2,
+                analysisMapper.savedRows
+        );
+    }
+
+    @Test
+    void rejectsInconsistentDailyResult() {
+        InMemoryFinancialDataQueryMapper queryMapper =
+                new InMemoryFinancialDataQueryMapper();
+
+        InMemoryTxnAnalysisMapper analysisMapper =
+                new InMemoryTxnAnalysisMapper();
+
+        TxnAnalysisService service =
+                new TxnAnalysisService(
+                        analysisMapper,
+                        queryMapper
+                );
+
+        assertThrows(
+                ServiceException.class,
+                () -> service.saveDailyAnalyses(
+                        List.of(
+                                new TransactionAnalysisSaveItem(
+                                        1L,
+                                        false,
+                                        "FOOD",
+                                        "VARIABLE"
+                                )
+                        )
+                )
+        );
+
+        assertThrows(
+                ServiceException.class,
+                () -> service.saveDailyAnalyses(
+                        List.of(
+                                new TransactionAnalysisSaveItem(
+                                        2L,
+                                        true,
+                                        null,
+                                        null
+                                )
+                        )
+                )
+        );
+
+        assertEquals(
+                0,
+                analysisMapper.savedRows
+        );
+    }
+
+    @Test
+    void rejectsDailyQueryLimitOutsideOneToFiveHundred() {
+        TxnAnalysisService service =
+                new TxnAnalysisService(
+                        new InMemoryTxnAnalysisMapper(),
+                        new InMemoryFinancialDataQueryMapper()
+                );
+
+        assertThrows(
+                ServiceException.class,
+                () -> service.findUnanalyzedTransactions(0)
+        );
+
+        assertThrows(
+                ServiceException.class,
+                () -> service.findUnanalyzedTransactions(501)
+        );
+    }
+
+
     private static TransactionAnalysisSaveRequest request(Long userId, String yearMonth, Long... transactionIds) {
         List<TransactionAnalysisSaveItem> analyses = new ArrayList<>();
         for (Long transactionId : transactionIds) {
@@ -213,6 +319,14 @@ class TxnAnalysisServiceTest {
             upsertAnalysesCalls++;
             savedRows += request.getAnalyses().size();
             return request.getAnalyses().size();
+        }
+
+        @Override
+        public int upsertDailyAnalyses(
+                List<TransactionAnalysisSaveItem> analyses
+        ) {
+            savedRows += analyses.size();
+            return analyses.size();
         }
     }
 
@@ -277,6 +391,12 @@ class TxnAnalysisServiceTest {
                     .filter(t -> yearMonth.equals(t.yearMonth()))
                     .map(TxnRow::transactionId)
                     .toList();
+        }
+
+        @Override
+        public List<DailyClassificationTargetTransaction>
+                findUnanalyzedTransactions(int limit) {
+            return List.of();
         }
     }
 }

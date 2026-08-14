@@ -41,7 +41,9 @@
                account_row.account_name AS productName,
                account_row.balance AS outstandingBalance,
                account_row.next_payment_date AS nextPaymentDate,
-               latest_tx.out_amount AS expectedAmount
+               latest_tx.out_amount AS expectedAmount,
+               latest_tx.loan_principal_amount AS expectedPrincipalAmount,
+               latest_tx.loan_interest_amount AS expectedInterestAmount
         FROM ACCOUNT account_row
                  LEFT JOIN ACCOUNT_TRANSACTION latest_tx
                            ON latest_tx.account_transaction_id = (

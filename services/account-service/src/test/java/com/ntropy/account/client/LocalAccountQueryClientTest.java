@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.ntropy.common.dto.account.ClassificationTargetTransaction;
+import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.account.domain.AccountGroup;
@@ -247,6 +248,12 @@ class LocalAccountQueryClientTest {
                 String yearMonth,
                 List<Long> transactionIds
         ) {
+            return List.of();
+        }
+
+        @Override
+        public List<DailyClassificationTargetTransaction>
+        findUnanalyzedTransactions(int limit) {
             return List.of();
         }
     }

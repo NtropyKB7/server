@@ -58,6 +58,69 @@ class FinancialDataQueryMapperContractTest {
         assertTrue(validationQuery.contains("transaction_row.account_transaction_id IN"));
     }
 
+    @Test
+    void dailyQueryFindsAllSupportedTransactionsWithoutExistingAnalysis()
+            throws IOException {
+
+        String query = selectBody(
+                readMapper(),
+                "findUnanalyzedTransactions"
+        );
+
+        assertTrue(query.contains("NOT EXISTS"));
+        assertTrue(
+                query.contains("FROM TXN_ANALYSIS analysis_row")
+        );
+
+        assertTrue(
+                query.contains(
+                        "transaction_row.transaction_category = 'ORDINARY'"
+                )
+        );
+
+        assertTrue(
+                query.contains(
+                        "transaction_row.transaction_category = 'INSTALLMENT'"
+                )
+        );
+
+        assertTrue(
+                query.contains(
+                        "transaction_row.transaction_category = 'LOAN'"
+                )
+        );
+
+        assertTrue(
+                query.contains(
+                        "transaction_row.out_amount &gt; 0"
+                )
+        );
+
+        assertTrue(
+                query.contains(
+                        "transaction_row.in_amount &gt; 0"
+                )
+        );
+
+        assertTrue(
+                query.contains(
+                        "ORDER BY transaction_row.account_transaction_id"
+                )
+        );
+
+        assertTrue(
+                query.contains("LIMIT #{limit}")
+        );
+
+        /*
+         * 과거에 생성된 비활성 계좌 거래도 분석에서 빠지지 않도록
+         * ACTIVE 계좌 조건을 사용하지 않습니다.
+         */
+        assertFalse(
+                query.contains("account_row.status = 'ACTIVE'")
+        );
+    }
+
     private static String sqlFragmentBody(String mapper, String sqlId) {
         int start = mapper.indexOf("<sql id=\"" + sqlId + "\"");
         int end = mapper.indexOf("</sql>", start);

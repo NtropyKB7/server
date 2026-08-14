@@ -87,4 +87,24 @@ public class InMemoryWorkLogPlatformIncomeMapper implements WorkLogPlatformIncom
         }
         return result;
     }
+
+    @Override
+    public List<WorkLogPlatformIncome> findConfirmedByUserIdInAndDateRange(
+            List<Long> userIds, LocalDate startDate, LocalDate endDate) {
+        List<WorkLogPlatformIncome> result = new ArrayList<>();
+        for (WorkLogPlatformIncome income : store.values()) {
+            WorkLog workLog = workLogMapper.findById(income.getLogId());
+            if (workLog == null || !userIds.contains(workLog.getUserId())) {
+                continue;
+            }
+            if (!"CONFIRMED".equals(workLog.getStatus()) || workLog.getWorkDate() == null) {
+                continue;
+            }
+            if (workLog.getWorkDate().isBefore(startDate) || workLog.getWorkDate().isAfter(endDate)) {
+                continue;
+            }
+            result.add(income);
+        }
+        return result;
+    }
 }
