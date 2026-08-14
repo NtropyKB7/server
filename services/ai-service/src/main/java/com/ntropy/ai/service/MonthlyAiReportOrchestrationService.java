@@ -89,6 +89,9 @@ public class MonthlyAiReportOrchestrationService {
      */
     private final AiReportService aiReportService;
 
+    /** 저장 완료된 AI 리포트의 구독자 자동 이메일 발송을 담당합니다. */
+    private final AiReportEmailDeliveryService aiReportEmailDeliveryService;
+
     /**
      * Java 객체를 JSON 문자열로 변환합니다.
      */
@@ -448,6 +451,15 @@ public class MonthlyAiReportOrchestrationService {
                         .financialSummaryJson(financialSummaryJson)
                         .recommendationJson(recommendationJson)
                         .build()
+        );
+
+        /*
+         * upsert 트랜잭션이 정상적으로 종료된 후에만 자동 이메일을 발송합니다.
+         * 자동 전달 서비스는 구독·이메일 확인과 발송 실패를 내부에서 격리합니다.
+         */
+        aiReportEmailDeliveryService.deliverAutomatically(
+                userId,
+                yearMonth
         );
 
         log.info(

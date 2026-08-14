@@ -10,6 +10,10 @@ application.properties
 application-local.properties
 application-*.properties
 !application.properties.example
+mail.properties
+mail-local.properties
+mail-*.properties
+!mail.properties.example
 codef-local.properties
 portone-local.properties
 weather-local.properties

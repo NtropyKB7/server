@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.YearMonth;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -258,6 +259,101 @@ class MonthlyAiReportOrchestrationServiceTest {
         assertFalse(hasCategory(topCategories, "ETC"));
     }
 
+    @Test
+    @DisplayName("AI_REPORT 저장이 정상 반환한 뒤 자동 이메일 발송을 호출한다")
+    void runBatch_deliversAutomaticallyAfterUpsertReturns() {
+        List<String> events = new ArrayList<>();
+        AiReportService reportService = new CapturingAiReportService() {
+            @Override
+            public void upsert(AiReport aiReport) {
+                events.add("UPSERT:" + aiReport.getUserId());
+            }
+        };
+        AiReportEmailDeliveryService deliveryService = new NoOpAutomaticDeliveryService() {
+            @Override
+            public void deliverAutomatically(Long userId, String yearMonth) {
+                events.add("DELIVERY:" + userId);
+            }
+        };
+        MonthlyAiReportOrchestrationService service = createService(
+                () -> List.of(1L),
+                (userId, yearMonth) -> null,
+                (userId, yearMonth) -> null,
+                new CapturingRecommendationClient(),
+                reportService,
+                deliveryService
+        );
+
+        service.runBatch(YearMonth.of(2026, 7));
+
+        assertEquals(List.of("UPSERT:1", "DELIVERY:1"), events);
+    }
+
+    @Test
+    @DisplayName("AI_REPORT 저장 실패 시 자동 이메일을 호출하지 않는다")
+    void runBatch_whenUpsertFails_doesNotDeliverAutomatically() {
+        List<Long> deliveredUserIds = new ArrayList<>();
+        AiReportService reportService = new CapturingAiReportService() {
+            @Override
+            public void upsert(AiReport aiReport) {
+                throw new IllegalStateException("simulated persistence failure");
+            }
+        };
+        AiReportEmailDeliveryService deliveryService = new NoOpAutomaticDeliveryService() {
+            @Override
+            public void deliverAutomatically(Long userId, String yearMonth) {
+                deliveredUserIds.add(userId);
+            }
+        };
+        MonthlyAiReportOrchestrationService service = createService(
+                () -> List.of(1L),
+                (userId, yearMonth) -> null,
+                (userId, yearMonth) -> null,
+                new CapturingRecommendationClient(),
+                reportService,
+                deliveryService
+        );
+
+        assertDoesNotThrow(() -> service.runBatch(YearMonth.of(2026, 7)));
+
+        assertTrue(deliveredUserIds.isEmpty());
+    }
+
+    @Test
+    @DisplayName("첫 사용자의 자동 발송 오류 후에도 다음 사용자를 계속 처리한다")
+    void runBatch_whenFirstAutomaticDeliveryFails_continuesWithNextUser() {
+        List<Long> savedUserIds = new ArrayList<>();
+        List<Long> attemptedDeliveryUserIds = new ArrayList<>();
+        AiReportService reportService = new CapturingAiReportService() {
+            @Override
+            public void upsert(AiReport aiReport) {
+                savedUserIds.add(aiReport.getUserId());
+            }
+        };
+        AiReportEmailDeliveryService deliveryService = new NoOpAutomaticDeliveryService() {
+            @Override
+            public void deliverAutomatically(Long userId, String yearMonth) {
+                attemptedDeliveryUserIds.add(userId);
+                if (userId.equals(1L)) {
+                    throw new IllegalStateException("simulated isolated delivery failure");
+                }
+            }
+        };
+        MonthlyAiReportOrchestrationService service = createService(
+                () -> List.of(1L, 2L),
+                (userId, yearMonth) -> null,
+                (userId, yearMonth) -> null,
+                new CapturingRecommendationClient(),
+                reportService,
+                deliveryService
+        );
+
+        assertDoesNotThrow(() -> service.runBatch(YearMonth.of(2026, 7)));
+
+        assertEquals(List.of(1L, 2L), savedUserIds);
+        assertEquals(List.of(1L, 2L), attemptedDeliveryUserIds);
+    }
+
     private MonthlyAiReportOrchestrationService createUnitService() {
         return createService(
                 List::of,
@@ -275,12 +371,31 @@ class MonthlyAiReportOrchestrationServiceTest {
             FastApiProductRecommendationClient recommendationClient,
             AiReportService aiReportService
     ) {
+        return createService(
+                activeUserQueryClient,
+                incomeAnalysisQueryClient,
+                monthlyExpenseQueryClient,
+                recommendationClient,
+                aiReportService,
+                new NoOpAutomaticDeliveryService()
+        );
+    }
+
+    private MonthlyAiReportOrchestrationService createService(
+            ActiveUserQueryClient activeUserQueryClient,
+            IncomeAnalysisQueryClient incomeAnalysisQueryClient,
+            MonthlyExpenseQueryClient monthlyExpenseQueryClient,
+            FastApiProductRecommendationClient recommendationClient,
+            AiReportService aiReportService,
+            AiReportEmailDeliveryService deliveryService
+    ) {
         return new MonthlyAiReportOrchestrationService(
                 activeUserQueryClient,
                 incomeAnalysisQueryClient,
                 monthlyExpenseQueryClient,
                 recommendationClient,
                 aiReportService,
+                deliveryService,
                 objectMapper
         );
     }
@@ -420,6 +535,19 @@ class MonthlyAiReportOrchestrationServiceTest {
         @Override
         public void upsert(AiReport aiReport) {
             capturedReport = aiReport;
+        }
+    }
+
+    private static class NoOpAutomaticDeliveryService
+            extends AiReportEmailDeliveryService {
+
+        private NoOpAutomaticDeliveryService() {
+            super(null, null, null, null, null);
+        }
+
+        @Override
+        public void deliverAutomatically(Long userId, String yearMonth) {
+            // 기존 리포트 생성 테스트에서는 자동 발송을 수행하지 않는다.
         }
     }
 }
