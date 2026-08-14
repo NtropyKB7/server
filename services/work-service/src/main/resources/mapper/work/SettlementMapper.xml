@@ -34,4 +34,14 @@
           AND deposit_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
+    <select id="findByUserIdInAndDepositDateRange" resultType="com.ntropy.work.domain.entity.Settlement">
+        SELECT *
+        FROM SETTLEMENT
+        WHERE user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        AND deposit_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
 </mapper>

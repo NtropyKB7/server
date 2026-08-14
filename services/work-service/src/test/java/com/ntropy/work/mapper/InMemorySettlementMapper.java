@@ -50,6 +50,20 @@ public class InMemorySettlementMapper implements SettlementMapper {
         return result;
     }
 
+    @Override
+    public List<Settlement> findByUserIdInAndDepositDateRange(List<Long> userIds, LocalDate startDate,
+                                                                LocalDate endDate) {
+        List<Settlement> result = new ArrayList<>();
+        for (Settlement settlement : store) {
+            if (userIds.contains(settlement.getUserId())
+                    && !settlement.getDepositDate().isBefore(startDate)
+                    && !settlement.getDepositDate().isAfter(endDate)) {
+                result.add(settlement);
+            }
+        }
+        return result;
+    }
+
     public List<Settlement> findAll() {
         return store;
     }
