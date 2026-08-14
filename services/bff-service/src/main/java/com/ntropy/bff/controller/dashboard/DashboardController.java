@@ -2,6 +2,8 @@ package com.ntropy.bff.controller.dashboard;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +25,7 @@ import com.ntropy.common.dto.user.UserSummary;
 import com.ntropy.common.dto.work.summary.CalendarDailySummary;
 import com.ntropy.common.dto.work.summary.CalendarMonthlyHours;
 import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
+import com.ntropy.common.dto.work.summary.JobFatigueSummary;
 import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.common.exception.ServiceException;
 
@@ -86,8 +89,16 @@ public class DashboardController {
     public ApiResponse<JobRecommendationsResponse> getRecommendationHours(
             @ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
+        YearMonth thisMonth = YearMonth.now();
+
+        MonthlyIncomeAnalysisSummary incomeAnalysis =
+                incomeAnalysisQueryClient.getMonthlyIncomeAnalysis(userId, thisMonth);
+        Map<Long, Long> currentHoursByJobId = incomeAnalysis.getFatigueSummaries().stream()
+                .collect(Collectors.toMap(JobFatigueSummary::getJobId, s -> s.getTotalWorkMinutes() / 60));
+
         JobRecommendationsResponse response = JobRecommendationsResponse.from(
-                recommendedWorkHoursQueryClient.getCurrentMonthRecommendedWorkHours(userId));
+                recommendedWorkHoursQueryClient.getCurrentMonthRecommendedWorkHours(userId),
+                currentHoursByJobId);
         return ApiResponse.success(response);
     }
 }

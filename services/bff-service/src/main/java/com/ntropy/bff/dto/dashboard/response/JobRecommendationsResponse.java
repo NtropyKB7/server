@@ -1,6 +1,7 @@
 package com.ntropy.bff.dto.dashboard.response;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.ntropy.common.dto.work.summary.RecommendedWorkHoursSummary;
@@ -23,13 +24,16 @@ public class JobRecommendationsResponse {
         this.jobs = jobs;
     }
 
-    /** 이번 달 저축목표가 없으면 null. */
-    public static JobRecommendationsResponse from(RecommendedWorkHoursSummary summary) {
+    /**
+     * 이번 달 저축목표가 없으면 null.
+     * currentHoursByJobId는 jobId별 이번 달 현재까지 근무시간(IncomeAnalysisQueryClient 출처).
+     */
+    public static JobRecommendationsResponse from(RecommendedWorkHoursSummary summary, Map<Long, Long> currentHoursByJobId) {
         if (summary == null) {
             return null;
         }
         List<JobRecommendationResponse> jobs = summary.getRecommendedJobs().stream()
-                .map(JobRecommendationResponse::from)
+                .map(job -> JobRecommendationResponse.from(job, currentHoursByJobId.get(job.getJobId())))
                 .collect(Collectors.toList());
         return new JobRecommendationsResponse(summary.getTargetMonth(), summary.getTotalRecommendedHours(), jobs);
     }
