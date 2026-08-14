@@ -51,4 +51,32 @@
         classified_at = CURRENT_TIMESTAMP
     </insert>
 
+    <insert id="upsertDailyAnalyses">
+        INSERT INTO TXN_ANALYSIS (
+        account_transaction_id,
+        is_consumption,
+        category,
+        expense_type,
+        classified_at
+        )
+        VALUES
+        <foreach collection="analyses" item="item" separator=",">
+            (
+            #{item.transactionId},
+            #{item.isConsumption},
+            #{item.category},
+            #{item.expenseType},
+            CURRENT_TIMESTAMP
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        is_consumption = VALUES(is_consumption),
+        category = VALUES(category),
+        expense_type = VALUES(expense_type),
+        classified_at = CURRENT_TIMESTAMP
+    </insert>
+
+
+
+
 </mapper>

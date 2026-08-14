@@ -2,6 +2,48 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ntropy.account.mapper.FinancialDataQueryMapper">
 
+    <select id="findUnanalyzedTransactions"
+            resultType="com.ntropy.common.dto.account.DailyClassificationTargetTransaction">
+        SELECT
+            transaction_row.account_transaction_id AS transactionId,
+            account_row.user_id AS userId,
+            transaction_row.transaction_category AS transactionCategory,
+            CAST(transaction_row.out_amount AS SIGNED) AS outAmount,
+            CAST(transaction_row.in_amount AS SIGNED) AS inAmount,
+            account_row.organization_code AS organizationCode,
+            transaction_row.loan_transaction_type_name AS loanTransactionTypeName,
+            transaction_row.desc1,
+            transaction_row.desc2,
+            transaction_row.desc3,
+            transaction_row.desc4
+        FROM ACCOUNT_TRANSACTION transaction_row
+                 INNER JOIN ACCOUNT account_row
+                            ON account_row.account_id = transaction_row.account_id
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM TXN_ANALYSIS analysis_row
+            WHERE analysis_row.account_transaction_id
+                      = transaction_row.account_transaction_id
+        )
+          AND (
+            (
+                transaction_row.transaction_category = 'ORDINARY'
+                    AND transaction_row.out_amount &gt; 0
+                )
+                OR (
+                transaction_row.transaction_category = 'INSTALLMENT'
+                    AND transaction_row.in_amount &gt; 0
+                )
+                OR (
+                transaction_row.transaction_category = 'LOAN'
+                    AND transaction_row.out_amount &gt; 0
+                )
+            )
+        ORDER BY transaction_row.account_transaction_id
+            LIMIT #{limit}
+    </select>
+
+
     <sql id="accountColumns">
         account_row.account_id AS id, account_row.codef_connection_id AS codefConnectionId,
         account_row.user_id AS userId, connection_row.provider AS connectionProvider,
@@ -139,4 +181,6 @@
               #{id}
           </foreach>
     </select>
+
+
 </mapper>
