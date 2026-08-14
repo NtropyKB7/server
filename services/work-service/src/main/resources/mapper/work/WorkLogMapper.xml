@@ -50,6 +50,16 @@
           AND work_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
+    <select id="findByUserIdInAndDateRange" resultMap="workLogResultMap">
+        SELECT log_id, user_id, job_id, work_date, start_time, end_time, task_count, fatigue, estimated_income, status, settlement_status
+        FROM WORK_LOG
+        WHERE user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        AND work_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
     <update id="update" parameterType="com.ntropy.work.domain.entity.WorkLog">
         UPDATE WORK_LOG
         SET work_date = #{workDate},

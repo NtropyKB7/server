@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,12 +25,14 @@ import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.IncomeAnalysisQueryClient;
 import com.ntropy.common.client.MonthlyExpenseQueryClient;
 import com.ntropy.common.dto.account.MonthlyExpenseSummary;
+import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 
 class MonthlyAiReportOrchestrationServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    @DisplayName("빈 사용자 목록이면 예외 없이 배치가 종료된다")
     void runBatch_whenTargetUserListIsEmpty_completesWithoutException() {
         MonthlyAiReportOrchestrationService orchestrationService =
                 createService(
@@ -48,6 +51,30 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("소득분석은 사용자별 개별 호출이 아니라 벌크 조회를 사용한다")
+    void runBatch_usesBulkIncomeAnalysisInsteadOfPerUserCalls() {
+        RecordingIncomeAnalysisQueryClient income =
+                new RecordingIncomeAnalysisQueryClient();
+
+        MonthlyAiReportOrchestrationService service = createService(
+                () -> List.of(1L, 2L, 3L),
+                income,
+                (userId, yearMonth) -> null,
+                new CapturingRecommendationClient(),
+                new CapturingAiReportService()
+        );
+
+        service.runBatch(YearMonth.of(2026, 7));
+
+        assertEquals(0, income.singleCallCount,
+                "getMonthlyIncomeAnalysis(단건)는 더 이상 호출되면 안 됩니다");
+        assertEquals(1, income.bulkCallCount,
+                "getMonthlyIncomeAnalysisBulk는 사용자 수와 무관하게 1번만 호출돼야 합니다");
+        assertEquals(List.of(1L, 2L, 3L), income.lastBulkUserIds);
+    }
+
+    @Test
+    @DisplayName("카테고리가 4개 이상이면 상위 3개와 합산된 기타를 반환한다")
     void buildTopCategories_whenFourOrMoreCategories_returnsTopThreeAndAggregatedOther() {
         MonthlyAiReportOrchestrationService service = createUnitService();
         MonthlyExpenseSummary expense = expenseSummary(
@@ -78,6 +105,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("구체적인 카테고리가 3개이고 원천 ETC가 없으면 기타를 만들지 않는다")
     void buildTopCategories_whenThreeConcreteCategoriesAndNoEtc_doesNotCreateAggregatedOther() {
         MonthlyAiReportOrchestrationService service = createUnitService();
         MonthlyExpenseSummary expense = expenseSummary(
@@ -98,6 +126,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("구체적인 카테고리가 3개이고 원천 ETC가 있으면 기타를 만든다")
     void buildTopCategories_whenThreeConcreteCategoriesAndSourceEtc_createsAggregatedOther() {
         MonthlyAiReportOrchestrationService service = createUnitService();
         MonthlyExpenseSummary expense = expenseSummary(
@@ -120,6 +149,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("금액이 null/0/음수인 카테고리는 제외한다")
     void buildTopCategories_excludesNullZeroAndNegativeAmounts() {
         MonthlyAiReportOrchestrationService service = createUnitService();
         MonthlyExpenseSummary expense = expenseSummary(
@@ -141,6 +171,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("금액이 동률이면 카테고리 코드 오름차순으로 정렬한다")
     void buildTopCategories_whenAmountsAreEqual_usesCategoryCodeAsTieBreaker() {
         MonthlyAiReportOrchestrationService service = createUnitService();
         MonthlyExpenseSummary expense = expenseSummary(
@@ -163,6 +194,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("총소비가 0이면 빈 리스트를 반환한다")
     void buildTopCategories_whenTotalExpenseIsZero_returnsEmptyList() {
         MonthlyAiReportOrchestrationService service = createUnitService();
         MonthlyExpenseSummary expense = expenseSummary(
@@ -174,6 +206,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
+    @DisplayName("FastAPI에는 전체 카테고리를, 저장에는 요약된 상위 카테고리를 사용한다")
     void runBatch_sendsAllCategoriesToFastApiAndStoresSummarizedCategories()
             throws Exception {
         MonthlyExpenseSummary currentExpense = expenseSummary(
@@ -326,7 +359,6 @@ class MonthlyAiReportOrchestrationServiceTest {
 
     private static class CapturingRecommendationClient
             extends FastApiProductRecommendationClient {
-
         private ProductRecommendationRequest capturedRequest;
 
         private CapturingRecommendationClient() {
@@ -339,6 +371,40 @@ class MonthlyAiReportOrchestrationServiceTest {
         ) {
             capturedRequest = request;
             return new ProductRecommendationResponse();
+        }
+    }
+
+    /**
+     * getMonthlyIncomeAnalysis(단건)와 getMonthlyIncomeAnalysisBulk(벌크) 호출 횟수를
+     * 각각 세는 fake. 람다로는 두 메서드를 다 구현할 수 없어(함수형 인터페이스가 아니게 됨),
+     * runBatch가 실제로 벌크 경로를 타는지(default 폴백이 아니라) 검증하려면 명시적 구현이 필요하다.
+     */
+    private static class RecordingIncomeAnalysisQueryClient
+            implements IncomeAnalysisQueryClient {
+
+        private int singleCallCount;
+        private int bulkCallCount;
+        private List<Long> lastBulkUserIds;
+
+        @Override
+        public MonthlyIncomeAnalysisSummary getMonthlyIncomeAnalysis(
+                Long userId, YearMonth yearMonth
+        ) {
+            singleCallCount++;
+            return null;
+        }
+
+        @Override
+        public Map<Long, MonthlyIncomeAnalysisSummary> getMonthlyIncomeAnalysisBulk(
+                List<Long> userIds, YearMonth yearMonth
+        ) {
+            bulkCallCount++;
+            lastBulkUserIds = userIds;
+            Map<Long, MonthlyIncomeAnalysisSummary> result = new LinkedHashMap<>();
+            for (Long userId : userIds) {
+                result.put(userId, null);
+            }
+            return result;
         }
     }
 

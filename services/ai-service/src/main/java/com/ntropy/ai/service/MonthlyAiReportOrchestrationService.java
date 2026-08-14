@@ -136,6 +136,29 @@ public class MonthlyAiReportOrchestrationService {
         }
 
         /*
+         * work-service 소득분석을 사용자 전원분 한 번에 조회합니다 (N+1 방지).
+         *
+         * 이 호출 자체가 실패하면 사용자 단위로 격리되지 않으므로,
+         * 배치 전체를 막지 않고 빈 결과로 진행합니다 - 이후 각 사용자는
+         * income == null과 동일하게 처리됩니다 (기존 §12 실패 처리와 동일한 형태).
+         */
+        Map<Long, MonthlyIncomeAnalysisSummary> incomeByUser;
+        try {
+            incomeByUser =
+                    incomeAnalysisQueryClient.getMonthlyIncomeAnalysisBulk(
+                            userIds,
+                            targetYearMonth
+                    );
+        } catch (Exception e) {
+            log.error(
+                    "[AI 리포트 배치] 소득분석 벌크 조회 실패. yearMonth={}",
+                    targetYearMonth,
+                    e
+            );
+            incomeByUser = Map.of();
+        }
+
+        /*
          * 사용자별로 처리합니다.
          *
          * 한 사용자의 데이터 오류가
@@ -144,7 +167,11 @@ public class MonthlyAiReportOrchestrationService {
          */
         for (Long userId : userIds) {
             try {
-                processUserReport(userId, targetYearMonth);
+                processUserReport(
+                        userId,
+                        targetYearMonth,
+                        incomeByUser.get(userId)
+                );
             } catch (Exception e) {
                 log.error(
                         "[AI 리포트 배치] 사용자 처리 실패. userId={}, yearMonth={}",
@@ -158,10 +185,14 @@ public class MonthlyAiReportOrchestrationService {
 
     /**
      * 사용자 한 명의 AI 리포트를 생성합니다.
+     *
+     * @param income runBatch에서 벌크 조회로 미리 확보한 이 사용자의 소득분석 결과.
+     *               조회 실패(벌크 호출 자체 실패) 또는 데이터 없음이면 null.
      */
     private void processUserReport(
             Long userId,
-            YearMonth targetYearMonth
+            YearMonth targetYearMonth,
+            MonthlyIncomeAnalysisSummary income
     ) {
         String yearMonth =
                 targetYearMonth.toString();
@@ -169,11 +200,6 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * work-service에서 해당 월의 소득 정보를 조회합니다.
          */
-        MonthlyIncomeAnalysisSummary income =
-                incomeAnalysisQueryClient.getMonthlyIncomeAnalysis(
-                        userId,
-                        targetYearMonth
-                );
 
         /*
          * account-service에서 해당 월의 소비 정보를 조회합니다.
