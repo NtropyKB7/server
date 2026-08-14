@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
     provider                    VARCHAR(10)  NOT NULL DEFAULT 'CODEF' COMMENT '연결 제공자: CODEF(실제 CODEF 연동), NTROPY(가상 연결, 이슈 #35)',
     connected_id                VARCHAR(100) NOT NULL COMMENT 'CODEF 커넥티드 아이디 (실연결은 계정 등록 API 응답값, 가상연결은 서버에서 발급한 NTROPY-{UUID})',
     registered_institution_keys JSON         NULL COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용',
+    birth_date_ciphertext       VARCHAR(255) NULL COMMENT '기업·국민은행 birthDate AES-256-GCM 암호문(Base64). 이슈 #158',
+    birth_date_iv               VARCHAR(32)  NULL COMMENT '암호화마다 새로 생성하는 12바이트 IV(Base64). 이슈 #158',
+    birth_date_key_version      BIGINT       NULL COMMENT '암호화 당시 사용한 키 버전. 키 회전 시 복호화에 필요. 이슈 #158',
     created_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_codef_connection_user_provider (user_id, provider)

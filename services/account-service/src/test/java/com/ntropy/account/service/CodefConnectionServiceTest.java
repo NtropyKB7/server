@@ -6,16 +6,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.account.client.codef.CodefConnectionClient;
+import com.ntropy.account.config.BirthDateEncryptionProperties;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.CodefConnectionMapper;
+import com.ntropy.account.security.BirthDateCipher;
 
 class CodefConnectionServiceTest {
+
+    static BirthDateCipher testBirthDateCipher() {
+        return new BirthDateCipher(
+                new BirthDateEncryptionProperties("EnZnHF6ULrhAjwHSJs5+2lizbiv7BHiB+5sZ4YIKEmc=", 1)
+        );
+    }
 
     @Test
     void registersAccountAndReadsSavedConnectionBack() {
         StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
-        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper, testBirthDateCipher());
 
         CodefConnection saved = service.registerAndSave(
                 1L,
@@ -43,7 +51,7 @@ class CodefConnectionServiceTest {
         existing.setProvider("CODEF");
         existing.setConnectedId("existing-connected-id");
         mapper.upsert(existing);
-        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper, testBirthDateCipher());
 
         CodefConnection saved = service.registerAndSave(
                 1L, "0088", "BK", "P", "login-id", "password", null
@@ -67,7 +75,7 @@ class CodefConnectionServiceTest {
         existing.setConnectedId("existing-connected-id");
         existing.setRegisteredInstitutionKeys("[\"0088\"]");
         mapper.upsert(existing);
-        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper, testBirthDateCipher());
 
         CodefConnection saved = service.registerAndSave(
                 1L, "0088", "BK", "P", "login-id", "password", null
@@ -92,7 +100,7 @@ class CodefConnectionServiceTest {
         existing.setConnectedId("existing-connected-id");
         existing.setRegisteredInstitutionKeys("[\"0004\"]");
         mapper.upsert(existing);
-        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper);
+        CodefConnectionService service = new CodefConnectionService(connectionClient, mapper, testBirthDateCipher());
 
         CodefConnection saved = service.registerAndSave(
                 1L, "0088", "BK", "P", "login-id", "password", null

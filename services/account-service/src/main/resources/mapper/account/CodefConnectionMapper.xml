@@ -4,22 +4,33 @@
 
     <insert id="insert" parameterType="com.ntropy.account.domain.entity.CodefConnection"
             useGeneratedKeys="true" keyProperty="id" keyColumn="codef_connection_id">
-        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
-        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
+        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys,
+                                       birth_date_ciphertext, birth_date_iv, birth_date_key_version)
+        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys},
+                #{birthDateCiphertext}, #{birthDateIv}, #{birthDateKeyVersion})
     </insert>
 
     <insert id="insertIfAbsent" parameterType="com.ntropy.account.domain.entity.CodefConnection">
-        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
-        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
+        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys,
+                                       birth_date_ciphertext, birth_date_iv, birth_date_key_version)
+        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys},
+                #{birthDateCiphertext}, #{birthDateIv}, #{birthDateKeyVersion})
         ON DUPLICATE KEY UPDATE codef_connection_id = codef_connection_id
     </insert>
 
+    <!-- birth_date_*는 이 호출에서 값이 있을 때만 갱신한다(COALESCE). birthDate가 필요 없는 은행을
+         추가 등록할 때 이전에 저장된 다른 은행의 birthDate 암호문을 NULL로 덮어쓰지 않기 위함. -->
     <insert id="upsert" parameterType="com.ntropy.account.domain.entity.CodefConnection">
-        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys)
-        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys})
+        INSERT INTO CODEF_CONNECTION (user_id, provider, connected_id, registered_institution_keys,
+                                       birth_date_ciphertext, birth_date_iv, birth_date_key_version)
+        VALUES (#{userId}, #{provider}, #{connectedId}, #{registeredInstitutionKeys},
+                #{birthDateCiphertext}, #{birthDateIv}, #{birthDateKeyVersion})
         ON DUPLICATE KEY UPDATE
             connected_id = #{connectedId},
-            registered_institution_keys = #{registeredInstitutionKeys}
+            registered_institution_keys = #{registeredInstitutionKeys},
+            birth_date_ciphertext = COALESCE(VALUES(birth_date_ciphertext), birth_date_ciphertext),
+            birth_date_iv = COALESCE(VALUES(birth_date_iv), birth_date_iv),
+            birth_date_key_version = COALESCE(VALUES(birth_date_key_version), birth_date_key_version)
     </insert>
 
     <select id="findByUserIdAndProvider" resultType="com.ntropy.account.domain.entity.CodefConnection">
@@ -28,6 +39,9 @@
                provider,
                connected_id                AS connectedId,
                registered_institution_keys AS registeredInstitutionKeys,
+               birth_date_ciphertext       AS birthDateCiphertext,
+               birth_date_iv               AS birthDateIv,
+               birth_date_key_version      AS birthDateKeyVersion,
                created_at                  AS createdAt,
                updated_at                  AS updatedAt
         FROM CODEF_CONNECTION

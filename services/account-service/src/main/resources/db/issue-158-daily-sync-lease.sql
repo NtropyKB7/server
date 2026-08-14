@@ -1,6 +1,14 @@
 -- 이슈 #158: 일일 금융거래 증분 동기화를 위한 DB 기반 분산 lease와
--- 연결·기관별 동기화 기준점(watermark) 테이블을 추가한다.
+-- 연결·기관별 동기화 기준점(watermark) 테이블, 기업·국민은행 birthDate 암호화 저장 컬럼을 추가한다.
 -- 신규 환경은 account-service-schema.sql만 실행하면 된다.
+
+ALTER TABLE CODEF_CONNECTION
+    ADD COLUMN birth_date_ciphertext VARCHAR(255) NULL
+        COMMENT '기업·국민은행 birthDate AES-256-GCM 암호문(Base64). 이슈 #158' AFTER registered_institution_keys,
+    ADD COLUMN birth_date_iv VARCHAR(32) NULL
+        COMMENT '암호화마다 새로 생성하는 12바이트 IV(Base64). 이슈 #158' AFTER birth_date_ciphertext,
+    ADD COLUMN birth_date_key_version BIGINT NULL
+        COMMENT '암호화 당시 사용한 키 버전. 키 회전 시 복호화에 필요. 이슈 #158' AFTER birth_date_iv;
 
 CREATE TABLE IF NOT EXISTS DAILY_BATCH_EXECUTION
 (
