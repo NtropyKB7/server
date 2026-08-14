@@ -47,8 +47,8 @@ public class SecurityConfig {
                         .antMatchers(HttpMethod.GET, "/api/subscriptions/plans").permitAll()
                         .antMatchers("/swagger-ui.html", "/webjars/**", "/v2/api-docs",
                                 "/swagger-resources/**", "/resources/**").permitAll()
-                        // 루트 페이지(HomeController)와 헬스체크는 인증 없이 접근한다
-                        .antMatchers("/", "/health").permitAll()
+                        // 헬스체크는 인증 없이 접근한다
+                        .antMatchers("/health").permitAll()
                         // [테스트용] HolidayTestController - 검증 끝나면 이 줄과 컨트롤러 같이 지울 것
                         .antMatchers("/internal/test/**").permitAll()
                         .anyRequest().authenticated()
@@ -79,7 +79,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        configuration.setAllowedOrigins(List.of("http://localhost:5173", "https://kbntropy.vercel.app"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
