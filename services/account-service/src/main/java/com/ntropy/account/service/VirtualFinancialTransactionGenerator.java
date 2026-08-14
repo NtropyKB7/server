@@ -27,20 +27,22 @@ import com.ntropy.account.domain.entity.AccountTransaction;
 public class VirtualFinancialTransactionGenerator {
 
     public static final int TRANSACTIONS_PER_USER_PER_MONTH = 100;
-    public static final int INCOME_COUNTERPARTY_COUNT = 11;
     private static final int CONSUMPTION_TRANSACTIONS_PER_MONTH = 74;
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     /**
      * 가상 소득 입금 거래에 사용할 정산 주체명.
-     * work-service의 PLATFORM.deposit_name 시드 데이터(services/work-service/src/main/resources/db/work-service-seed.sql)와
-     * 동일한 값을 써야 한다. 두 서비스는 별도 모듈이라 자동 동기화되지 않으니, 시드 데이터가 바뀌면 이 배열도 함께 수정할 것.
+     * work-service의 PLATFORM.deposit_name 확정 시드 데이터(services/work-service/src/main/resources/db/work-service-seed.sql,
+     * docs/financial-diagnosis-mvp-spec.md §3.6)와 동일한 값을 써야 한다. 두 서비스는 별도 모듈이라 자동 동기화되지 않으니,
+     * 시드 데이터가 바뀌면 이 배열도 함께 수정할 것.
      */
     private static final String[] INCOME_COUNTERPARTY_NAMES = {
-            "우아한형제들", "쿠팡이츠", "위대한상상", "카카오모빌리티", "구글코리아",
-            "로지올", "쿠팡풀필먼트서비스", "미소", "알바몬", "도그메이트", "엠브레인패널파워"
+            "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "GOOGLE",
+            "쿠팡-용역비", "티맵모빌리티", "CJ대한통운", "로젠택배", "생활연구소",
+            "유한회사미소", "케어닥", "펫피플", "PAYPAL", "네이버"
     };
+    public static final int INCOME_COUNTERPARTY_COUNT = INCOME_COUNTERPARTY_NAMES.length;
 
     private static final FixedExpenseTemplate[] RECURRING_FIXED_EXPENSES = {
             fixedExpense("우리집월세", 650_000L, 850_000L),

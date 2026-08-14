@@ -65,14 +65,15 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                     """));
-            assertEquals(11, count(jdbc, """
+            assertEquals(15, count(jdbc, """
                     SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND REPLACE(transaction_row.desc3, '홈)', '') IN (
-                          '우아한형제들', '쿠팡이츠', '위대한상상', '카카오모빌리티', '구글코리아',
-                          '로지올', '쿠팡풀필먼트서비스', '미소', '알바몬', '도그메이트', '엠브레인패널파워'
+                          '우아한청년들', '쿠팡이츠정산', '위대한상상', '카카오모빌리티', 'GOOGLE',
+                          '쿠팡-용역비', '티맵모빌리티', 'CJ대한통운', '로젠택배', '생활연구소',
+                          '유한회사미소', '케어닥', '펫피플', 'PAYPAL', '네이버'
                       )
                     """));
             assertEquals(0, count(jdbc, """
@@ -99,8 +100,9 @@ class VirtualFinancialDataManualVerificationTest {
                     WHERE account_row.user_id BETWEEN ? AND ?
                       AND account_row.organization_code = '0003'
                       AND transaction_row.desc3 IN (
-                          '우아한형제들', '쿠팡이츠', '위대한상상', '카카오모빌리티', '구글코리아',
-                          '로지올', '쿠팡풀필먼트서비스', '미소', '알바몬', '도그메이트', '엠브레인패널파워'
+                          '우아한청년들', '쿠팡이츠정산', '위대한상상', '카카오모빌리티', 'GOOGLE',
+                          '쿠팡-용역비', '티맵모빌리티', 'CJ대한통운', '로젠택배', '생활연구소',
+                          '유한회사미소', '케어닥', '펫피플', 'PAYPAL', '네이버'
                       )
                       AND transaction_row.desc1 IS NOT NULL
                     """));

@@ -32,7 +32,34 @@ class InsuranceCompanyTest {
     void matchesNationalHealthInsuranceAliases() {
         assertEquals(Optional.of("국민건강보험"), InsuranceCompany.matchStandardName("국민건강보험공단"));
         assertEquals(Optional.of("국민건강보험"), InsuranceCompany.matchStandardName("국민건강보험"));
-        assertEquals(Optional.of("국민건강보험"), InsuranceCompany.matchStandardName("건강보험"));
+    }
+
+    @Test
+    void matchesHyundaiInsuranceAliases() {
+        assertEquals(Optional.of("현대해상"), InsuranceCompany.matchStandardName("현대해상화재보험㈜"));
+        assertEquals(Optional.of("현대해상"), InsuranceCompany.matchStandardName("현대해상화재보험"));
+        assertEquals(Optional.of("현대해상"), InsuranceCompany.matchStandardName("현대해상"));
+    }
+
+    @Test
+    void matchesKyoboLifeAliases() {
+        assertEquals(Optional.of("교보생명"), InsuranceCompany.matchStandardName("교보생명보험㈜"));
+        assertEquals(Optional.of("교보생명"), InsuranceCompany.matchStandardName("교보생명보험"));
+        assertEquals(Optional.of("교보생명"), InsuranceCompany.matchStandardName("교보생명"));
+    }
+
+    @Test
+    void matchesHanwhaLifeAliases() {
+        assertEquals(Optional.of("한화생명"), InsuranceCompany.matchStandardName("한화생명보험㈜"));
+        assertEquals(Optional.of("한화생명"), InsuranceCompany.matchStandardName("한화생명보험"));
+        assertEquals(Optional.of("한화생명"), InsuranceCompany.matchStandardName("한화생명"));
+    }
+
+    @Test
+    void doesNotMisclassifyGenericHealthInsuranceProductNameAsNationalHealthInsurance() {
+        assertEquals(Optional.of("현대해상"), InsuranceCompany.matchStandardName("현대해상 건강보험"));
+        assertTrue(InsuranceCompany.matchStandardName("건강보험").isEmpty());
+        assertEquals(Optional.of("국민건강보험"), InsuranceCompany.matchStandardName("국민건강보험공단"));
     }
 
     @Test
