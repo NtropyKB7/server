@@ -17,4 +17,11 @@ public interface AccountTransactionMapper {
                                                          @Param("endDate") LocalDate endDate);
 
     void deleteByUserIdAndProvider(@Param("userId") Long userId, @Param("provider") String provider);
+
+    /**
+     * watermark(ACCOUNT_SYNC_STATE)가 아직 없는 기존 연결의 초기 백필 시작점 계산에 쓰인다(이슈 #158).
+     * 저장된 거래가 없으면 {@code null}을 반환한다.
+     */
+    LocalDate findMostRecentTransactionDate(@Param("codefConnectionId") Long codefConnectionId,
+                                            @Param("organizationCode") String organizationCode);
 }

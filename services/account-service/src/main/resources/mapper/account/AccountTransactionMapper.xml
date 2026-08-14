@@ -46,6 +46,14 @@
         ORDER BY tran_date, tran_time, account_transaction_id
     </select>
 
+    <select id="findMostRecentTransactionDate" resultType="java.time.LocalDate">
+        SELECT MAX(t.tran_date)
+        FROM ACCOUNT_TRANSACTION t
+                 JOIN ACCOUNT a ON a.account_id = t.account_id
+        WHERE a.codef_connection_id = #{codefConnectionId}
+          AND a.organization_code = #{organizationCode}
+    </select>
+
     <delete id="deleteByUserIdAndProvider">
         DELETE FROM ACCOUNT_TRANSACTION
         WHERE account_id IN (
