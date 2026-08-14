@@ -24,4 +24,10 @@ dependencies {
 
     // @Transactional 어노테이션 제공
     implementation "org.springframework:spring-tx:$springVersion"
+
+    // AI 리포트 PDF 메모리 생성 및 Gmail SMTP 첨부 발송
+    implementation 'org.apache.pdfbox:pdfbox:3.0.8'
+    implementation 'com.sun.mail:javax.mail:1.6.2'
+
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
 }
