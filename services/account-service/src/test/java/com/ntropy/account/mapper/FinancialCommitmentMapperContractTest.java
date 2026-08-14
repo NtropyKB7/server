@@ -35,6 +35,8 @@ class FinancialCommitmentMapperContractTest {
         assertTrue(query.contains("account_row.currency_code = 'KRW'"));
         assertTrue(query.contains("account_row.deposit_type_code = '40'"));
         assertTrue(query.contains("account_row.account_group = 'LOAN'"));
+        assertTrue(query.contains("latest_tx.loan_principal_amount AS expectedPrincipalAmount"));
+        assertTrue(query.contains("latest_tx.loan_interest_amount AS expectedInterestAmount"));
         assertTrue(query.contains("transaction_category = 'LOAN'"));
         assertTrue(query.contains("loan_row.out_amount > 0"));
         assertTrue(query.contains("loan_transaction_type_name IS NULL"));

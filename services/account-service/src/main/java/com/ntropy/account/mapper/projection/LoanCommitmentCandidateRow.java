@@ -14,5 +14,13 @@ public class LoanCommitmentCandidateRow {
     private String productName;
     private BigDecimal outstandingBalance;
     private LocalDate nextPaymentDate;
+
+    /** 최근 정상 상환 거래의 총상환액(out_amount). */
     private BigDecimal expectedAmount;
+
+    /** 최근 정상 상환 거래의 원금(loan_principal_amount). */
+    private BigDecimal expectedPrincipalAmount;
+
+    /** 최근 정상 상환 거래의 이자(loan_interest_amount). */
+    private BigDecimal expectedInterestAmount;
 }
