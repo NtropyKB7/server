@@ -1,0 +1,7 @@
+# Gmail SMTP 환경변수 이름만 문서화합니다. 실제 주소와 앱 비밀번호는 작성하지 않습니다.
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM=
+MAIL_FROM_NAME=Ntropy

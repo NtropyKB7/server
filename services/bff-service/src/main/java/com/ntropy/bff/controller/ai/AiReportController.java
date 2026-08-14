@@ -6,8 +6,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.ntropy.bff.dto.ai.AiReportResponse;
+import com.ntropy.bff.dto.ai.AiReportEmailDeliveryResponse;
 import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
+import com.ntropy.common.client.AiReportEmailDeliveryClient;
 import com.ntropy.common.client.AiReportQueryClient;
 import com.ntropy.common.dto.ai.AiReportSummary;
 
@@ -33,7 +35,26 @@ public class AiReportController {
 
     // ai-service가 제공하는 AI 리포트 조회 인터페이스입니다.
     private final AiReportQueryClient aiReportQueryClient;
+    private final AiReportEmailDeliveryClient aiReportEmailDeliveryClient;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
+
+    /** 인증 사용자의 월간 AI 리포트를 가입 이메일로 PDF 첨부 발송합니다. */
+    @ApiOperation("AI 리포트 이메일 PDF 내보내기")
+    @PostMapping("/deliveries/email")
+    public ResponseEntity<ApiResponse<AiReportEmailDeliveryResponse>> deliverAiReportByEmail(
+            @ApiParam(hidden = true) Authentication authentication,
+            @RequestParam String yearMonth
+    ) {
+        Long userId = authenticatedUserIdResolver.resolve(authentication);
+        AiReportEmailDeliveryResponse response = AiReportEmailDeliveryResponse.from(
+                aiReportEmailDeliveryClient.deliver(userId, yearMonth)
+        );
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "AI 리포트를 이메일로 전송했습니다.",
+                response
+        ));
+    }
 
     /**
      * 인증된 사용자의 특정 월 AI 리포트를 조회합니다.
