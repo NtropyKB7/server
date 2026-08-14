@@ -14,7 +14,10 @@ public enum InsuranceCompany {
     SAMSUNG_LIFE("삼성생명", "삼성생명보험", "삼성생명"),
     DB_INSURANCE("DB손보", "DB손해보험㈜", "DB손해보험", "DB손보"),
     KB_INSURANCE("KB손보", "KB손해보험", "KB손보"),
-    NATIONAL_HEALTH_INSURANCE("국민건강보험", "국민건강보험공단", "국민건강보험", "건강보험"),
+    HYUNDAI_INSURANCE("현대해상", "현대해상화재보험㈜", "현대해상화재보험", "현대해상"),
+    KYOBO_LIFE("교보생명", "교보생명보험㈜", "교보생명보험", "교보생명"),
+    HANWHA_LIFE("한화생명", "한화생명보험㈜", "한화생명보험", "한화생명"),
+    NATIONAL_HEALTH_INSURANCE("국민건강보험", "국민건강보험공단", "국민건강보험"),
     NATIONAL_PENSION("국민연금", "국민연금공단", "국민연금");
 
     private final String standardName;
