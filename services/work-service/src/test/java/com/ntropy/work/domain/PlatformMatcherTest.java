@@ -12,8 +12,54 @@ import com.ntropy.work.domain.entity.Platform;
 
 class PlatformMatcherTest {
 
+    // work-service-seed.sql PLATFORM 시드의 확정 deposit_name 15개(2026-08-14 기준).
+    private static final List<Platform> SEED_PLATFORMS = List.of(
+            platform(1L, "우아한청년들"),
+            platform(2L, "쿠팡이츠정산"),
+            platform(3L, "위대한상상"),
+            platform(4L, "카카오모빌리티"),
+            platform(5L, "GOOGLE"),
+            platform(7L, "쿠팡-용역비"),
+            platform(8L, "티맵모빌리티"),
+            platform(9L, "CJ대한통운"),
+            platform(10L, "로젠택배"),
+            platform(11L, "생활연구소"),
+            platform(12L, "유한회사미소"),
+            platform(13L, "케어닥"),
+            platform(14L, "펫피플"),
+            platform(15L, "PAYPAL"),
+            platform(16L, "네이버")
+    );
+
     private static Platform platform(long id, String depositName) {
         return Platform.builder().platformId(id).depositName(depositName).build();
+    }
+
+    @Test
+    @DisplayName("확정 시드의 deposit_name 15개는 각각 정확히 하나의 플랫폼에 매칭된다")
+    void match_confirmedSeedDepositNames_returnsExactlyOneMatch() {
+        List<String> confirmedDepositNames = List.of(
+                "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "GOOGLE",
+                "쿠팡-용역비", "티맵모빌리티", "CJ대한통운", "로젠택배", "생활연구소",
+                "유한회사미소", "케어닥", "펫피플", "PAYPAL", "네이버"
+        );
+
+        for (String depositName : confirmedDepositNames) {
+            PlatformMatchResult result = PlatformMatcher.match(depositName, SEED_PLATFORMS);
+
+            PlatformMatchResult.Matched matched = assertInstanceOf(PlatformMatchResult.Matched.class, result);
+            assertEquals(depositName, matched.platform().getDepositName());
+        }
+    }
+
+    @Test
+    @DisplayName("환불·캐시백·예금이자 등 비잡 입금은 확정 시드 플랫폼과 매칭되지 않는다")
+    void match_nonJobIncome_returnsNotMatched() {
+        for (String counterpartyName : List.of("쿠팡", "김밥천국", "NH카드캐쉬백", "예금이자")) {
+            PlatformMatchResult result = PlatformMatcher.match(counterpartyName, SEED_PLATFORMS);
+
+            assertInstanceOf(PlatformMatchResult.NotMatched.class, result);
+        }
     }
 
     @Test

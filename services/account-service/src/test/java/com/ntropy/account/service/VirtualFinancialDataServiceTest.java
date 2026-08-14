@@ -46,7 +46,7 @@ class VirtualFinancialDataServiceTest {
 
         assertEquals(50, first.users());
         assertEquals(100, first.accounts());
-        assertEquals(11, first.incomeCounterparties());
+        assertEquals(15, first.incomeCounterparties());
         assertEquals(15_000, first.transactions());
         assertEquals(first, second);
         assertEquals(50, connectionMapper.store.size());
