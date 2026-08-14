@@ -47,6 +47,17 @@ public class InMemoryJobMapper implements JobMapper {
     }
 
     @Override
+    public List<Job> findByUserIdIn(List<Long> userIds) {
+        List<Job> result = new ArrayList<>();
+        for (Job job : store.values()) {
+            if (userIds.contains(job.getUserId())) {
+                result.add(job);
+            }
+        }
+        return result;
+    }
+
+    @Override
     public void update(Job job) {
         store.put(job.getJobId(), job);
     }
