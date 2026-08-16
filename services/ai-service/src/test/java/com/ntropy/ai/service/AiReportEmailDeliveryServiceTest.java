@@ -1,16 +1,30 @@
 package com.ntropy.ai.service;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -105,5 +119,171 @@ class AiReportEmailDeliveryServiceTest {
 
         assertEquals(400, exception.getStatusCode());
         verify(subscriptionClient, never()).supportsFeature(any(), any());
+    }
+
+    @Test
+    void automaticDeliveryReloadsStoredReportAndReusesPdfAndEmailComposition() {
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(subscriptionClient).supportsFeature(7L, Feature.AI_REPORT);
+        verify(userClient).getUserSummary(7L);
+        verify(reportClient).findByUserIdAndYearMonth(7L, "2026-05");
+        verify(pdfService).generate(any());
+
+        ArgumentCaptor<EmailMessage> captor = ArgumentCaptor.forClass(EmailMessage.class);
+        verify(emailSender).send(captor.capture());
+        EmailMessage message = captor.getValue();
+        assertEquals("billing.owner@example.com", message.recipient());
+        assertEquals("[Ntropy] 2026년 5월 AI 재무 리포트", message.subject());
+        assertEquals("Ntropy_AI_Report_2026-05.pdf", message.attachmentName());
+        assertEquals("application/pdf", message.attachmentContentType());
+        assertArrayEquals(new byte[] {1, 2, 3}, message.attachment());
+    }
+
+    @Test
+    void automaticDeliverySkipsUserWithoutAiReportFeature() {
+        when(subscriptionClient.supportsFeature(7L, Feature.AI_REPORT)).thenReturn(false);
+
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(userClient, never()).getUserSummary(any());
+        verify(reportClient, never()).findByUserIdAndYearMonth(any(), any());
+        verify(pdfService, never()).generate(any());
+        verify(emailSender, never()).send(any());
+    }
+
+    @Test
+    void automaticDeliverySkipsWhenUserLookupReturnsNull() {
+        when(userClient.getUserSummary(7L)).thenReturn(null);
+
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(reportClient, never()).findByUserIdAndYearMonth(any(), any());
+        verify(pdfService, never()).generate(any());
+        verify(emailSender, never()).send(any());
+    }
+
+    @Test
+    void automaticDeliverySkipsNullOrBlankEmail() {
+        when(userClient.getUserSummary(7L))
+                .thenReturn(new UserSummary(7L, "사용자", null, "GOOGLE", true, true, true))
+                .thenReturn(new UserSummary(7L, "사용자", "  ", "GOOGLE", true, true, true));
+
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(reportClient, never()).findByUserIdAndYearMonth(any(), any());
+        verify(pdfService, never()).generate(any());
+        verify(emailSender, never()).send(any());
+    }
+
+    @Test
+    void automaticDeliveryIsolatesReportLookupFailure() {
+        when(reportClient.findByUserIdAndYearMonth(7L, "2026-05"))
+                .thenThrow(new IllegalStateException("simulated report lookup failure"));
+
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(pdfService, never()).generate(any());
+        verify(emailSender, never()).send(any());
+    }
+
+    @Test
+    void automaticDeliveryIsolatesPdfFailureWithoutCallingSmtp() {
+        when(pdfService.generate(any()))
+                .thenThrow(new IllegalStateException("simulated PDF failure"));
+
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(emailSender, never()).send(any());
+    }
+
+    @Test
+    void automaticDeliveryIsolatesSmtpFailure() {
+        doThrow(new IllegalStateException("simulated SMTP failure"))
+                .when(emailSender).send(any());
+
+        assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
+
+        verify(emailSender).send(any());
+    }
+
+    @Test
+    void automaticFailureLogsOnlySafeCodesWithoutSensitiveMessagesOrThrowable() {
+        Logger logger = (Logger) LogManager.getLogger(AiReportEmailDeliveryService.class);
+        Level originalLevel = logger.getLevel();
+        CollectingAppender appender = new CollectingAppender("automatic-delivery-security-test");
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.ALL);
+
+        String emailSentinel = "private-recipient@sentinel.invalid";
+        String smtpSentinel = "MAIL_USERNAME=sender@sentinel.invalid MAIL_PASSWORD=secret-sentinel";
+        String amountSentinel = "totalIncome=987654321원";
+
+        try {
+            when(reportClient.findByUserIdAndYearMonth(7L, "2026-05"))
+                    .thenThrow(new IllegalStateException(emailSentinel));
+            service.deliverAutomatically(7L, "2026-05");
+
+            doReturn(reportSummary()).when(reportClient)
+                    .findByUserIdAndYearMonth(7L, "2026-05");
+            when(pdfService.generate(any()))
+                    .thenThrow(new IllegalStateException(amountSentinel));
+            service.deliverAutomatically(7L, "2026-05");
+
+            doReturn(new byte[] {1, 2, 3}).when(pdfService).generate(any());
+            doThrow(new IllegalStateException(smtpSentinel)).when(emailSender).send(any());
+            service.deliverAutomatically(7L, "2026-05");
+
+            List<LogEvent> failureEvents = appender.getEvents().stream()
+                    .filter(event -> event.getMessage().getFormattedMessage().contains("result=FAILED"))
+                    .toList();
+            String combinedMessages = failureEvents.stream()
+                    .map(event -> event.getMessage().getFormattedMessage())
+                    .reduce("", (left, right) -> left + "\n" + right);
+
+            assertEquals(3, failureEvents.size());
+            assertTrue(combinedMessages.contains("failureCode=REPORT_LOOKUP_FAILED"));
+            assertTrue(combinedMessages.contains("failureCode=PDF_GENERATION_FAILED"));
+            assertTrue(combinedMessages.contains("failureCode=EMAIL_DELIVERY_FAILED"));
+            assertFalse(combinedMessages.contains(emailSentinel));
+            assertFalse(combinedMessages.contains(smtpSentinel));
+            assertFalse(combinedMessages.contains(amountSentinel));
+            assertTrue(failureEvents.stream().allMatch(event -> event.getThrown() == null));
+        } finally {
+            logger.removeAppender(appender);
+            logger.setLevel(originalLevel);
+            appender.stop();
+        }
+    }
+
+    private AiReportSummary reportSummary() {
+        return new AiReportSummary(
+                31L,
+                7L,
+                "2026-05",
+                new ObjectMapper().createObjectNode().put("totalIncome", 10),
+                new ObjectMapper().createObjectNode(),
+                LocalDateTime.of(2026, 6, 1, 1, 2)
+        );
+    }
+
+    private static final class CollectingAppender extends AbstractAppender {
+
+        private final List<LogEvent> events = new ArrayList<>();
+
+        private CollectingAppender(String name) {
+            super(name, null, PatternLayout.createDefaultLayout(), false, Property.EMPTY_ARRAY);
+        }
+
+        @Override
+        public void append(LogEvent event) {
+            events.add(event.toImmutable());
+        }
+
+        private List<LogEvent> getEvents() {
+            return events;
+        }
     }
 }

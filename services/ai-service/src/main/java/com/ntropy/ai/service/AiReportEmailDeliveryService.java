@@ -27,6 +27,16 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class AiReportEmailDeliveryService {
 
+    private static final String FAILURE_NONE = "NONE";
+    private static final String FAILURE_INVALID_REQUEST = "INVALID_REQUEST";
+    private static final String FAILURE_SUBSCRIPTION_CHECK = "SUBSCRIPTION_CHECK_FAILED";
+    private static final String FAILURE_SUBSCRIPTION_INELIGIBLE = "SUBSCRIPTION_NOT_ELIGIBLE";
+    private static final String FAILURE_USER_LOOKUP = "USER_LOOKUP_FAILED";
+    private static final String FAILURE_EMAIL_UNAVAILABLE = "EMAIL_NOT_AVAILABLE";
+    private static final String FAILURE_REPORT_LOOKUP = "REPORT_LOOKUP_FAILED";
+    private static final String FAILURE_PDF_GENERATION = "PDF_GENERATION_FAILED";
+    private static final String FAILURE_EMAIL_DELIVERY = "EMAIL_DELIVERY_FAILED";
+
     private final SubscriptionQueryClient subscriptionQueryClient;
     private final UserQueryClient userQueryClient;
     private final AiReportQueryClient aiReportQueryClient;
@@ -49,17 +59,7 @@ public class AiReportEmailDeliveryService {
 
             AiReportSummary summary = aiReportQueryClient.findByUserIdAndYearMonth(userId, yearMonth);
             reportId = summary.reportId();
-            AiReportDetailSummary detail = AiReportDetailSummary.from(summary);
-            byte[] pdf = aiReportPdfService.generate(detail);
-
-            emailSender.send(new EmailMessage(
-                    recipient,
-                    subject(YearMonth.parse(yearMonth)),
-                    body(YearMonth.parse(yearMonth)),
-                    "Ntropy_AI_Report_" + yearMonth + ".pdf",
-                    "application/pdf",
-                    pdf
-            ));
+            sendReport(recipient, summary);
 
             log.info("AI 리포트 전달 완료. userId={}, reportId={}, yearMonth={}, channel=EMAIL, result=SUCCESS",
                     userId, reportId, yearMonth);
@@ -69,6 +69,76 @@ public class AiReportEmailDeliveryService {
                     userId, reportId, yearMonth, exception.getClass().getSimpleName());
             throw exception;
         }
+    }
+
+    /** 저장이 완료된 월간 AI 리포트를 현재 구독자의 가입 이메일로 자동 발송한다. */
+    public void deliverAutomatically(Long userId, String requestedYearMonth) {
+        String yearMonth = requestedYearMonth;
+        Long reportId = null;
+        String failureCode = FAILURE_INVALID_REQUEST;
+
+        try {
+            yearMonth = validateYearMonth(requestedYearMonth);
+
+            failureCode = FAILURE_SUBSCRIPTION_CHECK;
+            if (!subscriptionQueryClient.supportsFeature(userId, Feature.AI_REPORT)) {
+                log.info("AI 리포트 자동 전달 건너뜀. userId={}, reportId={}, yearMonth={}, "
+                                + "channel=EMAIL, deliveryType=AUTO, result=SKIPPED, "
+                                + "failureCode={}",
+                        userId, reportId, yearMonth, FAILURE_SUBSCRIPTION_INELIGIBLE);
+                return;
+            }
+
+            failureCode = FAILURE_USER_LOOKUP;
+            UserSummary user = userQueryClient.getUserSummary(userId);
+            String recipient = user == null ? null : user.email();
+            if (recipient == null || recipient.isBlank()) {
+                log.info("AI 리포트 자동 전달 건너뜀. userId={}, reportId={}, yearMonth={}, "
+                                + "channel=EMAIL, deliveryType=AUTO, result=SKIPPED, "
+                                + "failureCode={}",
+                        userId, reportId, yearMonth, FAILURE_EMAIL_UNAVAILABLE);
+                return;
+            }
+
+            failureCode = FAILURE_REPORT_LOOKUP;
+            AiReportSummary summary = aiReportQueryClient.findByUserIdAndYearMonth(userId, yearMonth);
+            reportId = summary.reportId();
+
+            failureCode = FAILURE_PDF_GENERATION;
+            byte[] pdf = generatePdf(summary);
+
+            failureCode = FAILURE_EMAIL_DELIVERY;
+            sendMessage(recipient, summary.yearMonth(), pdf);
+
+            log.info("AI 리포트 자동 전달 완료. userId={}, reportId={}, yearMonth={}, "
+                            + "channel=EMAIL, deliveryType=AUTO, result=SUCCESS, failureCode={}",
+                    userId, reportId, yearMonth, FAILURE_NONE);
+        } catch (RuntimeException ignored) {
+            log.error("AI 리포트 자동 전달 실패. userId={}, reportId={}, yearMonth={}, "
+                            + "channel=EMAIL, deliveryType=AUTO, result=FAILED, failureCode={}",
+                    userId, reportId, yearMonth, failureCode);
+        }
+    }
+
+    private void sendReport(String recipient, AiReportSummary summary) {
+        byte[] pdf = generatePdf(summary);
+        sendMessage(recipient, summary.yearMonth(), pdf);
+    }
+
+    private byte[] generatePdf(AiReportSummary summary) {
+        return aiReportPdfService.generate(AiReportDetailSummary.from(summary));
+    }
+
+    private void sendMessage(String recipient, String yearMonth, byte[] pdf) {
+        YearMonth parsedYearMonth = YearMonth.parse(yearMonth);
+        emailSender.send(new EmailMessage(
+                recipient,
+                subject(parsedYearMonth),
+                body(parsedYearMonth),
+                "Ntropy_AI_Report_" + yearMonth + ".pdf",
+                "application/pdf",
+                pdf
+        ));
     }
 
     private static String validateYearMonth(String value) {
