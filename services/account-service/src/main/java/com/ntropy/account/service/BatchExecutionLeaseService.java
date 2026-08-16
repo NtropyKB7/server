@@ -1,8 +1,6 @@
 package com.ntropy.account.service;
 
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +20,9 @@ import lombok.RequiredArgsConstructor;
  * {@link #heartbeat(LeaseHandle)}을 호출해 lease_until을 연장하는 것을 전제로 한다.
  * heartbeat·완료는 owner_id + lease_token 기반 fencing으로 보호되므로, lease를 이미 잃은
  * 호출자가 실행 상태를 덮어쓸 수 없다.
+ *
+ * <p>획득·heartbeat·완료 SQL이 DB {@code NOW()}로 만료 여부를 판정하고 새 시각도 같은 문장에서
+ * 계산한다. 따라서 인스턴스별 시계 차이나 DB 시각을 조회한 뒤의 일시 중단에 영향받지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,7 +30,6 @@ public class BatchExecutionLeaseService {
 
     private final DailyBatchExecutionMapper dailyBatchExecutionMapper;
     private final DailySyncLeaseProperties leaseProperties;
-    private final Clock clock;
 
     /**
      * lease 획득을 시도한다. INSERT가 UNIQUE(job_name, business_date) 위반으로 실패하면
@@ -37,9 +37,8 @@ public class BatchExecutionLeaseService {
      * 다른 인스턴스가 이미 선점한 것으로 보고 빈 Optional을 반환한다.
      */
     public Optional<LeaseHandle> acquire(String jobName, LocalDate businessDate, String ownerId) {
-        LocalDateTime now = LocalDateTime.now(clock);
         String leaseToken = UUID.randomUUID().toString();
-        LocalDateTime leaseUntil = now.plus(leaseProperties.getLeaseDuration());
+        long leaseDurationSeconds = leaseProperties.getLeaseDuration().toSeconds();
 
         DailyBatchExecution execution = new DailyBatchExecution();
         execution.setJobName(jobName);
@@ -47,14 +46,12 @@ public class BatchExecutionLeaseService {
         execution.setStatus(BatchExecutionStatus.RUNNING);
         execution.setOwnerId(ownerId);
         execution.setLeaseToken(leaseToken);
-        execution.setLeaseUntil(leaseUntil);
-        execution.setStartedAt(now);
 
         try {
-            dailyBatchExecutionMapper.insert(execution);
+            dailyBatchExecutionMapper.insert(execution, leaseDurationSeconds);
             return Optional.of(new LeaseHandle(execution.getId(), jobName, businessDate, ownerId, leaseToken));
         } catch (DuplicateKeyException alreadyExists) {
-            int acquired = dailyBatchExecutionMapper.acquireExpiredLease(execution, now);
+            int acquired = dailyBatchExecutionMapper.acquireExpiredLease(execution, leaseDurationSeconds);
             if (acquired != 1) {
                 return Optional.empty();
             }
@@ -69,10 +66,8 @@ public class BatchExecutionLeaseService {
      * 호출자는 {@code false}를 받으면 watermark 갱신을 포함한 남은 처리를 즉시 중단해야 한다.
      */
     public boolean heartbeat(LeaseHandle lease) {
-        LocalDateTime now = LocalDateTime.now(clock);
-        LocalDateTime newLeaseUntil = now.plus(leaseProperties.getLeaseDuration());
         int renewed = dailyBatchExecutionMapper.renewLease(
-                lease.executionId(), lease.ownerId(), lease.leaseToken(), newLeaseUntil, now
+                lease.executionId(), lease.ownerId(), lease.leaseToken(), leaseProperties.getLeaseDuration().toSeconds()
         );
         return renewed == 1;
     }
@@ -82,10 +77,9 @@ public class BatchExecutionLeaseService {
      * 이미 소유권을 잃은 뒤 호출하면 {@code false}가 반환되고 실행 상태는 바뀌지 않는다.
      */
     public boolean complete(LeaseHandle lease, BatchExecutionStatus status, String errorSummaryJson) {
-        LocalDateTime now = LocalDateTime.now(clock);
         int completed = dailyBatchExecutionMapper.completeIfOwner(
                 lease.executionId(), lease.ownerId(), lease.leaseToken(),
-                status.name(), now, errorSummaryJson, now
+                status.name(), errorSummaryJson
         );
         return completed == 1;
     }

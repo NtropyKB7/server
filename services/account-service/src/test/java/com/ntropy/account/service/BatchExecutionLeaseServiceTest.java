@@ -133,7 +133,7 @@ class BatchExecutionLeaseServiceTest {
 
     private static BatchExecutionLeaseService newService(MutableClock clock) {
         DailySyncLeaseProperties properties = new DailySyncLeaseProperties(360);
-        return new BatchExecutionLeaseService(new InMemoryDailyBatchExecutionMapper(), properties, clock);
+        return new BatchExecutionLeaseService(new InMemoryDailyBatchExecutionMapper(clock), properties);
     }
 
     /** 테스트에서 시간을 직접 흘려보낼 수 있는 {@link Clock}. */
@@ -180,19 +180,27 @@ class BatchExecutionLeaseServiceTest {
 
         private final Map<String, DailyBatchExecution> store = new HashMap<>();
         private final AtomicLong idSequence = new AtomicLong(1);
+        private final Clock clock;
+
+        private InMemoryDailyBatchExecutionMapper(Clock clock) {
+            this.clock = clock;
+        }
 
         @Override
-        public void insert(DailyBatchExecution execution) {
+        public void insert(DailyBatchExecution execution, long leaseDurationSeconds) {
             String key = key(execution.getJobName(), execution.getBusinessDate());
             if (store.containsKey(key)) {
                 throw new DuplicateKeyException("uk_daily_batch_execution_job_date 위반: " + key);
             }
             execution.setId(idSequence.getAndIncrement());
+            execution.setLeaseUntil(LocalDateTime.now(clock).plusSeconds(leaseDurationSeconds));
+            execution.setStartedAt(LocalDateTime.now(clock));
             store.put(key, copy(execution));
         }
 
         @Override
-        public int acquireExpiredLease(DailyBatchExecution execution, LocalDateTime now) {
+        public int acquireExpiredLease(DailyBatchExecution execution, long leaseDurationSeconds) {
+            LocalDateTime now = LocalDateTime.now(clock);
             String key = key(execution.getJobName(), execution.getBusinessDate());
             DailyBatchExecution existing = store.get(key);
             if (existing == null) {
@@ -206,33 +214,34 @@ class BatchExecutionLeaseServiceTest {
             existing.setStatus(execution.getStatus());
             existing.setOwnerId(execution.getOwnerId());
             existing.setLeaseToken(execution.getLeaseToken());
-            existing.setLeaseUntil(execution.getLeaseUntil());
-            existing.setStartedAt(execution.getStartedAt());
+            existing.setLeaseUntil(now.plusSeconds(leaseDurationSeconds));
+            existing.setStartedAt(now);
             existing.setCompletedAt(null);
             existing.setErrorSummary(null);
             return 1;
         }
 
         @Override
-        public int renewLease(Long id, String ownerId, String leaseToken, LocalDateTime newLeaseUntil,
-                               LocalDateTime now) {
+        public int renewLease(Long id, String ownerId, String leaseToken, long leaseDurationSeconds) {
+            LocalDateTime now = LocalDateTime.now(clock);
             DailyBatchExecution existing = findById(id);
             if (existing == null || !ownsValidLease(existing, ownerId, leaseToken, now)) {
                 return 0;
             }
-            existing.setLeaseUntil(newLeaseUntil);
+            existing.setLeaseUntil(now.plusSeconds(leaseDurationSeconds));
             return 1;
         }
 
         @Override
         public int completeIfOwner(Long id, String ownerId, String leaseToken, String status,
-                                    LocalDateTime completedAt, String errorSummary, LocalDateTime now) {
+                                    String errorSummary) {
+            LocalDateTime now = LocalDateTime.now(clock);
             DailyBatchExecution existing = findById(id);
             if (existing == null || !ownsValidLease(existing, ownerId, leaseToken, now)) {
                 return 0;
             }
             existing.setStatus(BatchExecutionStatus.valueOf(status));
-            existing.setCompletedAt(completedAt);
+            existing.setCompletedAt(now);
             existing.setErrorSummary(errorSummary);
             return 1;
         }
