@@ -1,7 +1,6 @@
 package com.ntropy.account.mapper;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -20,17 +19,25 @@ public interface AccountSyncStateMapper {
     /**
      * 호출 시점에 job_name/business_date에 대해 유효한 lease(owner_id + lease_token +
      * status='RUNNING' + lease_until 유효)를 가진 실행에서만 watermark를 전진시킨다 (fencing).
-     * 영향받은 row 수가 0이면 watermark 갱신 실패로 처리해야 한다. "현재 시각"은 DB NOW()가 아니라
-     * 애플리케이션 Clock으로 계산해 넘긴다 (DB 세션 타임존과 무관하게 동작해야 하므로).
+     * 영향받은 row 수가 0이면 watermark 갱신 실패로 처리해야 한다. 성공 시각과 lease 유효성은
+     * 같은 UPDATE 문 안에서 DB {@code NOW()}로 평가한다.
      */
     int advanceIfOwner(@Param("codefConnectionId") Long codefConnectionId,
                        @Param("organizationCode") String organizationCode,
-                       @Param("lastSuccessfulSyncedAt") LocalDateTime lastSuccessfulSyncedAt,
                        @Param("lastStatus") String lastStatus,
                        @Param("lastErrorCode") String lastErrorCode,
                        @Param("jobName") String jobName,
                        @Param("businessDate") LocalDate businessDate,
                        @Param("ownerId") String ownerId,
-                       @Param("leaseToken") String leaseToken,
-                       @Param("now") LocalDateTime now);
+                       @Param("leaseToken") String leaseToken);
+
+    /** 성공 watermark는 유지한 채, 현재 lease 소유자만 기관 실패 상태를 기록한다. */
+    int markStatusIfOwner(@Param("codefConnectionId") Long codefConnectionId,
+                          @Param("organizationCode") String organizationCode,
+                          @Param("lastStatus") String lastStatus,
+                          @Param("lastErrorCode") String lastErrorCode,
+                          @Param("jobName") String jobName,
+                          @Param("businessDate") LocalDate businessDate,
+                          @Param("ownerId") String ownerId,
+                          @Param("leaseToken") String leaseToken);
 }

@@ -246,7 +246,7 @@ class AccountCollectionServiceTest {
 
         List<AccountCollectionService.AccountCollectionOutcome> outcomes = service.collectForDailySync(
                 1L, PersonalBank.SC_BANK, null,
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), () -> true
         );
 
         assertEquals(1, outcomes.size());
@@ -255,6 +255,49 @@ class AccountCollectionServiceTest {
                 outcomes.get(0).status()
         );
         assertEquals(0, transactionMapper.insertedBatches);
+    }
+
+    @Test
+    void throwsLeaseLostExceptionAndStopsWhenHeartbeatFailsMidAccountLoop() throws Exception {
+        String twoOrdinaryAccounts = """
+                {
+                  "result": {"code": "CF-00000"},
+                  "data": {
+                    "resDepositTrust": [
+                      {"resAccount": "110111111111", "resAccountDeposit": "11",
+                       "resAccountBalance": "10000", "resAccountCurrency": "KRW"},
+                      {"resAccount": "110222222222", "resAccountDeposit": "11",
+                       "resAccountBalance": "20000", "resAccountCurrency": "KRW"}
+                    ]
+                  }
+                }
+                """;
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
+        FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
+                objectMapper.readTree(TRANSACTION_LIST_WITH_ONE_ENTRY)
+        );
+        StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
+                objectMapper.readTree(twoOrdinaryAccounts)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
+        );
+        int[] heartbeatCalls = {0};
+
+        assertThrows(
+                com.ntropy.account.exception.LeaseLostException.class,
+                () -> service.collectForDailySync(
+                        1L, PersonalBank.SHINHAN_BANK, null,
+                        LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
+                        () -> ++heartbeatCalls[0] < 8
+                )
+        );
+
+        assertEquals(8, heartbeatCalls[0], "두 번째 계좌 진입 직전 heartbeat에서 멈춰야 합니다");
+        assertEquals(1, transactionClient.calls.size(), "첫 번째 계좌만 처리되고 두 번째는 처리되면 안 됩니다");
     }
 
     @Test

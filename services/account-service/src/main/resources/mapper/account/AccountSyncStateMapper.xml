@@ -26,7 +26,7 @@
          lease(owner_id + lease_token + status='RUNNING' + lease_until 유효)를 가지고 있을 때만 갱신된다. -->
     <update id="advanceIfOwner">
         UPDATE ACCOUNT_SYNC_STATE state
-        SET last_successful_synced_at = #{lastSuccessfulSyncedAt},
+        SET last_successful_synced_at = NOW(),
             last_status               = #{lastStatus},
             last_error_code           = #{lastErrorCode}
         WHERE state.codef_connection_id = #{codefConnectionId}
@@ -39,7 +39,25 @@
                 AND execution.status = 'RUNNING'
                 AND execution.owner_id = #{ownerId}
                 AND execution.lease_token = #{leaseToken}
-                AND execution.lease_until &gt;= #{now}
+                AND execution.lease_until &gt;= NOW()
+          )
+    </update>
+
+    <update id="markStatusIfOwner">
+        UPDATE ACCOUNT_SYNC_STATE state
+        SET last_status     = #{lastStatus},
+            last_error_code = #{lastErrorCode}
+        WHERE state.codef_connection_id = #{codefConnectionId}
+          AND state.organization_code = #{organizationCode}
+          AND EXISTS (
+              SELECT 1
+              FROM DAILY_BATCH_EXECUTION execution
+              WHERE execution.job_name = #{jobName}
+                AND execution.business_date = #{businessDate}
+                AND execution.status = 'RUNNING'
+                AND execution.owner_id = #{ownerId}
+                AND execution.lease_token = #{leaseToken}
+                AND execution.lease_until &gt;= NOW()
           )
     </update>
 

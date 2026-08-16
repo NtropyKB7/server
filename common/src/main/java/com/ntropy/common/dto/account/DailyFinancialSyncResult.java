@@ -25,9 +25,14 @@ public record DailyFinancialSyncResult(
         long processedTransactionCount
 ) {
 
-    /** 기관별 처리 결과. 실패 사유는 계좌번호·생년월일·connectedId 등 민감정보를 포함하지 않는다. */
+    /**
+     * 기관별 처리 결과. 실패 사유는 계좌번호·생년월일·connectedId 등 민감정보를 포함하지 않는다.
+     * 같은 기관 코드를 쓰는 여러 연결의 결과가 섞이지 않도록 내부 {@code codefConnectionId}를
+     * 함께 반환한다.
+     */
     public record InstitutionSyncResult(
             String organizationCode,
+            Long codefConnectionId,
             String status,
             String errorCode
     ) {

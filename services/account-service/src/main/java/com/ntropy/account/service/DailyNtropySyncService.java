@@ -1,9 +1,8 @@
 package com.ntropy.account.service;
 
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -16,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import com.ntropy.account.config.IncrementalSyncPolicy;
 import com.ntropy.account.domain.AccountGroup;
+import com.ntropy.account.domain.AccountSyncStatus;
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.IncrementalSyncRangeCalculator;
 import com.ntropy.account.domain.InstitutionKeys;
@@ -53,13 +53,12 @@ public class DailyNtropySyncService {
     private final BatchExecutionLeaseService leaseService;
     private final NtropyIncrementalTransactionGenerator transactionGenerator;
     private final IncrementalSyncPolicy incrementalSyncPolicy;
-    private final Clock clock;
 
     public DailyFinancialSyncResult synchronize(List<Long> activeUserIds, LocalDate businessDate, LeaseHandle lease) {
         Set<Long> successfulUserIds = new LinkedHashSet<>();
         Set<Long> partialFailedUserIds = new LinkedHashSet<>();
         Map<Long, Set<YearMonth>> affectedYearMonthsByUser = new LinkedHashMap<>();
-        Map<String, InstitutionAggregate> institutionAggregates = new LinkedHashMap<>();
+        List<InstitutionSyncResult> institutionResults = new ArrayList<>();
         long processedTransactionCount = 0;
         boolean leaseLost = false;
 
@@ -79,19 +78,31 @@ public class DailyNtropySyncService {
                     break userLoop;
                 }
 
+                accountSyncStateMapper.insertIfAbsent(pendingSyncState(connection.getId(), organizationCode));
                 InstitutionGenerationOutcome outcome = generateForInstitution(userId, connection, organizationCode, businessDate);
                 processedTransactionCount += outcome.transactionCount();
-                institutionAggregates.merge(organizationCode, outcome.aggregate(), InstitutionAggregate::merge);
+                institutionResults.add(new InstitutionSyncResult(
+                        organizationCode, connection.getId(), outcome.aggregate().status(),
+                        outcome.aggregate().errorCode()
+                ));
 
                 if (outcome.aggregate().hasFailure()) {
                     userHasFailure = true;
+                    boolean marked = accountSyncStateMapper.markStatusIfOwner(
+                            connection.getId(), organizationCode, AccountSyncStatus.PARTIAL_FAILED.name(),
+                            outcome.aggregate().errorCode(), lease.jobName(), lease.businessDate(),
+                            lease.ownerId(), lease.leaseToken()
+                    ) == 1;
+                    if (!marked) {
+                        leaseLost = true;
+                        break userLoop;
+                    }
                     continue;
                 }
 
-                LocalDateTime now = LocalDateTime.now(clock);
                 boolean advanced = accountSyncStateMapper.advanceIfOwner(
-                        connection.getId(), organizationCode, now, "SUCCESS", null,
-                        lease.jobName(), lease.businessDate(), lease.ownerId(), lease.leaseToken(), now
+                        connection.getId(), organizationCode, AccountSyncStatus.SUCCESS.name(), null,
+                        lease.jobName(), lease.businessDate(), lease.ownerId(), lease.leaseToken()
                 ) == 1;
                 if (!advanced) {
                     leaseLost = true;
@@ -99,9 +110,11 @@ public class DailyNtropySyncService {
                 }
 
                 userHasSuccess = true;
-                affectedYearMonthsByUser
-                        .computeIfAbsent(userId, id -> new TreeSet<>())
-                        .addAll(monthsBetween(outcome.startDate(), businessDate));
+                if (!outcome.affectedYearMonths().isEmpty()) {
+                    affectedYearMonthsByUser
+                            .computeIfAbsent(userId, id -> new TreeSet<>())
+                            .addAll(outcome.affectedYearMonths());
+                }
             }
 
             if (userHasFailure) {
@@ -122,9 +135,7 @@ public class DailyNtropySyncService {
                 affectedYearMonthsByUser.entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, e -> List.copyOf(e.getValue()))),
                 List.copyOf(partialFailedUserIds),
-                institutionAggregates.entrySet().stream()
-                        .map(e -> new InstitutionSyncResult(e.getKey(), e.getValue().status(), e.getValue().errorCode()))
-                        .toList(),
+                List.copyOf(institutionResults),
                 processedTransactionCount
         );
     }
@@ -154,26 +165,31 @@ public class DailyNtropySyncService {
             if (!transactions.isEmpty()) {
                 accountTransactionMapper.insertAll(transactions);
             }
-            return new InstitutionGenerationOutcome(InstitutionAggregate.success(), startDate, transactions.size());
+            Set<YearMonth> affectedYearMonths = transactions.stream()
+                    .map(AccountTransaction::getTranDate)
+                    .filter(java.util.Objects::nonNull)
+                    .map(YearMonth::from)
+                    .collect(Collectors.toCollection(TreeSet::new));
+            return new InstitutionGenerationOutcome(
+                    InstitutionAggregate.success(), Set.copyOf(affectedYearMonths), transactions.size()
+            );
         } catch (RuntimeException e) {
             return InstitutionGenerationOutcome.failed(InstitutionAggregate.failed("GENERATION_FAILED"));
         }
     }
 
-    private static Set<YearMonth> monthsBetween(LocalDate startDate, LocalDate endDate) {
-        Set<YearMonth> months = new TreeSet<>();
-        YearMonth cursor = YearMonth.from(startDate);
-        YearMonth last = YearMonth.from(endDate);
-        while (!cursor.isAfter(last)) {
-            months.add(cursor);
-            cursor = cursor.plusMonths(1);
-        }
-        return months;
+    private static AccountSyncState pendingSyncState(Long codefConnectionId, String organizationCode) {
+        AccountSyncState state = new AccountSyncState();
+        state.setCodefConnectionId(codefConnectionId);
+        state.setOrganizationCode(organizationCode);
+        state.setLastStatus(AccountSyncStatus.PENDING);
+        return state;
     }
 
-    private record InstitutionGenerationOutcome(InstitutionAggregate aggregate, LocalDate startDate, long transactionCount) {
+    private record InstitutionGenerationOutcome(InstitutionAggregate aggregate, Set<YearMonth> affectedYearMonths,
+                                                long transactionCount) {
         static InstitutionGenerationOutcome failed(InstitutionAggregate aggregate) {
-            return new InstitutionGenerationOutcome(aggregate, null, 0);
+            return new InstitutionGenerationOutcome(aggregate, Set.of(), 0);
         }
     }
 
@@ -184,13 +200,6 @@ public class DailyNtropySyncService {
 
         static InstitutionAggregate failed(String errorCode) {
             return new InstitutionAggregate(true, errorCode);
-        }
-
-        static InstitutionAggregate merge(InstitutionAggregate a, InstitutionAggregate b) {
-            if (a.hasFailure || b.hasFailure) {
-                return new InstitutionAggregate(true, a.hasFailure ? a.errorCode : b.errorCode);
-            }
-            return success();
         }
 
         String status() {

@@ -1,8 +1,12 @@
 package com.ntropy.account.service;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 import org.springframework.stereotype.Service;
 
@@ -24,6 +28,7 @@ import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.exception.CredentialRequiredException;
+import com.ntropy.account.exception.LeaseLostException;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
@@ -43,6 +48,7 @@ public class AccountCollectionService {
     private static final String ORDINARY_WITHDRAWAL = "11";
     private static final String REGULAR_SAVINGS = "12";
     private static final String LOAN = "40";
+    private static final BooleanSupplier LEASE_NOT_REQUIRED = () -> true;
     private final PersonalBankAccountService personalBankAccountService;
     private final CodefConnectionMapper codefConnectionMapper;
     private final CodefBankTransactionClient codefBankTransactionClient;
@@ -62,7 +68,7 @@ public class AccountCollectionService {
                                  LocalDate transactionStartDate, LocalDate transactionEndDate) {
         CodefConnection connection = requireCodefConnection(userId);
         String normalizedBirthDate = bank.normalizeBirthDate(birthDate);
-        List<SavedAccountContext> savedContexts = fetchAndSaveAccounts(userId, bank, connection);
+        List<SavedAccountContext> savedContexts = fetchAndSaveAccounts(userId, bank, connection, LEASE_NOT_REQUIRED);
 
         List<IllegalStateException> collectionFailures = new ArrayList<>();
         for (SavedAccountContext context : savedContexts) {
@@ -70,7 +76,7 @@ public class AccountCollectionService {
             try {
                 collectEligibleTransactions(
                         bank, connection.getConnectedId(), context.rawAccountNo(), saved,
-                        normalizedBirthDate, transactionStartDate, transactionEndDate
+                        normalizedBirthDate, transactionStartDate, transactionEndDate, LEASE_NOT_REQUIRED
                 );
             } catch (RuntimeException e) {
                 collectionFailures.add(new IllegalStateException(
@@ -98,33 +104,42 @@ public class AccountCollectionService {
      * 예외로 묶어 던지지 않고, 계좌별 결과를 모두 반환한다. 비밀번호가 필요해 조회할 수 없는
      * 계좌(SC은행)는 {@link AccountCollectionOutcome.Status#SKIPPED_CREDENTIAL_REQUIRED}로,
      * 그 외 실패는 {@link AccountCollectionOutcome.Status#FAILED}로 구분한다.
+     *
+     * <p>{@code heartbeat}는 계좌 목록과 거래 API의 호출 직전·응답 직후, 파싱과 저장 직후에
+     * 확인한다. CODEF의 긴 timeout과 인증 재시도 사이에 lease가 만료되면 응답 처리를 시작하기
+     * 전에 중단하며, {@code false}이면 {@link LeaseLostException}을 던진다.
      */
     public List<AccountCollectionOutcome> collectForDailySync(Long userId, PersonalBank bank, String birthDate,
                                                                LocalDate transactionStartDate,
-                                                               LocalDate transactionEndDate) {
+                                                               LocalDate transactionEndDate,
+                                                               BooleanSupplier heartbeat) {
         CodefConnection connection = requireCodefConnection(userId);
         String normalizedBirthDate = bank.normalizeBirthDate(birthDate);
-        List<SavedAccountContext> savedContexts = fetchAndSaveAccounts(userId, bank, connection);
+        List<SavedAccountContext> savedContexts = fetchAndSaveAccounts(userId, bank, connection, heartbeat);
 
         List<AccountCollectionOutcome> outcomes = new ArrayList<>();
         for (SavedAccountContext context : savedContexts) {
+            requireLease(heartbeat);
             Account saved = context.account();
             try {
-                int transactionCount = collectEligibleTransactions(
+                TransactionCollectionResult collectionResult = collectEligibleTransactions(
                         bank, connection.getConnectedId(), context.rawAccountNo(), saved,
-                        normalizedBirthDate, transactionStartDate, transactionEndDate
+                        normalizedBirthDate, transactionStartDate, transactionEndDate, heartbeat
                 );
                 outcomes.add(new AccountCollectionOutcome(
-                        saved, AccountCollectionOutcome.Status.SUCCESS, null, transactionCount
+                        saved, AccountCollectionOutcome.Status.SUCCESS, null,
+                        collectionResult.transactionCount(), collectionResult.affectedYearMonths()
                 ));
+            } catch (LeaseLostException leaseLost) {
+                throw leaseLost;
             } catch (CredentialRequiredException e) {
                 outcomes.add(new AccountCollectionOutcome(
                         saved, AccountCollectionOutcome.Status.SKIPPED_CREDENTIAL_REQUIRED,
-                        "SKIPPED_CREDENTIAL_REQUIRED", 0
+                        "SKIPPED_CREDENTIAL_REQUIRED", 0, Set.of()
                 ));
             } catch (RuntimeException e) {
                 outcomes.add(new AccountCollectionOutcome(
-                        saved, AccountCollectionOutcome.Status.FAILED, classifyFailure(e), 0
+                        saved, AccountCollectionOutcome.Status.FAILED, classifyFailure(e), 0, Set.of()
                 ));
             }
         }
@@ -141,8 +156,17 @@ public class AccountCollectionService {
     }
 
     /** 실행마다 보유계좌를 재조회해 원문 계좌번호를 이 요청 흐름 안에서만 확보한다(저장하지 않음). */
-    private List<SavedAccountContext> fetchAndSaveAccounts(Long userId, PersonalBank bank, CodefConnection connection) {
-        JsonNode accountListResponse = personalBankAccountService.getPersonalAccountList(userId, bank);
+    private List<SavedAccountContext> fetchAndSaveAccounts(Long userId, PersonalBank bank, CodefConnection connection,
+                                                           BooleanSupplier heartbeat) {
+        requireLease(heartbeat);
+        JsonNode accountListResponse;
+        try {
+            accountListResponse = personalBankAccountService.getPersonalAccountList(userId, bank);
+        } catch (RuntimeException e) {
+            requireLease(heartbeat);
+            throw e;
+        }
+        requireLease(heartbeat);
         List<ParsedAccount> parsedAccounts = AccountResponseParser.parse(
                 accountListResponse.path("data"), connection.getId(), userId, bank.getOrganizationCode()
         );
@@ -155,6 +179,7 @@ public class AccountCollectionService {
             );
             savedContexts.add(new SavedAccountContext(saved, parsed.rawAccountNo()));
         }
+        requireLease(heartbeat);
         return savedContexts;
     }
 
@@ -171,7 +196,8 @@ public class AccountCollectionService {
     }
 
     /** 계좌 단위 증분 수집 결과. 이슈 #158의 provider별 일일 동기화 결과 집계에 쓰인다. */
-    public record AccountCollectionOutcome(Account account, Status status, String errorCode, int transactionCount) {
+    public record AccountCollectionOutcome(Account account, Status status, String errorCode, int transactionCount,
+                                           Set<YearMonth> affectedYearMonths) {
         public enum Status {
             SUCCESS,
             SKIPPED_CREDENTIAL_REQUIRED,
@@ -179,37 +205,48 @@ public class AccountCollectionService {
         }
     }
 
-    private int collectEligibleTransactions(PersonalBank bank, String connectedId, String rawAccountNo,
-                                            Account saved, String birthDate,
-                                            LocalDate startDate, LocalDate endDate) {
+    private TransactionCollectionResult collectEligibleTransactions(PersonalBank bank, String connectedId,
+                                                                    String rawAccountNo, Account saved,
+                                                                    String birthDate, LocalDate startDate,
+                                                                    LocalDate endDate, BooleanSupplier heartbeat) {
         if (isOrdinaryTransactionEligible(saved)) {
             return collectTransactions(
-                    bank, connectedId, rawAccountNo, saved.getId(), birthDate, startDate, endDate
+                    bank, connectedId, rawAccountNo, saved.getId(), birthDate, startDate, endDate, heartbeat
             );
         } else if (isInstallmentSavingsEligible(saved)) {
             return collectInstallmentSavings(
-                    bank, connectedId, rawAccountNo, saved, birthDate, startDate, endDate
+                    bank, connectedId, rawAccountNo, saved, birthDate, startDate, endDate, heartbeat
             );
         } else if (isLoanEligible(saved)) {
             return collectLoanTransactions(
-                    bank, connectedId, rawAccountNo, saved, birthDate, startDate, endDate
+                    bank, connectedId, rawAccountNo, saved, birthDate, startDate, endDate, heartbeat
             );
         }
-        return 0;
+        return TransactionCollectionResult.empty();
     }
 
     private record SavedAccountContext(Account account, String rawAccountNo) {
     }
 
-    private int collectLoanTransactions(PersonalBank bank, String connectedId, String rawAccountNo,
-                                        Account account, String birthDate,
-                                        LocalDate startDate, LocalDate endDate) {
-        JsonNode response = codefLoanTransactionClient.getPersonalTransactionList(
-                bank.getOrganizationCode(), connectedId, rawAccountNo, null,
-                startDate, endDate, birthDate
-        );
+    private TransactionCollectionResult collectLoanTransactions(PersonalBank bank, String connectedId,
+                                                                 String rawAccountNo, Account account,
+                                                                 String birthDate, LocalDate startDate,
+                                                                 LocalDate endDate, BooleanSupplier heartbeat) {
+        requireLease(heartbeat);
+        JsonNode response;
+        try {
+            response = codefLoanTransactionClient.getPersonalTransactionList(
+                    bank.getOrganizationCode(), connectedId, rawAccountNo, null,
+                    startDate, endDate, birthDate
+            );
+        } catch (RuntimeException e) {
+            requireLease(heartbeat);
+            throw e;
+        }
+        requireLease(heartbeat);
         List<ParsedLoan> parsedResults = LoanTransactionResponseParser.parse(response.path("data"), account.getId());
         int transactionCount = 0;
+        Set<YearMonth> affectedYearMonths = new LinkedHashSet<>();
         for (ParsedLoan parsed : parsedResults) {
             if (parsed.detail().getNextPaymentDate() == null) {
                 parsed.detail().setNextPaymentDate(DefaultPaymentSchedule.nextAfter(endDate));
@@ -219,17 +256,28 @@ public class AccountCollectionService {
             if (!transactions.isEmpty()) {
                 accountTransactionMapper.insertAll(transactions);
                 transactionCount += transactions.size();
+                affectedYearMonths.addAll(affectedMonths(transactions));
             }
         }
-        return transactionCount;
+        requireLease(heartbeat);
+        return new TransactionCollectionResult(transactionCount, Set.copyOf(affectedYearMonths));
     }
 
-    private int collectInstallmentSavings(PersonalBank bank, String connectedId, String rawAccountNo,
-                                          Account account, String birthDate,
-                                          LocalDate startDate, LocalDate endDate) {
-        JsonNode response = codefInstallmentSavingsClient.getPersonalTransactionList(
-                bank.getOrganizationCode(), connectedId, rawAccountNo, startDate, endDate, birthDate
-        );
+    private TransactionCollectionResult collectInstallmentSavings(PersonalBank bank, String connectedId,
+                                                                   String rawAccountNo, Account account,
+                                                                   String birthDate, LocalDate startDate,
+                                                                   LocalDate endDate, BooleanSupplier heartbeat) {
+        requireLease(heartbeat);
+        JsonNode response;
+        try {
+            response = codefInstallmentSavingsClient.getPersonalTransactionList(
+                    bank.getOrganizationCode(), connectedId, rawAccountNo, startDate, endDate, birthDate
+            );
+        } catch (RuntimeException e) {
+            requireLease(heartbeat);
+            throw e;
+        }
+        requireLease(heartbeat);
         List<ParsedInstallmentSavings> parsedResults = InstallmentSavingsResponseParser.parse(
                 response.path("data"), account.getId()
         );
@@ -238,6 +286,7 @@ public class AccountCollectionService {
             updateNextPaymentDate(account.getId(), defaultNextPaymentDate);
         }
         int transactionCount = 0;
+        Set<YearMonth> affectedYearMonths = new LinkedHashSet<>();
         for (ParsedInstallmentSavings parsed : parsedResults) {
             parsed.detail().setNextPaymentDate(defaultNextPaymentDate);
             accountMapper.updateAccountDetails(parsed.detail());
@@ -245,9 +294,11 @@ public class AccountCollectionService {
             if (!transactions.isEmpty()) {
                 accountTransactionMapper.insertAll(transactions);
                 transactionCount += transactions.size();
+                affectedYearMonths.addAll(affectedMonths(transactions));
             }
         }
-        return transactionCount;
+        requireLease(heartbeat);
+        return new TransactionCollectionResult(transactionCount, Set.copyOf(affectedYearMonths));
     }
 
     private void updateNextPaymentDate(Long accountId, LocalDate nextPaymentDate) {
@@ -257,29 +308,60 @@ public class AccountCollectionService {
         accountMapper.updateAccountDetails(schedule);
     }
 
-    private int collectTransactions(PersonalBank bank, String connectedId, String rawAccountNo, Long accountId,
-                                    String birthDate, LocalDate startDate, LocalDate endDate) {
+    private TransactionCollectionResult collectTransactions(PersonalBank bank, String connectedId,
+                                                             String rawAccountNo, Long accountId,
+                                                             String birthDate, LocalDate startDate,
+                                                             LocalDate endDate, BooleanSupplier heartbeat) {
         boolean scBank = bank == PersonalBank.SC_BANK;
         JsonNode transactionListResponse;
+        requireLease(heartbeat);
         try {
             transactionListResponse = codefBankTransactionClient.getPersonalTransactionList(
                     bank.getOrganizationCode(), connectedId, rawAccountNo, startDate, endDate, birthDate, scBank
             );
         } catch (IllegalStateException e) {
+            requireLease(heartbeat);
             if (scBank && isCredentialRequiredMessage(e.getMessage())) {
                 throw new CredentialRequiredException(
                         "SC은행 계좌가 비밀번호를 요구해 조회할 수 없습니다: accountId=" + accountId, e
                 );
             }
             throw e;
+        } catch (RuntimeException e) {
+            requireLease(heartbeat);
+            throw e;
         }
+        requireLease(heartbeat);
         List<AccountTransaction> transactions = AccountTransactionResponseParser.parse(
                 transactionListResponse.path("data"), accountId
         );
         if (!transactions.isEmpty()) {
             accountTransactionMapper.insertAll(transactions);
         }
-        return transactions.size();
+        requireLease(heartbeat);
+        return new TransactionCollectionResult(transactions.size(), affectedMonths(transactions));
+    }
+
+    private static void requireLease(BooleanSupplier heartbeat) {
+        if (!heartbeat.getAsBoolean()) {
+            throw new LeaseLostException();
+        }
+    }
+
+    private static Set<YearMonth> affectedMonths(List<AccountTransaction> transactions) {
+        Set<YearMonth> months = new LinkedHashSet<>();
+        for (AccountTransaction transaction : transactions) {
+            if (transaction.getTranDate() != null) {
+                months.add(YearMonth.from(transaction.getTranDate()));
+            }
+        }
+        return Set.copyOf(months);
+    }
+
+    private record TransactionCollectionResult(int transactionCount, Set<YearMonth> affectedYearMonths) {
+        static TransactionCollectionResult empty() {
+            return new TransactionCollectionResult(0, Set.of());
+        }
     }
 
     /**

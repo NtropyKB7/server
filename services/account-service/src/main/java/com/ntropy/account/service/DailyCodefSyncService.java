@@ -1,9 +1,8 @@
 package com.ntropy.account.service;
 
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -15,12 +14,14 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import com.ntropy.account.config.IncrementalSyncPolicy;
+import com.ntropy.account.domain.AccountSyncStatus;
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.IncrementalSyncRangeCalculator;
 import com.ntropy.account.domain.InstitutionKeys;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.AccountSyncState;
 import com.ntropy.account.domain.entity.CodefConnection;
+import com.ntropy.account.exception.LeaseLostException;
 import com.ntropy.account.mapper.AccountSyncStateMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
@@ -52,13 +53,12 @@ public class DailyCodefSyncService {
     private final BatchExecutionLeaseService leaseService;
     private final BirthDateCipher birthDateCipher;
     private final IncrementalSyncPolicy incrementalSyncPolicy;
-    private final Clock clock;
 
     public DailyFinancialSyncResult synchronize(List<Long> activeUserIds, LocalDate businessDate, LeaseHandle lease) {
         Set<Long> successfulUserIds = new LinkedHashSet<>();
         Set<Long> partialFailedUserIds = new LinkedHashSet<>();
         Map<Long, Set<YearMonth>> affectedYearMonthsByUser = new LinkedHashMap<>();
-        Map<String, InstitutionAggregate> institutionAggregates = new LinkedHashMap<>();
+        List<InstitutionSyncResult> institutionResults = new ArrayList<>();
         long processedTransactionCount = 0;
         boolean leaseLost = false;
 
@@ -85,19 +85,40 @@ public class DailyCodefSyncService {
                     continue; // 지원 대상 밖 기관코드 방어
                 }
 
-                InstitutionSyncOutcome outcome = synchronizeInstitution(userId, bank, connection, businessDate);
+                // 실패도 ACCOUNT_SYNC_STATE에 남길 수 있도록 외부 호출 전에 상태 행을 보장한다.
+                accountSyncStateMapper.insertIfAbsent(pendingSyncState(connection.getId(), organizationCode));
+
+                InstitutionSyncOutcome outcome;
+                try {
+                    outcome = synchronizeInstitution(userId, bank, connection, businessDate, lease);
+                } catch (LeaseLostException leaseLostSignal) {
+                    leaseLost = true;
+                    break userLoop;
+                }
+
                 processedTransactionCount += outcome.transactionCount();
-                institutionAggregates.merge(organizationCode, outcome.aggregate(), InstitutionAggregate::merge);
+                institutionResults.add(new InstitutionSyncResult(
+                        organizationCode, connection.getId(), outcome.aggregate().statusName(),
+                        outcome.aggregate().errorCode()
+                ));
 
                 if (outcome.aggregate().hasFailure()) {
                     userHasFailure = true;
+                    boolean marked = accountSyncStateMapper.markStatusIfOwner(
+                            connection.getId(), organizationCode, AccountSyncStatus.PARTIAL_FAILED.name(),
+                            outcome.aggregate().errorCode(), lease.jobName(), lease.businessDate(),
+                            lease.ownerId(), lease.leaseToken()
+                    ) == 1;
+                    if (!marked) {
+                        leaseLost = true;
+                        break userLoop;
+                    }
                     continue; // watermark 전진하지 않음
                 }
 
-                LocalDateTime now = LocalDateTime.now(clock);
                 boolean advanced = accountSyncStateMapper.advanceIfOwner(
-                        connection.getId(), organizationCode, now, outcome.watermarkStatus(), null,
-                        lease.jobName(), lease.businessDate(), lease.ownerId(), lease.leaseToken(), now
+                        connection.getId(), organizationCode, outcome.watermarkStatus(), null,
+                        lease.jobName(), lease.businessDate(), lease.ownerId(), lease.leaseToken()
                 ) == 1;
                 if (!advanced) {
                     leaseLost = true;
@@ -105,9 +126,11 @@ public class DailyCodefSyncService {
                 }
                 if (outcome.hadAnySuccess()) {
                     userHasSuccess = true;
-                    affectedYearMonthsByUser
-                            .computeIfAbsent(userId, id -> new TreeSet<>())
-                            .addAll(monthsBetween(outcome.startDate(), businessDate));
+                    if (!outcome.affectedYearMonths().isEmpty()) {
+                        affectedYearMonthsByUser
+                                .computeIfAbsent(userId, id -> new TreeSet<>())
+                                .addAll(outcome.affectedYearMonths());
+                    }
                 }
             }
 
@@ -129,15 +152,13 @@ public class DailyCodefSyncService {
                 affectedYearMonthsByUser.entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, e -> List.copyOf(e.getValue()))),
                 List.copyOf(partialFailedUserIds),
-                institutionAggregates.entrySet().stream()
-                        .map(e -> new InstitutionSyncResult(e.getKey(), e.getValue().status(), e.getValue().errorCode()))
-                        .toList(),
+                List.copyOf(institutionResults),
                 processedTransactionCount
         );
     }
 
     private InstitutionSyncOutcome synchronizeInstitution(Long userId, PersonalBank bank, CodefConnection connection,
-                                                           LocalDate businessDate) {
+                                                           LocalDate businessDate, LeaseHandle lease) {
         String organizationCode = bank.getOrganizationCode();
 
         String birthDate = null;
@@ -145,7 +166,12 @@ public class DailyCodefSyncService {
             if (connection.getBirthDateCiphertext() == null || connection.getBirthDateIv() == null) {
                 return InstitutionSyncOutcome.failed(InstitutionAggregate.failed("CREDENTIAL_MISSING"));
             }
-            birthDate = birthDateCipher.decrypt(connection.getBirthDateCiphertext(), connection.getBirthDateIv());
+            try {
+                birthDate = birthDateCipher.decrypt(connection.getBirthDateCiphertext(), connection.getBirthDateIv());
+            } catch (RuntimeException decryptFailure) {
+                // 손상된 IV·암호문이나 키 버전 불일치 하나가 전체 배치를 막으면 안 되므로 이 기관만 실패 처리한다.
+                return InstitutionSyncOutcome.failed(InstitutionAggregate.failed("CREDENTIAL_DECRYPT_FAILED"));
+            }
         }
 
         AccountSyncState state = accountSyncStateMapper.findByConnectionAndOrganization(connection.getId(), organizationCode);
@@ -158,7 +184,11 @@ public class DailyCodefSyncService {
 
         List<AccountCollectionOutcome> outcomes;
         try {
-            outcomes = accountCollectionService.collectForDailySync(userId, bank, birthDate, startDate, businessDate);
+            outcomes = accountCollectionService.collectForDailySync(
+                    userId, bank, birthDate, startDate, businessDate, () -> leaseService.heartbeat(lease)
+            );
+        } catch (LeaseLostException leaseLostSignal) {
+            throw leaseLostSignal; // 상위 루프에서 전체 중단 처리
         } catch (RuntimeException e) {
             return InstitutionSyncOutcome.failed(InstitutionAggregate.failed("COLLECTION_FAILED"));
         }
@@ -167,58 +197,79 @@ public class DailyCodefSyncService {
                 .anyMatch(o -> o.status() == AccountCollectionOutcome.Status.FAILED);
         boolean hasSuccess = outcomes.stream()
                 .anyMatch(o -> o.status() == AccountCollectionOutcome.Status.SUCCESS);
+        boolean hasSkipped = outcomes.stream()
+                .anyMatch(o -> o.status() == AccountCollectionOutcome.Status.SKIPPED_CREDENTIAL_REQUIRED);
         long transactionCount = outcomes.stream().mapToLong(AccountCollectionOutcome::transactionCount).sum();
+        Set<YearMonth> affectedYearMonths = outcomes.stream()
+                .flatMap(outcome -> outcome.affectedYearMonths().stream())
+                .collect(Collectors.toCollection(TreeSet::new));
 
         if (hasRealFailure) {
+            String errorCode = outcomes.stream()
+                    .filter(outcome -> outcome.status() == AccountCollectionOutcome.Status.FAILED)
+                    .map(AccountCollectionOutcome::errorCode)
+                    .filter(java.util.Objects::nonNull)
+                    .findFirst()
+                    .orElse("COLLECTION_FAILED");
             return new InstitutionSyncOutcome(
-                    InstitutionAggregate.failed("COLLECTION_FAILED"), false, startDate, transactionCount, null
+                    InstitutionAggregate.failed(errorCode), false, affectedYearMonths, transactionCount, null
             );
         }
-        return new InstitutionSyncOutcome(
-                InstitutionAggregate.success(), hasSuccess, startDate, transactionCount, "SUCCESS"
-        );
+        // SKIPPED_CREDENTIAL_REQUIRED는 실패가 아니므로 watermark는 전진시키되(hasFailure=false),
+        // 일부 계좌가 비밀번호 요구로 제외됐다는 사실 자체는 상태에 남긴다.
+        InstitutionAggregate aggregate = hasSkipped ? InstitutionAggregate.skipped() : InstitutionAggregate.success();
+        String watermarkStatus = hasSkipped
+                ? AccountSyncStatus.SKIPPED_CREDENTIAL_REQUIRED.name()
+                : AccountSyncStatus.SUCCESS.name();
+        return new InstitutionSyncOutcome(aggregate, hasSuccess, affectedYearMonths, transactionCount, watermarkStatus);
     }
 
-    /**
-     * 조회 구간에 걸친 연월 목록. {@code affectedYearMonthsByUser}는 "정확히 신규/변경된 거래"가 아니라
-     * 조회되어 멱등 upsert에 성공한 거래가 속할 수 있는 연월(MVP 단순화)로 정의한다.
-     */
-    private static Set<YearMonth> monthsBetween(LocalDate startDate, LocalDate endDate) {
-        Set<YearMonth> months = new TreeSet<>();
-        YearMonth cursor = YearMonth.from(startDate);
-        YearMonth last = YearMonth.from(endDate);
-        while (!cursor.isAfter(last)) {
-            months.add(cursor);
-            cursor = cursor.plusMonths(1);
-        }
-        return months;
+    private static AccountSyncState pendingSyncState(Long codefConnectionId, String organizationCode) {
+        AccountSyncState state = new AccountSyncState();
+        state.setCodefConnectionId(codefConnectionId);
+        state.setOrganizationCode(organizationCode);
+        state.setLastStatus(AccountSyncStatus.PENDING);
+        return state;
     }
 
     private record InstitutionSyncOutcome(InstitutionAggregate aggregate, boolean hadAnySuccess,
-                                          LocalDate startDate, long transactionCount, String watermarkStatus) {
+                                          Set<YearMonth> affectedYearMonths, long transactionCount,
+                                          String watermarkStatus) {
         static InstitutionSyncOutcome failed(InstitutionAggregate aggregate) {
-            return new InstitutionSyncOutcome(aggregate, false, null, 0, null);
+            return new InstitutionSyncOutcome(aggregate, false, Set.of(), 0, null);
         }
     }
 
-    private record InstitutionAggregate(boolean hasFailure, String errorCode) {
+    private record InstitutionAggregate(Status status, String errorCode) {
+
+        enum Status {
+            SUCCESS,
+            SKIPPED_CREDENTIAL_REQUIRED,
+            PARTIAL_FAILED
+        }
+
         static InstitutionAggregate success() {
-            return new InstitutionAggregate(false, null);
+            return new InstitutionAggregate(Status.SUCCESS, null);
+        }
+
+        static InstitutionAggregate skipped() {
+            return new InstitutionAggregate(Status.SKIPPED_CREDENTIAL_REQUIRED, "SKIPPED_CREDENTIAL_REQUIRED");
         }
 
         static InstitutionAggregate failed(String errorCode) {
-            return new InstitutionAggregate(true, errorCode);
+            return new InstitutionAggregate(Status.PARTIAL_FAILED, errorCode);
         }
 
-        static InstitutionAggregate merge(InstitutionAggregate a, InstitutionAggregate b) {
-            if (a.hasFailure || b.hasFailure) {
-                return new InstitutionAggregate(true, a.hasFailure ? a.errorCode : b.errorCode);
-            }
-            return success();
+        boolean hasFailure() {
+            return status == Status.PARTIAL_FAILED;
         }
 
-        String status() {
-            return hasFailure ? "PARTIAL_FAILED" : "SUCCESS";
+        boolean isSkipped() {
+            return status == Status.SKIPPED_CREDENTIAL_REQUIRED;
+        }
+
+        String statusName() {
+            return status.name();
         }
     }
 }

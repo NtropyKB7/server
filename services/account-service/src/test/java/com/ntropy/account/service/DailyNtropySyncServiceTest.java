@@ -3,14 +3,14 @@ package com.ntropy.account.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -29,10 +29,6 @@ import com.ntropy.common.dto.account.DailyFinancialSyncResult;
 
 class DailyNtropySyncServiceTest {
 
-    private static final Clock CLOCK = Clock.fixed(
-            LocalDateTime.of(2026, 8, 14, 3, 0).atZone(ZoneId.of("Asia/Seoul")).toInstant(),
-            ZoneId.of("Asia/Seoul")
-    );
     private static final LocalDate BUSINESS_DATE = LocalDate.of(2026, 8, 14);
     private static final LeaseHandle LEASE = new LeaseHandle(1L, "daily-sync-ntropy", BUSINESS_DATE, "owner-a", "token-a");
 
@@ -57,6 +53,11 @@ class DailyNtropySyncServiceTest {
         assertEquals(1, syncStateMapper.advanceCalls.size());
         assertTrue(transactionMapper.insertedBatches > 0);
         assertTrue(transactionMapper.inserted.stream().noneMatch(t -> t.getTranDate().isAfter(BUSINESS_DATE)));
+        Set<YearMonth> generatedMonths = transactionMapper.inserted.stream()
+                .map(AccountTransaction::getTranDate)
+                .map(YearMonth::from)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(generatedMonths, new HashSet<>(result.affectedYearMonthsByUser().get(1L)));
     }
 
     @Test
@@ -75,6 +76,8 @@ class DailyNtropySyncServiceTest {
         assertEquals(List.of(1L), result.partialFailedUserIds());
         assertTrue(syncStateMapper.advanceCalls.isEmpty());
         assertEquals("ORDINARY_ACCOUNT_NOT_FOUND", result.institutionResults().get(0).errorCode());
+        assertEquals(1, syncStateMapper.statusCalls.size());
+        assertEquals("PARTIAL_FAILED", syncStateMapper.statusCalls.get(0)[2]);
     }
 
     @Test
@@ -97,6 +100,24 @@ class DailyNtropySyncServiceTest {
         assertEquals(2, leaseService.heartbeatCalls);
     }
 
+    @Test
+    void firstTimeGenerationSucceedsWithNoPreexistingWatermarkRow() {
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper();
+        connectionMapper.put(1L, connection(1L, 1L, "ntropy-cid", "[\"0088\"]"));
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        accountMapper.put(1L, ordinaryAccount(10L, 1L, "0088", null));
+        FakeAccountSyncStateMapper syncStateMapper = new FakeAccountSyncStateMapper();
+        RecordingAccountTransactionMapper transactionMapper = new RecordingAccountTransactionMapper();
+        DailyNtropySyncService service = newService(
+                connectionMapper, accountMapper, transactionMapper, syncStateMapper, alwaysTrueLease()
+        );
+
+        DailyFinancialSyncResult result = service.synchronize(List.of(1L), BUSINESS_DATE, LEASE);
+
+        assertEquals("SUCCESS", result.executionStatus());
+        assertEquals(1, syncStateMapper.insertIfAbsentCalls);
+    }
+
     private static DailyNtropySyncService newService(CodefConnectionMapper connectionMapper,
                                                       AccountMapper accountMapper,
                                                       AccountTransactionMapper transactionMapper,
@@ -104,7 +125,7 @@ class DailyNtropySyncServiceTest {
                                                       BatchExecutionLeaseService leaseService) {
         return new DailyNtropySyncService(
                 connectionMapper, accountMapper, transactionMapper, syncStateMapper, leaseService,
-                new NtropyIncrementalTransactionGenerator(), new IncrementalSyncPolicy(1, 90), CLOCK
+                new NtropyIncrementalTransactionGenerator(), new IncrementalSyncPolicy(1, 90)
         );
     }
 
@@ -139,7 +160,7 @@ class DailyNtropySyncServiceTest {
         private int heartbeatCalls;
 
         CountingLeaseService(int failFromCall) {
-            super(null, null, null);
+            super(null, null);
             this.failFromCall = failFromCall;
         }
 
@@ -148,6 +169,7 @@ class DailyNtropySyncServiceTest {
             heartbeatCalls++;
             return heartbeatCalls < failFromCall;
         }
+
     }
 
     private static class FakeCodefConnectionMapper implements CodefConnectionMapper {
@@ -212,9 +234,16 @@ class DailyNtropySyncServiceTest {
         }
     }
 
+    /**
+     * 실제 ACCOUNT_SYNC_STATE의 "UPDATE-only" 특성을 흉내낸다: insertIfAbsent로 행을 만들지 않은
+     * (connectionId, organizationCode)에는 advanceIfOwner가 0을 반환한다.
+     */
     private static class FakeAccountSyncStateMapper implements AccountSyncStateMapper {
 
+        private final Set<String> existingRows = new HashSet<>();
         private final List<Object[]> advanceCalls = new ArrayList<>();
+        private final List<Object[]> statusCalls = new ArrayList<>();
+        private int insertIfAbsentCalls;
 
         @Override
         public AccountSyncState findByConnectionAndOrganization(Long codefConnectionId, String organizationCode) {
@@ -223,15 +252,34 @@ class DailyNtropySyncServiceTest {
 
         @Override
         public void insertIfAbsent(AccountSyncState state) {
+            insertIfAbsentCalls++;
+            existingRows.add(key(state.getCodefConnectionId(), state.getOrganizationCode()));
         }
 
         @Override
         public int advanceIfOwner(Long codefConnectionId, String organizationCode,
-                                  LocalDateTime lastSuccessfulSyncedAt, String lastStatus, String lastErrorCode,
-                                  String jobName, LocalDate businessDate, String ownerId, String leaseToken,
-                                  LocalDateTime now) {
+                                  String lastStatus, String lastErrorCode, String jobName,
+                                  LocalDate businessDate, String ownerId, String leaseToken) {
+            if (!existingRows.contains(key(codefConnectionId, organizationCode))) {
+                return 0;
+            }
             advanceCalls.add(new Object[]{codefConnectionId, organizationCode, lastStatus});
             return 1;
+        }
+
+        @Override
+        public int markStatusIfOwner(Long codefConnectionId, String organizationCode,
+                                     String lastStatus, String lastErrorCode, String jobName,
+                                     LocalDate businessDate, String ownerId, String leaseToken) {
+            if (!existingRows.contains(key(codefConnectionId, organizationCode))) {
+                return 0;
+            }
+            statusCalls.add(new Object[]{codefConnectionId, organizationCode, lastStatus, lastErrorCode});
+            return 1;
+        }
+
+        private static String key(Long codefConnectionId, String organizationCode) {
+            return codefConnectionId + ":" + organizationCode;
         }
     }
 
