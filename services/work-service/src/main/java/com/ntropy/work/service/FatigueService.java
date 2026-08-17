@@ -2,6 +2,9 @@ package com.ntropy.work.service;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -9,7 +12,6 @@ import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.SavingGoalMapper;
-import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -27,7 +29,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FatigueService {
 
-    private static final int WINDOW_DAYS = 7;
+    /** 7일 가중 윈도우 크기. 호출부(CalendarService)가 조회 범위를 맞출 때 참조한다. */
+    public static final int WINDOW_DAYS = 7;
     private static final double NORMALIZATION_HOURS = 168.0; // 7일 x 24시간
     private static final double BASELINE_EXPECTED_WEIGHT = 0.57; // 28/49
 
@@ -40,17 +43,23 @@ public class FatigueService {
     private static final String LEVEL_MEDIUM = "MEDIUM";
     private static final String LEVEL_HIGH = "HIGH";
 
-    private final WorkLogMapper workLogMapper;
     private final SavingGoalMapper savingGoalMapper;
 
-    public CalendarFatigueGauge calculateGauge(Long userId, LocalDate date) {
+    /**
+     * workLogs는 호출부가 [date - (WINDOW_DAYS-1), date] 범위로 미리 조회해 넘겨줘야 한다.
+     * 하루치씩 DB를 왕복하던 이전 구현(N+1)을 없애기 위해 벌크 조회 결과를 받아 인메모리에서 그룹핑한다.
+     */
+    public CalendarFatigueGauge calculateGauge(Long userId, LocalDate date, List<WorkLog> workLogs) {
+        Map<LocalDate, List<WorkLog>> workLogsByDate = workLogs.stream()
+                .collect(Collectors.groupingBy(WorkLog::getWorkDate));
+
         double weightedFatigue = 0;
 
         for (int n = 0; n < WINDOW_DAYS; n++) {
             LocalDate day = date.minusDays(n);
             double dayWeight = (WINDOW_DAYS - n) / (double) WINDOW_DAYS;
 
-            for (WorkLog workLog : workLogMapper.findByUserIdAndWorkDate(userId, day)) {
+            for (WorkLog workLog : workLogsByDate.getOrDefault(day, List.of())) {
                 int hours = WorkTimeUtils.durationHours(workLog.getStartTime(), workLog.getEndTime());
                 weightedFatigue += hours * workLog.getFatigue() * dayWeight;
             }
