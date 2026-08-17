@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +32,7 @@ class FatigueServiceTest {
     void setUp() {
         workLogMapper = new InMemoryWorkLogMapper();
         savingGoalMapper = new InMemorySavingGoalMapper();
-        fatigueService = new FatigueService(workLogMapper, savingGoalMapper);
+        fatigueService = new FatigueService(savingGoalMapper);
     }
 
     private void seedWorkLog(Long jobId, LocalDate date, LocalTime start, LocalTime end, long fatigue) {
@@ -47,10 +48,17 @@ class FatigueServiceTest {
                 .build());
     }
 
+    /** 실제 호출부(CalendarService)와 동일하게, 7일 윈도우 범위를 벌크 조회해서 넘겨준다. */
+    private CalendarFatigueGauge calculateGauge(LocalDate date) {
+        List<WorkLog> workLogs = workLogMapper.findByUserIdAndDateRange(
+                USER_ID, date.minusDays(FatigueService.WINDOW_DAYS - 1L), date);
+        return fatigueService.calculateGauge(USER_ID, date, workLogs);
+    }
+
     @Test
     @DisplayName("7일간 근무 기록이 없으면 게이지는 0점, LOW다")
     void calculateGauge_noWorkLogs_returnsZero() {
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(0, gauge.getScore());
         assertEquals("LOW", gauge.getLevel());
@@ -62,7 +70,7 @@ class FatigueServiceTest {
     void calculateGauge_todayEightHours_isMediumLevel() {
         seedWorkLog(1L, TARGET_DATE, LocalTime.of(9, 0), LocalTime.of(17, 0), 3);
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(94, gauge.getScore());
         assertEquals("MEDIUM", gauge.getLevel());
@@ -74,7 +82,7 @@ class FatigueServiceTest {
     void calculateGauge_sixDaysAgoSameHours_isLowerScoreThanToday() {
         seedWorkLog(1L, TARGET_DATE.minusDays(6), LocalTime.of(9, 0), LocalTime.of(17, 0), 3);
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(13, gauge.getScore());
         assertEquals("LOW", gauge.getLevel());
@@ -85,7 +93,7 @@ class FatigueServiceTest {
     void calculateGauge_highIntensityWork_isOverThreshold() {
         seedWorkLog(1L, TARGET_DATE, LocalTime.of(6, 0), LocalTime.of(16, 0), 5);
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(195, gauge.getScore());
         assertEquals("HIGH", gauge.getLevel());
@@ -97,7 +105,7 @@ class FatigueServiceTest {
     void calculateGauge_workLogOutsideWindow_isExcluded() {
         seedWorkLog(1L, TARGET_DATE.minusDays(7), LocalTime.of(9, 0), LocalTime.of(17, 0), 3);
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(0, gauge.getScore());
     }
@@ -108,7 +116,7 @@ class FatigueServiceTest {
         seedWorkLog(1L, TARGET_DATE, LocalTime.of(9, 0), LocalTime.of(13, 0), 3);
         seedWorkLog(2L, TARGET_DATE, LocalTime.of(14, 0), LocalTime.of(18, 0), 3);
 
-        CalendarFatigueGauge combined = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge combined = calculateGauge(TARGET_DATE);
 
         assertEquals(94, combined.getScore());
     }
@@ -118,7 +126,7 @@ class FatigueServiceTest {
     void calculateGauge_usesWorkLogFatigueDirectly_notJobBaseFatigue() {
         seedWorkLog(1L, TARGET_DATE, LocalTime.of(9, 0), LocalTime.of(17, 0), 5);
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(156, gauge.getScore());
     }
@@ -130,7 +138,7 @@ class FatigueServiceTest {
         savingGoalMapper.insert(SavingGoal.builder()
                 .userId(USER_ID).targetMonth("2026-08").targetAmount(2_500_000L).laborIntensity(5L).build());
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(56, gauge.getScore());
         assertEquals("LOW", gauge.getLevel());
@@ -143,10 +151,9 @@ class FatigueServiceTest {
         savingGoalMapper.insert(SavingGoal.builder()
                 .userId(USER_ID).targetMonth("2026-09").targetAmount(2_500_000L).laborIntensity(5L).build());
 
-        CalendarFatigueGauge gauge = fatigueService.calculateGauge(USER_ID, TARGET_DATE);
+        CalendarFatigueGauge gauge = calculateGauge(TARGET_DATE);
 
         assertEquals(94, gauge.getScore());
         assertEquals("MEDIUM", gauge.getLevel());
     }
 }
-

@@ -91,7 +91,13 @@ public class CalendarService {
      * fatigue는 7일 가중 게이지로 계산한다.
      */
     public CalendarDailySummary getDailySummary(Long userId, LocalDate date, Double latitude, Double longitude) {
-        List<WorkLog> workLogs = workLogMapper.findByUserIdAndWorkDate(userId, date);
+        // 피로도 게이지(7일 가중)에 쓸 범위로 한 번에 조회하고, 당일 근무 목록은 이 결과에서 걸러 쓴다
+        // (예전에는 당일 WorkLog를 여기서 한 번, FatigueService 내부에서 또 한 번 중복 조회했음).
+        List<WorkLog> recentWorkLogs = workLogMapper.findByUserIdAndDateRange(
+                userId, date.minusDays(FatigueService.WINDOW_DAYS - 1L), date);
+        List<WorkLog> workLogs = recentWorkLogs.stream()
+                .filter(w -> date.equals(w.getWorkDate()))
+                .collect(Collectors.toList());
 
         List<Long> jobIds = workLogs.stream().map(WorkLog::getJobId).distinct().collect(Collectors.toList());
         Map<Long, String> jobNames = jobIds.stream()
@@ -103,7 +109,7 @@ public class CalendarService {
                 .collect(Collectors.toList());
 
         String dayOfWeek = KOREAN_DAY_OF_WEEK.get(date.getDayOfWeek());
-        CalendarFatigueGauge fatigue = fatigueService.calculateGauge(userId, date);
+        CalendarFatigueGauge fatigue = fatigueService.calculateGauge(userId, date, recentWorkLogs);
         WeatherForecast weather = weatherByDate(latitude, longitude).get(date);
 
         return new CalendarDailySummary(date, dayOfWeek, works, fatigue, weather);

@@ -283,12 +283,12 @@ class CalendarServiceTest {
         private final CalendarFatigueGauge gauge;
 
         StubFatigueService(CalendarFatigueGauge gauge) {
-            super(null, null);
+            super(null);
             this.gauge = gauge;
         }
 
         @Override
-        public CalendarFatigueGauge calculateGauge(Long userId, LocalDate date) {
+        public CalendarFatigueGauge calculateGauge(Long userId, LocalDate date, List<WorkLog> workLogs) {
             return gauge;
         }
     }
