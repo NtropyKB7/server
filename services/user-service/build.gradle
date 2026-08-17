@@ -20,4 +20,9 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:4.5.1'
     testImplementation 'org.mockito:mockito-junit-jupiter:4.5.1'
     testImplementation 'org.assertj:assertj-core:3.22.0'
+
+    // 실제 DB 연결을 검증하는 수동 테스트에서만 필요 (운영 코드는 api 모듈의 RootConfig가 DataSource를 제공)
+    testImplementation 'com.zaxxer:HikariCP:5.1.0'
+    testRuntimeOnly 'mysql:mysql-connector-java:8.0.33'
+    testImplementation "org.springframework:spring-jdbc:${springVersion}"
 }
