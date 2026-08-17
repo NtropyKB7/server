@@ -17,6 +17,8 @@ public interface WorkLogPlatformIncomeMapper {
 
     List<WorkLogPlatformIncome> findByLogId(@Param("logId") Long logId);
 
+    void deleteByLogId(@Param("logId") Long logId);
+
     /**
      * 정산 배치용: 이 잡의 이 플랫폼으로 매핑된 income 중, 확정(CONFIRMED)된 근무일지의
      * 근무일이 기간 내에 있는 것만 조회한다 (WORK_LOG 조인).

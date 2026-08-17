@@ -29,6 +29,11 @@
         WHERE log_id = #{logId}
     </select>
 
+    <delete id="deleteByLogId" parameterType="long">
+        DELETE FROM WORK_LOG_PLATFORM_INCOME
+        WHERE log_id = #{logId}
+    </delete>
+
     <select id="findConfirmedByJobIdAndPlatformIdAndDateRange" resultMap="workLogPlatformIncomeResultMap">
         SELECT wpi.income_id, wpi.log_id, wpi.platform_id, wpi.expected_amount, wpi.settlement_status
         FROM WORK_LOG_PLATFORM_INCOME wpi

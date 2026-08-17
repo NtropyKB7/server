@@ -480,6 +480,20 @@ class WorkLogServiceTest {
     }
 
     @Test
+    @DisplayName("확정된(income 행이 있는) 근무일지를 삭제하면 WORK_LOG_PLATFORM_INCOME도 함께 삭제된다")
+    void deleteWorkLog_confirmedWithIncome_removesIncomeRowsToo() {
+        Job job = onDemandJob();
+        WorkLog actual = planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0));
+        actual.setFatigue(4L);
+        WorkLog result = workLogService.registerActual(actual);
+        assertTrue(!workLogPlatformIncomeMapper.findByLogId(result.getLogId()).isEmpty());
+
+        workLogService.deleteWorkLog(USER_ID, result.getLogId());
+
+        assertTrue(workLogPlatformIncomeMapper.findByLogId(result.getLogId()).isEmpty());
+    }
+
+    @Test
     @DisplayName("존재하지 않는 근무일지를 삭제하면 실패한다")
     void deleteWorkLog_notFound_throws() {
         assertThrows(ServiceException.class, () -> workLogService.deleteWorkLog(USER_ID, 999L));
