@@ -32,6 +32,15 @@ public class CodefConnection {
      */
     private String registeredInstitutionKeys;
 
+    /** 기업·국민은행 birthDate AES-256-GCM 암호문(Base64). {@link com.ntropy.account.security.BirthDateCipher} 참고. */
+    private String birthDateCiphertext;
+
+    /** 암호화마다 새로 생성하는 12바이트 IV(Base64). */
+    private String birthDateIv;
+
+    /** 암호화 당시 사용한 키 버전. 키 회전 시 복호화에 필요. */
+    private Integer birthDateKeyVersion;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

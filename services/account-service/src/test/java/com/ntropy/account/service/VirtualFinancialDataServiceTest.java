@@ -248,5 +248,10 @@ class VirtualFinancialDataServiceTest {
         @Override
         public void deleteByUserIdAndProvider(Long userId, String provider) {
         }
+
+        @Override
+        public LocalDate findMostRecentTransactionDate(Long codefConnectionId, String organizationCode) {
+            return null;
+        }
     }
 }

@@ -298,5 +298,10 @@ class VirtualAccountRegenerationServiceTest {
                     .toList();
             store.values().removeIf(transaction -> matchingAccountIds.contains(transaction.getAccountId()));
         }
+
+        @Override
+        public LocalDate findMostRecentTransactionDate(Long codefConnectionId, String organizationCode) {
+            return null;
+        }
     }
 }

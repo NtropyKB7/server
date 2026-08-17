@@ -1,6 +1,7 @@
 package com.ntropy.account.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -176,12 +177,12 @@ class AccountCollectionServiceTest {
     }
 
     @Test
-    void skipsTransactionCollectionForScBank() throws Exception {
+    void collectsOrdinaryTransactionsForScBankWithNullAccountPassword() throws Exception {
         FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
         FakeAccountMapper accountMapper = new FakeAccountMapper();
         FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
         FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
-                objectMapper.readTree("{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")
+                objectMapper.readTree(TRANSACTION_LIST_WITH_ONE_ENTRY)
         );
         StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
                 objectMapper.readTree(ACCOUNT_LIST_WITH_ORDINARY_AND_FUND)
@@ -196,8 +197,107 @@ class AccountCollectionServiceTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
         );
 
-        assertTrue(transactionClient.calls.isEmpty());
+        assertEquals(1, transactionClient.calls.size());
+        assertTrue(transactionClient.includeNullAccountPasswordCalls.get(0));
+        assertEquals(1, transactionMapper.insertedBatches);
+    }
+
+    @Test
+    void doesNotIncludeAccountPasswordForBanksOtherThanSc() throws Exception {
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
+        FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
+                objectMapper.readTree(TRANSACTION_LIST_WITH_ONE_ENTRY)
+        );
+        StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
+                objectMapper.readTree(ACCOUNT_LIST_WITH_ORDINARY_AND_FUND)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
+        );
+
+        service.collect(
+                1L, PersonalBank.SHINHAN_BANK, null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)
+        );
+
+        assertFalse(transactionClient.includeNullAccountPasswordCalls.get(0));
+    }
+
+    @Test
+    void skipsScAccountAsCredentialRequiredWithoutFailingOtherAccountsInDailySync() throws Exception {
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
+        FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
+                objectMapper.readTree(
+                        "{\"result\":{\"code\":\"CF-03002\",\"message\":\"계좌 비밀번호가 필요합니다\"}}"
+                )
+        );
+        StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
+                objectMapper.readTree(ACCOUNT_LIST_WITH_ORDINARY_AND_FUND)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
+        );
+
+        List<AccountCollectionService.AccountCollectionOutcome> outcomes = service.collectForDailySync(
+                1L, PersonalBank.SC_BANK, null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), () -> true
+        );
+
+        assertEquals(1, outcomes.size());
+        assertEquals(
+                AccountCollectionService.AccountCollectionOutcome.Status.SKIPPED_CREDENTIAL_REQUIRED,
+                outcomes.get(0).status()
+        );
         assertEquals(0, transactionMapper.insertedBatches);
+    }
+
+    @Test
+    void throwsLeaseLostExceptionAndStopsWhenHeartbeatFailsMidAccountLoop() throws Exception {
+        String twoOrdinaryAccounts = """
+                {
+                  "result": {"code": "CF-00000"},
+                  "data": {
+                    "resDepositTrust": [
+                      {"resAccount": "110111111111", "resAccountDeposit": "11",
+                       "resAccountBalance": "10000", "resAccountCurrency": "KRW"},
+                      {"resAccount": "110222222222", "resAccountDeposit": "11",
+                       "resAccountBalance": "20000", "resAccountCurrency": "KRW"}
+                    ]
+                  }
+                }
+                """;
+        FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        FakeAccountTransactionMapper transactionMapper = new FakeAccountTransactionMapper();
+        FakeCodefBankTransactionClient transactionClient = new FakeCodefBankTransactionClient(
+                objectMapper.readTree(TRANSACTION_LIST_WITH_ONE_ENTRY)
+        );
+        StubPersonalBankAccountService personalBankAccountService = new StubPersonalBankAccountService(
+                objectMapper.readTree(twoOrdinaryAccounts)
+        );
+        AccountCollectionService service = new AccountCollectionService(
+                personalBankAccountService, connectionMapper, transactionClient, null, null,
+                accountMapper, transactionMapper
+        );
+        int[] heartbeatCalls = {0};
+
+        assertThrows(
+                com.ntropy.account.exception.LeaseLostException.class,
+                () -> service.collectForDailySync(
+                        1L, PersonalBank.SHINHAN_BANK, null,
+                        LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
+                        () -> ++heartbeatCalls[0] < 8
+                )
+        );
+
+        assertEquals(8, heartbeatCalls[0], "두 번째 계좌 진입 직전 heartbeat에서 멈춰야 합니다");
+        assertEquals(1, transactionClient.calls.size(), "첫 번째 계좌만 처리되고 두 번째는 처리되면 안 됩니다");
     }
 
     @Test
@@ -354,6 +454,7 @@ class AccountCollectionServiceTest {
 
         private final JsonNode response;
         private final List<TransactionCall> calls = new ArrayList<>();
+        private final List<Boolean> includeNullAccountPasswordCalls = new ArrayList<>();
 
         FakeCodefBankTransactionClient(JsonNode response) {
             super(null);
@@ -363,7 +464,22 @@ class AccountCollectionServiceTest {
         @Override
         public JsonNode getPersonalTransactionList(String organizationCode, String connectedId, String account,
                                                    LocalDate startDate, LocalDate endDate, String birthDate) {
+            return getPersonalTransactionList(
+                    organizationCode, connectedId, account, startDate, endDate, birthDate, false
+            );
+        }
+
+        @Override
+        public JsonNode getPersonalTransactionList(String organizationCode, String connectedId, String account,
+                                                   LocalDate startDate, LocalDate endDate, String birthDate,
+                                                   boolean includeNullAccountPassword) {
             calls.add(new TransactionCall(organizationCode, connectedId, account));
+            includeNullAccountPasswordCalls.add(includeNullAccountPassword);
+            String resultCode = response.path("result").path("code").asText();
+            if (!"CF-00000".equals(resultCode)) {
+                String message = response.path("result").path("message").asText("알 수 없는 오류");
+                throw new IllegalStateException("CODEF 개인 수시입출 거래내역 조회 실패: " + resultCode + " " + message);
+            }
             return response;
         }
     }
@@ -551,6 +667,11 @@ class AccountCollectionServiceTest {
 
         @Override
         public void deleteByUserIdAndProvider(Long userId, String provider) {
+        }
+
+        @Override
+        public LocalDate findMostRecentTransactionDate(Long codefConnectionId, String organizationCode) {
+            return null;
         }
     }
 }

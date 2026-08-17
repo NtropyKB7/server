@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS CODEF_CONNECTION
     provider                    VARCHAR(10)  NOT NULL DEFAULT 'CODEF' COMMENT '연결 제공자: CODEF(실제 CODEF 연동), NTROPY(가상 연결, 이슈 #35)',
     connected_id                VARCHAR(100) NOT NULL COMMENT 'CODEF 커넥티드 아이디 (실연결은 계정 등록 API 응답값, 가상연결은 서버에서 발급한 NTROPY-{UUID})',
     registered_institution_keys JSON         NULL COMMENT '등록 완료 기관코드 JSON 배열, 예: ["0004","0088"]. 동일 기관 중복 /account/add 요청 방지용',
+    birth_date_ciphertext       VARCHAR(255) NULL COMMENT '기업·국민은행 birthDate AES-256-GCM 암호문(Base64). 이슈 #158',
+    birth_date_iv               VARCHAR(32)  NULL COMMENT '암호화마다 새로 생성하는 12바이트 IV(Base64). 이슈 #158',
+    birth_date_key_version      BIGINT       NULL COMMENT '암호화 당시 사용한 키 버전. 키 회전 시 복호화에 필요. 이슈 #158',
     created_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_codef_connection_user_provider (user_id, provider)
@@ -93,6 +96,46 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
     CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
+
+-- 일일 배치(provider별 증분 동기화 등)의 실행을 job_name(예: daily-sync-codef, daily-sync-ntropy)
+-- 단위로 관리한다. UNIQUE(job_name, business_date)로 동일 영업일 중복 실행을 막고,
+-- owner_id + lease_token 기반 fencing으로 heartbeat·완료·watermark 갱신을 보호한다 (이슈 #158).
+CREATE TABLE IF NOT EXISTS DAILY_BATCH_EXECUTION
+(
+    daily_batch_execution_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    job_name      VARCHAR(50)  NOT NULL COMMENT 'provider별 독립 job: daily-sync-codef, daily-sync-ntropy',
+    business_date DATE         NOT NULL,
+    status        VARCHAR(20)  NOT NULL DEFAULT 'RUNNING' COMMENT 'RUNNING, SUCCESS, PARTIAL_FAILED, FAILED',
+    owner_id      VARCHAR(100) NOT NULL COMMENT '실행 인스턴스 식별자 (예: host:port)',
+    lease_token   VARCHAR(36)  NOT NULL COMMENT 'lease 획득마다 새로 발급하는 UUID. heartbeat·완료·watermark fencing에 사용',
+    lease_until   DATETIME     NOT NULL COMMENT '이 시각 이전에는 다른 인스턴스가 인계할 수 없음',
+    started_at    DATETIME     NOT NULL,
+    completed_at  DATETIME     NULL,
+    error_summary JSON         NULL COMMENT '실패 기관/오류코드 목록. connectedId·계좌번호·생년월일 등 민감정보 금지',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_daily_batch_execution_job_date (job_name, business_date)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
+
+-- 연결·기관별 증분 동기화 기준점(watermark). last_successful_synced_at 갱신은 반드시
+-- DAILY_BATCH_EXECUTION의 유효한 lease_token을 가진 실행에서만 이뤄져야 한다 (fencing, 이슈 #158).
+CREATE TABLE IF NOT EXISTS ACCOUNT_SYNC_STATE
+(
+    account_sync_state_id     BIGINT AUTO_INCREMENT PRIMARY KEY,
+    codef_connection_id       BIGINT      NOT NULL COMMENT 'CODEF_CONNECTION.codef_connection_id 참조',
+    organization_code         VARCHAR(10) NOT NULL COMMENT 'CODEF 기관코드',
+    last_successful_synced_at DATETIME    NULL COMMENT '이 연결·기관의 마지막 증분 동기화 성공 시각',
+    last_status                VARCHAR(30) NOT NULL DEFAULT 'PENDING'
+        COMMENT 'PENDING, SUCCESS, PARTIAL_FAILED, SKIPPED_CREDENTIAL_REQUIRED',
+    last_error_code             VARCHAR(50) NULL,
+    created_at                  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_account_sync_state_connection_org (codef_connection_id, organization_code),
+    CONSTRAINT fk_account_sync_state_codef_connection FOREIGN KEY (codef_connection_id)
+        REFERENCES CODEF_CONNECTION (codef_connection_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 

@@ -14,6 +14,8 @@ import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 
+import static com.ntropy.account.service.CodefConnectionServiceTest.testBirthDateCipher;
+
 class PersonalBankAccountServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -22,7 +24,8 @@ class PersonalBankAccountServiceTest {
     void registersSelectedBankAndGetsPersonalAccountList() throws Exception {
         StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
-        CodefConnectionService connectionService = new CodefConnectionService(connectionClient, mapper);
+        CodefConnectionService connectionService =
+                new CodefConnectionService(connectionClient, mapper, testBirthDateCipher());
         StubCodefBankAccountClient bankAccountClient = new StubCodefBankAccountClient(
                 objectMapper.readTree(
                         "{\"result\":{\"code\":\"CF-00000\"},\"data\":{\"resDepositTrust\":[]}}"
@@ -56,7 +59,7 @@ class PersonalBankAccountServiceTest {
         StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         PersonalBankAccountService service = new PersonalBankAccountService(
-                new CodefConnectionService(connectionClient, mapper), mapper, null
+                new CodefConnectionService(connectionClient, mapper, testBirthDateCipher()), mapper, null
         );
 
         service.registerPersonalAccount(
@@ -90,7 +93,7 @@ class PersonalBankAccountServiceTest {
         StubCodefConnectionClient connectionClient = new StubCodefConnectionClient();
         InMemoryCodefConnectionMapper mapper = new InMemoryCodefConnectionMapper();
         PersonalBankAccountService service = new PersonalBankAccountService(
-                new CodefConnectionService(connectionClient, mapper), mapper, null
+                new CodefConnectionService(connectionClient, mapper, testBirthDateCipher()), mapper, null
         );
 
         service.registerPersonalAccount(

@@ -1,0 +1,120 @@
+package com.ntropy.account.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
+import com.ntropy.common.client.ActiveUserQueryClient;
+import com.ntropy.common.client.DailyFinancialSyncClient;
+import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.common.dto.account.DailyFinancialSyncResult;
+
+class DailyFinancialSyncOrchestrationServiceTest {
+
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final LocalDate BUSINESS_DATE = LocalDate.of(2026, 8, 15);
+
+    @Test
+    void runsPreviousSeoulDayAndCallsNtropyBeforeCodef() {
+        RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
+        DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
+                Optional.of(() -> Arrays.asList(2L, null, 2L, 1L)),
+                syncClient,
+                Clock.fixed(Instant.parse("2026-08-15T15:30:00Z"), SEOUL)
+        );
+
+        service.runPreviousDayBatch();
+
+        assertEquals(
+                List.of(DailyFinancialSyncProvider.NTROPY, DailyFinancialSyncProvider.CODEF),
+                syncClient.providers
+        );
+        assertEquals(List.of(BUSINESS_DATE, BUSINESS_DATE), syncClient.businessDates);
+        assertEquals(List.of(2L, 1L), syncClient.activeUserIdsByCall.get(0));
+        assertEquals(List.of(2L, 1L), syncClient.activeUserIdsByCall.get(1));
+    }
+
+    @Test
+    void skipsProvidersWhenThereAreNoActiveUsers() {
+        RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
+        DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
+                Optional.of(List::of), syncClient, Clock.system(SEOUL)
+        );
+
+        service.runBatch(BUSINESS_DATE);
+
+        assertTrue(syncClient.providers.isEmpty());
+    }
+
+    @Test
+    void continuesWithCodefWhenNtropyInvocationThrows() {
+        RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
+        syncClient.throwingProvider = DailyFinancialSyncProvider.NTROPY;
+        DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
+                Optional.of(() -> List.of(1L)), syncClient, Clock.system(SEOUL)
+        );
+
+        service.runBatch(BUSINESS_DATE);
+
+        assertEquals(
+                List.of(DailyFinancialSyncProvider.NTROPY, DailyFinancialSyncProvider.CODEF),
+                syncClient.providers
+        );
+    }
+
+    @Test
+    void treatsNullActiveUserResultAsEmpty() {
+        RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
+        ActiveUserQueryClient activeUserQueryClient = () -> null;
+        DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
+                Optional.of(activeUserQueryClient), syncClient, Clock.system(SEOUL)
+        );
+
+        service.runBatch(BUSINESS_DATE);
+
+        assertTrue(syncClient.providers.isEmpty());
+    }
+
+    @Test
+    void failsClearlyWhenActiveUserClientIsMissingAtExecutionTime() {
+        DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
+                Optional.empty(), new RecordingDailyFinancialSyncClient(), Clock.system(SEOUL)
+        );
+
+        assertThrows(IllegalStateException.class, () -> service.runBatch(BUSINESS_DATE));
+    }
+
+    private static final class RecordingDailyFinancialSyncClient implements DailyFinancialSyncClient {
+
+        private final List<DailyFinancialSyncProvider> providers = new ArrayList<>();
+        private final List<LocalDate> businessDates = new ArrayList<>();
+        private final List<List<Long>> activeUserIdsByCall = new ArrayList<>();
+        private DailyFinancialSyncProvider throwingProvider;
+
+        @Override
+        public DailyFinancialSyncResult synchronize(DailyFinancialSyncProvider provider, List<Long> activeUserIds,
+                                                    LocalDate businessDate) {
+            providers.add(provider);
+            businessDates.add(businessDate);
+            activeUserIdsByCall.add(List.copyOf(activeUserIds));
+            if (provider == throwingProvider) {
+                throw new IllegalStateException("provider failure");
+            }
+            return new DailyFinancialSyncResult(
+                    businessDate, provider, "SUCCESS", activeUserIds, Map.of(), List.of(), List.of(), 0
+            );
+        }
+    }
+}

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.AccountSyncStateMapper">
+
+    <select id="findByConnectionAndOrganization" resultType="com.ntropy.account.domain.entity.AccountSyncState">
+        SELECT account_sync_state_id     AS id,
+               codef_connection_id       AS codefConnectionId,
+               organization_code         AS organizationCode,
+               last_successful_synced_at AS lastSuccessfulSyncedAt,
+               last_status               AS lastStatus,
+               last_error_code           AS lastErrorCode,
+               created_at                AS createdAt,
+               updated_at                AS updatedAt
+        FROM ACCOUNT_SYNC_STATE
+        WHERE codef_connection_id = #{codefConnectionId}
+          AND organization_code = #{organizationCode}
+    </select>
+
+    <insert id="insertIfAbsent" parameterType="com.ntropy.account.domain.entity.AccountSyncState">
+        INSERT INTO ACCOUNT_SYNC_STATE (codef_connection_id, organization_code, last_status)
+        VALUES (#{codefConnectionId}, #{organizationCode}, #{lastStatus})
+        ON DUPLICATE KEY UPDATE account_sync_state_id = account_sync_state_id
+    </insert>
+
+    <!-- DAILY_BATCH_EXECUTION에 대한 EXISTS 서브쿼리로 fencing한다: 호출자가 여전히 유효한
+         lease(owner_id + lease_token + status='RUNNING' + lease_until 유효)를 가지고 있을 때만 갱신된다. -->
+    <update id="advanceIfOwner">
+        UPDATE ACCOUNT_SYNC_STATE state
+        SET last_successful_synced_at = NOW(),
+            last_status               = #{lastStatus},
+            last_error_code           = #{lastErrorCode}
+        WHERE state.codef_connection_id = #{codefConnectionId}
+          AND state.organization_code = #{organizationCode}
+          AND EXISTS (
+              SELECT 1
+              FROM DAILY_BATCH_EXECUTION execution
+              WHERE execution.job_name = #{jobName}
+                AND execution.business_date = #{businessDate}
+                AND execution.status = 'RUNNING'
+                AND execution.owner_id = #{ownerId}
+                AND execution.lease_token = #{leaseToken}
+                AND execution.lease_until &gt;= NOW()
+          )
+    </update>
+
+    <update id="markStatusIfOwner">
+        UPDATE ACCOUNT_SYNC_STATE state
+        SET last_status     = #{lastStatus},
+            last_error_code = #{lastErrorCode}
+        WHERE state.codef_connection_id = #{codefConnectionId}
+          AND state.organization_code = #{organizationCode}
+          AND EXISTS (
+              SELECT 1
+              FROM DAILY_BATCH_EXECUTION execution
+              WHERE execution.job_name = #{jobName}
+                AND execution.business_date = #{businessDate}
+                AND execution.status = 'RUNNING'
+                AND execution.owner_id = #{ownerId}
+                AND execution.lease_token = #{leaseToken}
+                AND execution.lease_until &gt;= NOW()
+          )
+    </update>
+
+</mapper>

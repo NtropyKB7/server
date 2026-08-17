@@ -6,7 +6,7 @@ import java.time.ZoneId;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** 가상 데이터 생성 등 "오늘"을 기준일로 쓰는 로직이 고정 Clock으로 테스트 가능하도록 빈으로 분리한다. */
+/** 가상 데이터 생성과 일일 동기화처럼 "오늘"을 쓰는 로직을 서울 시간의 주입 가능한 Clock으로 제공한다. */
 @Configuration
 public class ClockConfig {
 

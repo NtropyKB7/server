@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.DailyBatchExecutionMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="execution.id"
+            keyColumn="daily_batch_execution_id">
+        INSERT INTO DAILY_BATCH_EXECUTION
+            (job_name, business_date, status, owner_id, lease_token, lease_until, started_at)
+        VALUES
+            (#{execution.jobName}, #{execution.businessDate}, #{execution.status}, #{execution.ownerId},
+             #{execution.leaseToken}, DATE_ADD(NOW(), INTERVAL #{leaseDurationSeconds} SECOND), NOW())
+    </insert>
+
+    <!-- status != 'RUNNING'은 동시 실행만 막기 위함이며, 같은 영업일에 완료된(SUCCESS 등) 실행을
+         재호출로 다시 트리거하는 것은 허용한다. 만료 판정과 새 만료 시각은 한 UPDATE 안의 DB
+         NOW()를 기준으로 계산해 오래된 시각이 바인딩될 여지를 없앤다. -->
+    <update id="acquireExpiredLease">
+        UPDATE DAILY_BATCH_EXECUTION
+        SET status        = #{execution.status},
+            owner_id      = #{execution.ownerId},
+            lease_token   = #{execution.leaseToken},
+            lease_until   = DATE_ADD(NOW(), INTERVAL #{leaseDurationSeconds} SECOND),
+            started_at    = NOW(),
+            completed_at  = NULL,
+            error_summary = NULL
+        WHERE job_name = #{execution.jobName}
+          AND business_date = #{execution.businessDate}
+          AND (status != 'RUNNING' OR lease_until &lt; NOW())
+    </update>
+
+    <update id="renewLease">
+        UPDATE DAILY_BATCH_EXECUTION
+        SET lease_until = DATE_ADD(NOW(), INTERVAL #{leaseDurationSeconds} SECOND)
+        WHERE daily_batch_execution_id = #{id}
+          AND owner_id = #{ownerId}
+          AND lease_token = #{leaseToken}
+          AND status = 'RUNNING'
+          AND lease_until &gt;= NOW()
+    </update>
+
+    <update id="completeIfOwner">
+        UPDATE DAILY_BATCH_EXECUTION
+        SET status        = #{status},
+            completed_at  = NOW(),
+            error_summary = #{errorSummary}
+        WHERE daily_batch_execution_id = #{id}
+          AND owner_id = #{ownerId}
+          AND lease_token = #{leaseToken}
+          AND status = 'RUNNING'
+          AND lease_until &gt;= NOW()
+    </update>
+
+    <select id="findByJobNameAndBusinessDate" resultType="com.ntropy.account.domain.entity.DailyBatchExecution">
+        SELECT daily_batch_execution_id AS id,
+               job_name                 AS jobName,
+               business_date            AS businessDate,
+               status,
+               owner_id                 AS ownerId,
+               lease_token              AS leaseToken,
+               lease_until              AS leaseUntil,
+               started_at               AS startedAt,
+               completed_at             AS completedAt,
+               error_summary            AS errorSummary,
+               created_at               AS createdAt,
+               updated_at               AS updatedAt
+        FROM DAILY_BATCH_EXECUTION
+        WHERE job_name = #{jobName}
+          AND business_date = #{businessDate}
+    </select>
+
+</mapper>
