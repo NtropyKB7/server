@@ -31,4 +31,6 @@ public interface UserMapper {
     Optional<User> findByRefreshToken(String refreshToken);
 
     List<Long> findActiveUserIds();
+
+    List<User> findAllByProvider(@Param("provider") String provider);
 }

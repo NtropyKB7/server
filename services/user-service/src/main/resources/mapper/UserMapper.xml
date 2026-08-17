@@ -29,7 +29,9 @@
           AND provider_id = #{providerId}
     </select>
 
-    <!-- 신규 소셜 회원 DB에 저장 -->
+    <!-- 신규 회원 DB에 저장. (provider, provider_id) unique key 경합 시 새 행을 만들지 않고
+         LAST_INSERT_ID(user_id) 트릭으로 기존 행의 user_id를 반환한다. 그 외 컬럼은 갱신하지 않으므로
+         호출자는 이 insert 이후 항상 findByProviderAndProviderId로 재조회해 저장된 값을 신뢰해야 한다. -->
     <insert id="insertUser" parameterType="com.ntropy.user.domain.entity.User" useGeneratedKeys="true" keyProperty="userId">
         INSERT INTO USERS (
             email, name, provider_id, refresh_token_hash,
@@ -42,6 +44,7 @@
                      #{provider}, #{status}, #{role}, NOW(),
                      #{lastLoginAt}, #{onboardingCompleted}, #{termsAgreed}
                  )
+        ON DUPLICATE KEY UPDATE user_id = LAST_INSERT_ID(user_id)
     </insert>
 
     <!-- 고유 번호(userId)로 유저 조회  -->
@@ -93,6 +96,14 @@
         SELECT *
         FROM USERS
         WHERE refresh_token_hash = #{refreshToken}
+    </select>
+
+    <!-- provider 기준 전체 회원 조회 (가상회원 시딩 목록 조회용) -->
+    <select id="findAllByProvider" resultMap="userResultMap">
+        SELECT *
+        FROM USERS
+        WHERE provider = #{provider}
+        ORDER BY provider_id
     </select>
 
     <!-- 월간 배치 대상 활성 사용자 ID 조회 -->
