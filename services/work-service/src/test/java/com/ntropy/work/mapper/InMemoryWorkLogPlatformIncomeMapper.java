@@ -46,6 +46,11 @@ public class InMemoryWorkLogPlatformIncomeMapper implements WorkLogPlatformIncom
     }
 
     @Override
+    public void deleteByLogId(Long logId) {
+        store.values().removeIf(income -> income.getLogId().equals(logId));
+    }
+
+    @Override
     public List<WorkLogPlatformIncome> findConfirmedByJobIdAndPlatformIdAndDateRange(
             Long jobId, Long platformId, LocalDate startDate, LocalDate endDate) {
         List<WorkLogPlatformIncome> result = new ArrayList<>();

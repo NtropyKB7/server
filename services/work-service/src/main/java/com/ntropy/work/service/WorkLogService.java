@@ -147,6 +147,7 @@ public class WorkLogService {
     public void deleteWorkLog(Long requesterUserId, Long logId) {
         WorkLog existing = findById(logId);
         verifyOwnership(requesterUserId, existing.getUserId(), logId);
+        workLogPlatformIncomeMapper.deleteByLogId(logId);
         workLogMapper.deleteById(logId);
     }
 
