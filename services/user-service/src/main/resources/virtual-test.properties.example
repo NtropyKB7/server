@@ -1,0 +1,9 @@
+# 아래 줄을 user-local.properties에 추가하세요 (user-local.properties는 git에 커밋되지 않습니다).
+# virtual-test.enabled=true는 deployment.environment가 local 또는 test일 때만 허용됩니다.
+# 운영 설정 파일에는 이 블록 자체를 넣지 않습니다 (기본값 false로 두면 시딩·테스트 로그인이 비활성화됩니다).
+virtual-test.enabled=false
+virtual-test.user-count=50
+virtual-test.random-seed=20260817
+virtual-test.reference-date=2026-08-17
+virtual-test.dataset-version=VIRTUAL-MULTI-DOMAIN-v1
+deployment.environment=local

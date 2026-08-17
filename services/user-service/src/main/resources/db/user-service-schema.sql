@@ -15,5 +15,6 @@ CREATE TABLE USERS (
                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,      -- 가입 일시
                        last_login_at DATETIME,                             -- 마지막 로그인 일시
                        onboarding_completed BOOLEAN DEFAULT FALSE,         -- 온보딩(초기 설정) 완료 여부
-                       terms_agreed BOOLEAN DEFAULT FALSE                  -- 약관 동의 여부
+                       terms_agreed BOOLEAN DEFAULT FALSE,                 -- 약관 동의 여부
+                       UNIQUE KEY uk_users_provider_provider_id (provider, provider_id)
 );

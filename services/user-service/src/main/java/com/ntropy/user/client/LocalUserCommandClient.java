@@ -22,7 +22,15 @@ public class LocalUserCommandClient implements UserCommandClient {
 
     @Override
     public OAuthLoginResult loginWithOAuthCode(String provider, String code) {
-        OAuthLoginResponse response = userService.processOAuthLoginWithCode(provider, code);
+        return toResult(userService.processOAuthLoginWithCode(provider, code));
+    }
+
+    @Override
+    public OAuthLoginResult loginAsVirtualUser(int virtualUserNumber) {
+        return toResult(userService.loginAsVirtualUser(virtualUserNumber));
+    }
+
+    private static OAuthLoginResult toResult(OAuthLoginResponse response) {
         return new OAuthLoginResult(
                 response.getAccessToken(),
                 response.getRefreshToken(),

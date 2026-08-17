@@ -3,6 +3,7 @@ package com.ntropy.user.service;
 import com.ntropy.user.client.oauth.GoogleOAuthClient;
 import com.ntropy.user.client.oauth.KakaoOAuthClient;
 
+import com.ntropy.user.config.VirtualTestProperties;
 import com.ntropy.user.dto.OAuthLoginResponse;
 import com.ntropy.user.security.JwtProvider;
 import com.ntropy.common.exception.ServiceException;
@@ -28,6 +29,8 @@ public class UserService {
     private final KakaoOAuthClient kakaoOAuthClient;
     private final GoogleOAuthClient googleOAuthClient;
     private final JwtProvider jwtProvider;
+    private final VirtualUserSeedService virtualUserSeedService;
+    private final VirtualTestProperties virtualTestProperties;
 
     @Transactional
     public OAuthLoginResponse processOAuthLoginWithCode(String provider, String code) {
@@ -50,47 +53,47 @@ public class UserService {
 
     @Transactional
     public OAuthLoginResponse processOAuthLogin(User oauthUserParam) {
-        Optional<User> optionalUser = userMapper.findByProviderAndProviderId(
+        User user = userMapper.findByProviderAndProviderId(
                 oauthUserParam.getProvider(),
                 oauthUserParam.getProviderId()
-        );
+        ).orElseGet(() -> registerNewUser(oauthUserParam));
 
-        User user;
-        String accessToken;
-        String refreshToken;
+        return issueTokensForExistingUser(user);
+    }
 
-        if (optionalUser.isPresent()) {
-            user = optionalUser.get();
-            log.info("기존 회원 로그인 처리: userId={}", user.getUserId());
+    /** (provider, provider_id) unique key 경합에서 진 경우에도 새 행을 만들지 않고 실제 저장된 행으로 수렴한다. */
+    private User registerNewUser(User oauthUserParam) {
+        User user = oauthUserParam;
+        log.info("신규 회원가입 처리: provider={}, email={}", user.getProvider(), user.getEmail());
+        user.setStatus("ACTIVE");
+        user.setRole("ROLE_USER");
+        user.setTermsAgreed(true);
+        user.setOnboardingCompleted(false);
 
-            if (!"ACTIVE".equals(user.getStatus())) {
-                throw new ServiceException(UserErrorCode.INACTIVE_USER, user.getStatus());
-            }
+        userMapper.insertUser(user); // (provider, provider_id) 경합 시 user_id만 기존 행으로 채워짐 (ON DUPLICATE KEY UPDATE)
 
-            accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
-            refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
+        // user_id 외 나머지 컬럼은 경합에서 이긴 요청이 실제로 저장한 값일 수 있으므로 항상 재조회해 신뢰한다.
+        return userMapper.findByProviderAndProviderId(user.getProvider(), user.getProviderId())
+                .orElseThrow(() -> new ServiceException(UserErrorCode.USER_NOT_FOUND));
+    }
 
-            user.setRefreshTokenHash(refreshToken);
-            user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
-            userMapper.updateLoginInfo(user);
+    /**
+     * 이미 존재가 확인된 회원에게만 토큰을 발급하고 로그인 정보를 갱신한다. 회원을 새로 만들지 않으므로
+     * 실제 OAuth 로그인(신규 회원가입 후)과 테스트 로그인(시딩된 가상회원)이 함께 재사용할 수 있다.
+     */
+    private OAuthLoginResponse issueTokensForExistingUser(User user) {
+        log.info("로그인 처리: userId={}", user.getUserId());
 
-        } else {
-            user = oauthUserParam;
-            log.info("신규 회원가입 처리: provider={}, email={}", user.getProvider(), user.getEmail());
-            user.setStatus("ACTIVE");
-            user.setRole("ROLE_USER");
-            user.setTermsAgreed(true);
-            user.setOnboardingCompleted(false);
-
-            userMapper.insertUser(user); // userId(PK)가 여기서 채워진다 (useGeneratedKeys)
-
-            accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
-            refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
-
-            user.setRefreshTokenHash(refreshToken);
-            user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
-            userMapper.updateLoginInfo(user);
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new ServiceException(UserErrorCode.INACTIVE_USER, user.getStatus());
         }
+
+        String accessToken = jwtProvider.createAccessToken(String.valueOf(user.getUserId()), user.getEmail(), user.getRole());
+        String refreshToken = jwtProvider.createRefreshToken(String.valueOf(user.getUserId()));
+
+        user.setRefreshTokenHash(refreshToken);
+        user.setRefreshTokenExpireAt(LocalDateTime.now().plusWeeks(2));
+        userMapper.updateLoginInfo(user);
 
         return OAuthLoginResponse.builder()
                 .accessToken(accessToken)
@@ -100,6 +103,27 @@ public class UserService {
                 .email(user.getEmail())
                 .onboardingCompleted(user.getOnboardingCompleted())
                 .build();
+    }
+
+    /**
+     * 시딩된 가상회원(virtualUserNumber 순번)으로 로그인한다. 이미 시딩된 회원만 조회하며,
+     * 없다고 해서 새 가상회원을 만들지 않는다.
+     */
+    @Transactional
+    public OAuthLoginResponse loginAsVirtualUser(int virtualUserNumber) {
+        if (!virtualTestProperties.isEnabled()) {
+            throw new ServiceException(UserErrorCode.VIRTUAL_TEST_DISABLED);
+        }
+        if (!virtualTestProperties.isVirtualUserNumberInRange(virtualUserNumber)) {
+            throw new ServiceException(UserErrorCode.INVALID_REQUEST,
+                    "virtualUserNumber는 1.." + virtualTestProperties.getUserCount() + " 범위여야 합니다: " + virtualUserNumber);
+        }
+
+        User user = virtualUserSeedService.findSeededUserByOrdinal(virtualUserNumber)
+                .orElseThrow(() -> new ServiceException(UserErrorCode.USER_NOT_FOUND,
+                        "시딩되지 않은 가상회원 순번입니다: " + virtualUserNumber));
+
+        return issueTokensForExistingUser(user);
     }
 
     public User getUserById(Long userId) {

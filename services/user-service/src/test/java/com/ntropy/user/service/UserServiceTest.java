@@ -3,6 +3,7 @@ package com.ntropy.user.service;
 import com.ntropy.user.client.oauth.GoogleOAuthClient;
 import com.ntropy.user.client.oauth.KakaoOAuthClient;
 
+import com.ntropy.user.config.VirtualTestProperties;
 import com.ntropy.user.dto.OAuthLoginResponse;
 import com.ntropy.user.security.JwtProvider;
 import com.ntropy.common.exception.ServiceException;
@@ -39,6 +40,10 @@ class UserServiceTest {
     private GoogleOAuthClient googleOAuthClient;
     @Mock
     private JwtProvider jwtProvider;
+    @Mock
+    private VirtualUserSeedService virtualUserSeedService;
+    @Mock
+    private VirtualTestProperties virtualTestProperties;
 
     private User testUser;
 
@@ -60,7 +65,9 @@ class UserServiceTest {
     @Test
     @DisplayName("신규 회원가입 및 로그인 성공")
     void processOAuthLogin_new_user_success() {
-        when(userMapper.findByProviderAndProviderId(anyString(), anyString())).thenReturn(Optional.empty());
+        // insertUser 이후에는 항상 재조회하므로, 최초 조회는 없음(empty)을, insertUser 이후 재조회는 저장된 행을 반환한다.
+        when(userMapper.findByProviderAndProviderId(anyString(), anyString()))
+                .thenReturn(Optional.empty(), Optional.of(testUser));
         when(jwtProvider.createAccessToken(anyString(), anyString(), anyString())).thenReturn("newAccessToken");
         when(jwtProvider.createRefreshToken(anyString())).thenReturn("newRefreshToken");
 
@@ -76,6 +83,7 @@ class UserServiceTest {
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
         assertThat(response.getUserId()).isEqualTo(1L);
         verify(userMapper, times(1)).insertUser(any(User.class));
+        verify(userMapper, times(2)).findByProviderAndProviderId(anyString(), anyString());
         verify(userMapper, times(1)).updateLoginInfo(any(User.class));
         verify(jwtProvider).createAccessToken("1", testUser.getEmail(), testUser.getRole());
     }
@@ -119,6 +127,22 @@ class UserServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
         verify(userMapper, times(1)).updateLoginInfo(any(User.class));
+    }
+
+    @Test
+    @DisplayName("로그아웃으로 무효화된 Refresh Token으로는 재발급할 수 없다")
+    void refreshAccessToken_afterLogout_failure() {
+        String oldRefreshToken = "revokedRefreshToken";
+        when(jwtProvider.validateToken(oldRefreshToken)).thenReturn(true);
+
+        userService.logout(testUser.getUserId());
+        // logout은 refresh_token_hash를 NULL로 만들므로, 이후 같은 토큰으로는 회원을 찾을 수 없다.
+        when(userMapper.findByRefreshToken(oldRefreshToken)).thenReturn(Optional.empty());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.refreshAccessToken(oldRefreshToken));
+        assertThat(exception.getStatusCode()).isEqualTo(401);
+        verify(userMapper, times(1)).invalidateRefreshToken(testUser.getUserId());
     }
 
     @Test
@@ -166,5 +190,58 @@ class UserServiceTest {
         ServiceException exception = assertThrows(ServiceException.class,
                 () -> userService.completeOnboarding(testUser.getUserId()));
         assertThat(exception.getStatusCode()).isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName("가상회원 테스트 로그인 성공")
+    void loginAsVirtualUser_success() {
+        when(virtualTestProperties.isEnabled()).thenReturn(true);
+        when(virtualTestProperties.isVirtualUserNumberInRange(1)).thenReturn(true);
+        when(virtualUserSeedService.findSeededUserByOrdinal(1)).thenReturn(Optional.of(testUser));
+        when(jwtProvider.createAccessToken(anyString(), anyString(), anyString())).thenReturn("virtualAccessToken");
+        when(jwtProvider.createRefreshToken(anyString())).thenReturn("virtualRefreshToken");
+
+        OAuthLoginResponse response = userService.loginAsVirtualUser(1);
+
+        assertThat(response.getAccessToken()).isEqualTo("virtualAccessToken");
+        assertThat(response.getUserId()).isEqualTo(testUser.getUserId());
+        verify(userMapper, never()).insertUser(any(User.class));
+    }
+
+    @Test
+    @DisplayName("virtual-test.enabled=false면 테스트 로그인 실패")
+    void loginAsVirtualUser_disabled_failure() {
+        when(virtualTestProperties.isEnabled()).thenReturn(false);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.loginAsVirtualUser(1));
+        assertThat(exception.getStatusCode()).isEqualTo(404);
+        verifyNoInteractions(virtualUserSeedService);
+    }
+
+    @Test
+    @DisplayName("virtualUserNumber가 범위를 벗어나면 테스트 로그인 실패")
+    void loginAsVirtualUser_outOfRange_failure() {
+        when(virtualTestProperties.isEnabled()).thenReturn(true);
+        when(virtualTestProperties.isVirtualUserNumberInRange(51)).thenReturn(false);
+        when(virtualTestProperties.getUserCount()).thenReturn(50);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.loginAsVirtualUser(51));
+        assertThat(exception.getStatusCode()).isEqualTo(400);
+        verifyNoInteractions(virtualUserSeedService);
+    }
+
+    @Test
+    @DisplayName("시딩되지 않은 순번이면 새 가상회원을 만들지 않고 실패")
+    void loginAsVirtualUser_notSeeded_failure() {
+        when(virtualTestProperties.isEnabled()).thenReturn(true);
+        when(virtualTestProperties.isVirtualUserNumberInRange(7)).thenReturn(true);
+        when(virtualUserSeedService.findSeededUserByOrdinal(7)).thenReturn(Optional.empty());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> userService.loginAsVirtualUser(7));
+        assertThat(exception.getStatusCode()).isEqualTo(404);
+        verify(userMapper, never()).insertUser(any(User.class));
     }
 }
