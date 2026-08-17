@@ -42,6 +42,8 @@ public class SecurityConfig {
                         .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 로그인/토큰 재발급은 토큰 없이 호출된다 (/me, /logout은 인증 필요)
                         .antMatchers("/api/auth/oauth/**", "/api/auth/refresh", "/oauth2/**").permitAll()
+                        // 가상회원 테스트 로그인 (이슈 #166). virtual-test.enabled=false면 컨트롤러가 404를 반환한다
+                        .antMatchers(HttpMethod.POST, "/api/auth/virtual-login").permitAll()
                         // PortOne이 외부에서 호출한다. PortOneWebhookVerifier의 서명 검증으로 보호된다
                         .antMatchers(HttpMethod.POST, "/api/subscriptions/webhook").permitAll()
                         .antMatchers(HttpMethod.GET, "/api/subscriptions/plans").permitAll()

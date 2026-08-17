@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ntropy.bff.dto.common.ApiResponse;
 import com.ntropy.bff.dto.common.ErrorCode;
 import com.ntropy.bff.dto.user.request.TokenRefreshRequest;
+import com.ntropy.bff.dto.user.request.VirtualLoginRequest;
 import com.ntropy.bff.dto.user.response.OAuthLoginResponse;
 import com.ntropy.bff.dto.user.response.TokenRefreshResponse;
 import com.ntropy.bff.dto.user.response.UserResponse;
@@ -44,6 +45,17 @@ public class AuthController {
     ) {
         return ApiResponse.success(
                 OAuthLoginResponse.from(userCommandClient.loginWithOAuthCode(provider, code))
+        );
+    }
+
+    @ApiOperation("가상회원 테스트 로그인 (내부 검증 전용)")
+    @PostMapping("/virtual-login")
+    public ApiResponse<OAuthLoginResponse> virtualLogin(@RequestBody VirtualLoginRequest request) {
+        if (request.getVirtualUserNumber() == null) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST);
+        }
+        return ApiResponse.success(
+                OAuthLoginResponse.from(userCommandClient.loginAsVirtualUser(request.getVirtualUserNumber()))
         );
     }
 
