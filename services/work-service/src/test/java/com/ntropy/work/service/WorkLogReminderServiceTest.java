@@ -13,8 +13,10 @@ import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
+import com.ntropy.common.domain.UserScope;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.common.dto.notification.NotificationSummary;
+import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 
@@ -27,7 +29,11 @@ class WorkLogReminderServiceTest {
     private final StubActiveUserQueryClient activeUserQueryClient = new StubActiveUserQueryClient();
     private final StubNotificationCommandClient notificationCommandClient = new StubNotificationCommandClient();
     private final WorkLogReminderService service =
-            new WorkLogReminderService(activeUserQueryClient, workLogMapper, notificationCommandClient);
+            new WorkLogReminderService(
+                    activeUserQueryClient,
+                    new WorkReminderBatchUserScopeProperties("REAL_ONLY"),
+                    workLogMapper,
+                    notificationCommandClient);
 
     @BeforeEach
     void setUp() {
@@ -104,6 +110,14 @@ class WorkLogReminderServiceTest {
         assertEquals(0, notificationCommandClient.created.size());
     }
 
+    @Test
+    @DisplayName("설정된 batch.work-reminder.user-scope를 ActiveUserQueryClient에 그대로 전달한다")
+    void checkNoWorkLogToday_passesConfiguredUserScopeToClient() {
+        service.checkNoWorkLogToday();
+
+        assertEquals(UserScope.REAL_ONLY, activeUserQueryClient.lastRequestedScope);
+    }
+
     private static WorkLog workLog(LocalDate workDate, String status) {
         return WorkLog.builder()
                 .userId(USER_ID)
@@ -125,9 +139,11 @@ class WorkLogReminderServiceTest {
 
     private static final class StubActiveUserQueryClient implements ActiveUserQueryClient {
         private List<Long> userIds = List.of();
+        private UserScope lastRequestedScope;
 
         @Override
-        public List<Long> findActiveUserIds() {
+        public List<Long> findActiveUserIds(UserScope scope) {
+            this.lastRequestedScope = scope;
             return userIds;
         }
     }
