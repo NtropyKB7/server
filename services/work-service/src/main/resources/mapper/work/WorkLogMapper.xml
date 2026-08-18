@@ -62,7 +62,8 @@
 
     <update id="update" parameterType="com.ntropy.work.domain.entity.WorkLog">
         UPDATE WORK_LOG
-        SET work_date = #{workDate},
+        SET job_id = #{jobId},
+            work_date = #{workDate},
             start_time = #{startTime},
             end_time = #{endTime},
             task_count = #{taskCount},
