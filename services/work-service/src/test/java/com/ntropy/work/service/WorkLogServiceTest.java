@@ -215,6 +215,18 @@ class WorkLogServiceTest {
     }
 
     @Test
+    @DisplayName("계획 등록 시 fatigue를 0으로 보내면 미입력으로 취급해 기본값이 채워진다")
+    void registerPlan_zeroFatigue_treatedAsUnprovided() {
+        Job job = hourlyJob();
+        WorkLog plan = planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0));
+        plan.setFatigue(0L);
+
+        WorkLog result = workLogService.registerPlan(plan);
+
+        assertEquals(job.getBaseFatigue().longValue(), result.getFatigue());
+    }
+
+    @Test
     @DisplayName("필수값이 없으면 계획 등록이 실패한다")
     void registerPlan_missingRequiredField_throws() {
         WorkLog plan = planOf(null, LocalTime.of(18, 0), LocalTime.of(22, 0));
@@ -250,6 +262,16 @@ class WorkLogServiceTest {
     void registerActual_requiresFatigue() {
         Job job = hourlyJob();
         WorkLog actual = planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0));
+
+        assertThrows(ServiceException.class, () -> workLogService.registerActual(actual));
+    }
+
+    @Test
+    @DisplayName("실적 등록은 fatigue를 0으로 보내도 미입력으로 취급해 실패한다")
+    void registerActual_zeroFatigue_throws() {
+        Job job = hourlyJob();
+        WorkLog actual = planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0));
+        actual.setFatigue(0L);
 
         assertThrows(ServiceException.class, () -> workLogService.registerActual(actual));
     }
@@ -306,6 +328,19 @@ class WorkLogServiceTest {
     }
 
     @Test
+    @DisplayName("수정 시 fatigue를 0으로 보내면 기존 값이 유지된다")
+    void editWorkLog_zeroFatigue_keepsExisting() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+        Long originalFatigue = plan.getFatigue();
+
+        WorkLog patch = WorkLog.builder().fatigue(0L).build();
+        WorkLog result = workLogService.editWorkLog(USER_ID, plan.getLogId(), patch);
+
+        assertEquals(originalFatigue, result.getFatigue());
+    }
+
+    @Test
     @DisplayName("수정 시 겹침 검증에서 자기 자신은 제외된다")
     void editWorkLog_overlapCheckExcludesSelf() {
         Job job = hourlyJob();
@@ -333,6 +368,18 @@ class WorkLogServiceTest {
         WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
 
         assertThrows(ServiceException.class, () -> workLogService.editWorkLog(999L, plan.getLogId(), patch));
+    }
+
+    @Test
+    @DisplayName("확정된 근무일지는 수정할 수 없다")
+    void editWorkLog_confirmed_throws() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+        workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
+
+        assertThrows(ServiceException.class, () -> workLogService.editWorkLog(USER_ID, plan.getLogId(), patch));
     }
 
     @Test

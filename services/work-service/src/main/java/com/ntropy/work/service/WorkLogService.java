@@ -50,7 +50,7 @@ public class WorkLogService {
         validateNoOverlap(workLog.getUserId(), workLog.getWorkDate(), workLog.getStartTime(), workLog.getEndTime(), null);
         Job job = jobService.findById(workLog.getJobId());
 
-        if (workLog.getFatigue() == null) {
+        if (!isFatigueProvided(workLog.getFatigue())) {
             workLog.setFatigue(job.getBaseFatigue().longValue());
         }
         workLog.setTaskCount(null);
@@ -88,7 +88,8 @@ public class WorkLogService {
     }
 
     /**
-     * 근무일지 수정. PLANNED/CONFIRMED 둘 다 가능하며 상태는 그대로 유지한다.
+     * 근무일지 수정. PLANNED 상태에서만 가능하다. 확정(CONFIRMED) 이후에는
+     * WORK_LOG_PLATFORM_INCOME과의 정합성이 깨질 수 있어 수정할 수 없고, 삭제만 가능하다.
      * 넘어온 필드만 덮어쓰고 나머지는 기존 값을 유지한다.
      *
      * @param requesterUserId 요청자 userId. 근무일지 소유자와 다르면 예외
@@ -97,6 +98,9 @@ public class WorkLogService {
     public WorkLog editWorkLog(Long requesterUserId, Long logId, WorkLog patch) {
         WorkLog existing = findById(logId);
         verifyOwnership(requesterUserId, existing.getUserId(), logId);
+        if (STATUS_CONFIRMED.equals(existing.getStatus())) {
+            throw new ServiceException(WorkErrorCode.WORK_LOG_ALREADY_CONFIRMED, "logId=" + logId);
+        }
         applyPatch(existing, patch);
         validateNoOverlap(existing.getUserId(), existing.getWorkDate(), existing.getStartTime(), existing.getEndTime(),
                 existing.getLogId());
@@ -226,7 +230,7 @@ public class WorkLogService {
         if (patch.getTaskCount() != null) {
             existing.setTaskCount(patch.getTaskCount());
         }
-        if (patch.getFatigue() != null) {
+        if (isFatigueProvided(patch.getFatigue())) {
             existing.setFatigue(patch.getFatigue());
         }
     }
@@ -300,8 +304,13 @@ public class WorkLogService {
 
     private void validateActual(WorkLog workLog) {
         validatePlan(workLog);
-        if (workLog.getFatigue() == null) {
+        if (!isFatigueProvided(workLog.getFatigue())) {
             throw new ServiceException(WorkErrorCode.FATIGUE_REQUIRED_FOR_ACTUAL);
         }
+    }
+
+    /** fatigue는 1~5 척도이므로 null과 0은 둘 다 "미입력"으로 취급한다. */
+    private boolean isFatigueProvided(Long fatigue) {
+        return fatigue != null && fatigue != 0;
     }
 }
