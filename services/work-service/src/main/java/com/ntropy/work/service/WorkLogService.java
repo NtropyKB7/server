@@ -50,7 +50,7 @@ public class WorkLogService {
         validateNoOverlap(workLog.getUserId(), workLog.getWorkDate(), workLog.getStartTime(), workLog.getEndTime(), null);
         Job job = jobService.findById(workLog.getJobId());
 
-        if (workLog.getFatigue() == null) {
+        if (!isFatigueProvided(workLog.getFatigue())) {
             workLog.setFatigue(job.getBaseFatigue().longValue());
         }
         workLog.setTaskCount(null);
@@ -230,7 +230,7 @@ public class WorkLogService {
         if (patch.getTaskCount() != null) {
             existing.setTaskCount(patch.getTaskCount());
         }
-        if (patch.getFatigue() != null) {
+        if (isFatigueProvided(patch.getFatigue())) {
             existing.setFatigue(patch.getFatigue());
         }
     }
@@ -304,8 +304,13 @@ public class WorkLogService {
 
     private void validateActual(WorkLog workLog) {
         validatePlan(workLog);
-        if (workLog.getFatigue() == null) {
+        if (!isFatigueProvided(workLog.getFatigue())) {
             throw new ServiceException(WorkErrorCode.FATIGUE_REQUIRED_FOR_ACTUAL);
         }
+    }
+
+    /** fatigue는 1~5 척도이므로 null과 0은 둘 다 "미입력"으로 취급한다. */
+    private boolean isFatigueProvided(Long fatigue) {
+        return fatigue != null && fatigue != 0;
     }
 }
