@@ -336,6 +336,18 @@ class WorkLogServiceTest {
     }
 
     @Test
+    @DisplayName("확정된 근무일지는 수정할 수 없다")
+    void editWorkLog_confirmed_throws() {
+        Job job = hourlyJob();
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+        workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
+
+        assertThrows(ServiceException.class, () -> workLogService.editWorkLog(USER_ID, plan.getLogId(), patch));
+    }
+
+    @Test
     @DisplayName("확정하면 PLANNED에서 CONFIRMED로 전환된다")
     void confirmWorkLog_transitionsPlannedToConfirmed() {
         Job job = hourlyJob();
