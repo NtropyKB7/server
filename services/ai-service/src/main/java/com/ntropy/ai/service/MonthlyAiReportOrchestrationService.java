@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.ai.client.fastapi.FastApiProductRecommendationClient;
+import com.ntropy.ai.config.AiReportBatchUserScopeProperties;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationRequest;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
@@ -68,6 +69,11 @@ public class MonthlyAiReportOrchestrationService {
      * 배치 대상 활성 사용자를 조회하는 Client입니다.
      */
     private final ActiveUserQueryClient activeUserQueryClient;
+
+    /**
+     * 이 배치가 대상으로 삼을 사용자 범위(batch.ai-report.user-scope) 설정입니다.
+     */
+    private final AiReportBatchUserScopeProperties userScopeProperties;
 
     /**
      * work-service에서 월별 소득 분석 결과를 조회하는 Client입니다.
@@ -128,7 +134,7 @@ public class MonthlyAiReportOrchestrationService {
 
     public void runBatch(YearMonth targetYearMonth) {
         List<Long> userIds =
-                activeUserQueryClient.findActiveUserIds();
+                activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope());
 
         if (userIds == null || userIds.isEmpty()) {
             log.info(
