@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.common.client.ActiveUserQueryClient;
+import com.ntropy.common.domain.UserScope;
 import com.ntropy.user.service.UserService;
 
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ public class LocalActiveUserQueryClient
     private final UserService userService;
 
     @Override
-    public List<Long> findActiveUserIds() {
-        return userService.findActiveUserIds();
+    public List<Long> findActiveUserIds(UserScope scope) {
+        return userService.findActiveUserIds(scope);
     }
 }
