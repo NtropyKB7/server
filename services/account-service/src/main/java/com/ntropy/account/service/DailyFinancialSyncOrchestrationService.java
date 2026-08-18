@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.account.config.FinancialSyncBatchUserScopeProperties;
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.DailyFinancialSyncClient;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
@@ -36,6 +37,7 @@ public class DailyFinancialSyncOrchestrationService {
     // account-service 단독 검증 컨텍스트도 기동될 수 있도록 Optional로 주입하되,
     // 실제 스케줄 실행 시 구현체가 없으면 조용히 건너뛰지 않고 명시적으로 실패한다.
     private final Optional<ActiveUserQueryClient> activeUserQueryClient;
+    private final FinancialSyncBatchUserScopeProperties userScopeProperties;
     private final DailyFinancialSyncClient dailyFinancialSyncClient;
     private final Clock clock;
 
@@ -51,7 +53,9 @@ public class DailyFinancialSyncOrchestrationService {
         ActiveUserQueryClient queryClient = activeUserQueryClient.orElseThrow(
                 () -> new IllegalStateException("ActiveUserQueryClient 구현체가 필요합니다")
         );
-        List<Long> activeUserIds = normalizeActiveUserIds(queryClient.findActiveUserIds());
+        List<Long> activeUserIds = normalizeActiveUserIds(
+                queryClient.findActiveUserIds(userScopeProperties.getUserScope())
+        );
         if (activeUserIds.isEmpty()) {
             log.info("[일일 금융거래 동기화] 대상 사용자가 없습니다. businessDate={}", businessDate);
             return;

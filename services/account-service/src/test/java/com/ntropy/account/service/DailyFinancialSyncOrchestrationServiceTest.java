@@ -16,21 +16,26 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.config.FinancialSyncBatchUserScopeProperties;
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.DailyFinancialSyncClient;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.common.domain.UserScope;
 import com.ntropy.common.dto.account.DailyFinancialSyncResult;
 
 class DailyFinancialSyncOrchestrationServiceTest {
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDate BUSINESS_DATE = LocalDate.of(2026, 8, 15);
+    private static final FinancialSyncBatchUserScopeProperties REAL_ONLY_SCOPE =
+            new FinancialSyncBatchUserScopeProperties("REAL_ONLY");
 
     @Test
     void runsPreviousSeoulDayAndCallsNtropyBeforeCodef() {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(() -> Arrays.asList(2L, null, 2L, 1L)),
+                Optional.of(scope -> Arrays.asList(2L, null, 2L, 1L)),
+                REAL_ONLY_SCOPE,
                 syncClient,
                 Clock.fixed(Instant.parse("2026-08-15T15:30:00Z"), SEOUL)
         );
@@ -50,7 +55,7 @@ class DailyFinancialSyncOrchestrationServiceTest {
     void skipsProvidersWhenThereAreNoActiveUsers() {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(List::of), syncClient, Clock.system(SEOUL)
+                Optional.of(scope -> List.of()), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 
         service.runBatch(BUSINESS_DATE);
@@ -63,7 +68,7 @@ class DailyFinancialSyncOrchestrationServiceTest {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         syncClient.throwingProvider = DailyFinancialSyncProvider.NTROPY;
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(() -> List.of(1L)), syncClient, Clock.system(SEOUL)
+                Optional.of(scope -> List.of(1L)), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 
         service.runBatch(BUSINESS_DATE);
@@ -77,9 +82,9 @@ class DailyFinancialSyncOrchestrationServiceTest {
     @Test
     void treatsNullActiveUserResultAsEmpty() {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
-        ActiveUserQueryClient activeUserQueryClient = () -> null;
+        ActiveUserQueryClient activeUserQueryClient = scope -> null;
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(activeUserQueryClient), syncClient, Clock.system(SEOUL)
+                Optional.of(activeUserQueryClient), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 
         service.runBatch(BUSINESS_DATE);
@@ -88,9 +93,26 @@ class DailyFinancialSyncOrchestrationServiceTest {
     }
 
     @Test
+    void passesConfiguredUserScopeToActiveUserQueryClient() {
+        RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
+        List<UserScope> requestedScopes = new ArrayList<>();
+        DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
+                Optional.of(scope -> {
+                    requestedScopes.add(scope);
+                    return List.of();
+                }),
+                REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
+        );
+
+        service.runBatch(BUSINESS_DATE);
+
+        assertEquals(List.of(UserScope.REAL_ONLY), requestedScopes);
+    }
+
+    @Test
     void failsClearlyWhenActiveUserClientIsMissingAtExecutionTime() {
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.empty(), new RecordingDailyFinancialSyncClient(), Clock.system(SEOUL)
+                Optional.empty(), REAL_ONLY_SCOPE, new RecordingDailyFinancialSyncClient(), Clock.system(SEOUL)
         );
 
         assertThrows(IllegalStateException.class, () -> service.runBatch(BUSINESS_DATE));

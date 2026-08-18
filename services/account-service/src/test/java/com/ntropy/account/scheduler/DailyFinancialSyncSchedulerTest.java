@@ -49,7 +49,7 @@ class DailyFinancialSyncSchedulerTest {
         private int calls;
 
         private RecordingOrchestrationService(boolean fail) {
-            super(null, null, null);
+            super(null, null, null, null);
             this.fail = fail;
         }
 
