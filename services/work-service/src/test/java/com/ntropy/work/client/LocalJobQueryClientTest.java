@@ -27,7 +27,10 @@ import com.ntropy.work.service.CategoryService;
 import com.ntropy.work.service.JobPlatformMappingService;
 import com.ntropy.work.service.JobService;
 import com.ntropy.work.service.PlatformService;
+import com.ntropy.work.service.RecommendedWorkHoursService;
+import com.ntropy.work.service.SavingGoalService;
 import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
+import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 
 class LocalJobQueryClientTest {
 
@@ -45,7 +48,12 @@ class LocalJobQueryClientTest {
         jobScheduleMapper = new InMemoryJobScheduleMapper();
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
-        jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper), new InMemoryAllocationGoalMapper());
+        InMemoryAllocationGoalMapper allocationGoalMapper = new InMemoryAllocationGoalMapper();
+        SavingGoalService savingGoalService = new SavingGoalService(new InMemorySavingGoalMapper(), allocationGoalMapper);
+        RecommendedWorkHoursService recommendedWorkHoursService =
+                new RecommendedWorkHoursService(savingGoalService, jobMapper, allocationGoalMapper);
+        jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper),
+                allocationGoalMapper, recommendedWorkHoursService);
 
         InMemoryPlatformMapper platformMapper = new InMemoryPlatformMapper();
         platformMapper.seed(Platform.builder().platformId(1L).categoryId(1L)

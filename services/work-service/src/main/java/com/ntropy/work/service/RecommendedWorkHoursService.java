@@ -16,6 +16,7 @@ import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.mapper.AllocationGoalMapper;
+import com.ntropy.work.mapper.JobMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,7 +45,7 @@ public class RecommendedWorkHoursService {
             1, 1.00, 2, 0.90, 3, 0.80, 4, 0.70, 5, 0.60);
 
     private final SavingGoalService savingGoalService;
-    private final JobService jobService;
+    private final JobMapper jobMapper;
     private final AllocationGoalMapper allocationGoalMapper;
 
     @Transactional
@@ -55,7 +56,7 @@ public class RecommendedWorkHoursService {
         }
 
         String targetMonth = goal.getTargetMonth();
-        List<Job> jobs = jobService.findByUserId(userId).stream()
+        List<Job> jobs = jobMapper.findByUserId(userId).stream()
                 .filter(job -> Boolean.TRUE.equals(job.getIsActive()))
                 .toList();
         List<JobSummary> summaries = jobs.stream().map(this::toSummary).toList();

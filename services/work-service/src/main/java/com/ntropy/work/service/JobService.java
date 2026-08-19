@@ -29,6 +29,7 @@ public class JobService {
     private final JobScheduleMapper jobScheduleMapper;
     private final CategoryService categoryService;
     private final AllocationGoalMapper allocationGoalMapper;
+    private final RecommendedWorkHoursService recommendedWorkHoursService;
 
     /**
      * 잡 등록. 정기근무 스케줄이 있으면 같이 등록한다(둘 다 성공하거나 둘 다 롤백).
@@ -58,8 +59,9 @@ public class JobService {
             jobScheduleMapper.insert(schedule);
         }
 
-        // 잡이 추가되면 기존 이번 달 추천 결과는 더 이상 최신이 아니므로 무효화합니다.
+        // 잡이 추가되면 기존 이번 달 추천 결과는 더 이상 최신이 아니므로 무효화하고 즉시 재계산합니다.
         allocationGoalMapper.deleteByUserIdAndTargetMonth(job.getUserId(), currentMonth());
+        recommendedWorkHoursService.getCurrentMonthRecommendedWorkHours(job.getUserId());
 
         return job;
     }
@@ -110,8 +112,9 @@ public class JobService {
             jobScheduleMapper.insert(schedule);
         }
 
-        // 시급·정산 방식·피로도·활성 상태 등이 변경될 수 있으므로 재계산을 유도합니다.
+        // 시급·정산 방식·피로도·활성 상태 등이 변경될 수 있으므로 즉시 재계산합니다.
         allocationGoalMapper.deleteByUserIdAndTargetMonth(existing.getUserId(), currentMonth());
+        recommendedWorkHoursService.getCurrentMonthRecommendedWorkHours(existing.getUserId());
 
         return job;
     }
@@ -124,6 +127,7 @@ public class JobService {
         job.setUpdatedAt(LocalDateTime.now());
         jobMapper.update(job);
         allocationGoalMapper.deleteByUserIdAndTargetMonth(job.getUserId(), currentMonth());
+        recommendedWorkHoursService.getCurrentMonthRecommendedWorkHours(job.getUserId());
     }
 
     /** 요청자가 이 잡의 소유자가 아니면 예외를 던진다. */
