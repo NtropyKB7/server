@@ -387,5 +387,12 @@ class IncomeAnalysisServiceTest {
                     .filter(s -> !s.getDepositDate().isBefore(startDate) && !s.getDepositDate().isAfter(endDate))
                     .toList();
         }
+
+        @Override
+        public List<Settlement> findByJobIdInAndDepositDateRangeAndStatus(List<Long> jobIds, LocalDate startDate,
+                                                                           LocalDate endDate,
+                                                                           SettlementMatchStatus status) {
+            throw new UnsupportedOperationException("이 테스트 더블은 조회만 지원합니다.");
+        }
     }
 }

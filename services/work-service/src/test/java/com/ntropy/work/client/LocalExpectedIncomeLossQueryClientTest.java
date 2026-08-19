@@ -5,9 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
+import com.ntropy.work.domain.entity.Settlement;
+import com.ntropy.work.domain.enums.SettlementMatchStatus;
 import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
+import com.ntropy.work.mapper.InMemorySettlementMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,11 +34,13 @@ class LocalExpectedIncomeLossQueryClientTest {
     private static final Long USER_ID = 1L;
 
     private InMemoryJobMapper jobMapper;
+    private InMemorySettlementMapper settlementMapper;
     private LocalExpectedIncomeLossQueryClient client;
 
     @BeforeEach
     void setUp() {
         jobMapper = new InMemoryJobMapper();
+        settlementMapper = new InMemorySettlementMapper();
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
         InMemoryAllocationGoalMapper allocationGoalMapper = new InMemoryAllocationGoalMapper();
@@ -44,7 +50,7 @@ class LocalExpectedIncomeLossQueryClientTest {
         JobService jobService = new JobService(
                 jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(categoryMapper),
                 allocationGoalMapper, recommendedWorkHoursService);
-        client = new LocalExpectedIncomeLossQueryClient(jobService);
+        client = new LocalExpectedIncomeLossQueryClient(jobService, settlementMapper);
     }
 
     private Job.JobBuilder baseJob() {
@@ -57,6 +63,16 @@ class LocalExpectedIncomeLossQueryClientTest {
                 .isRegular(false)
                 .baseFatigue(3)
                 .isActive(true);
+    }
+
+    private Settlement.SettlementBuilder matchedSettlement(Long jobId, LocalDate depositDate, long actualAmount) {
+        return Settlement.builder()
+                .userId(USER_ID)
+                .jobId(jobId)
+                .status(SettlementMatchStatus.MATCHED)
+                .depositDate(depositDate)
+                .actualAmount(actualAmount)
+                .transactionCount(1);
     }
 
     @Test
@@ -138,5 +154,83 @@ class LocalExpectedIncomeLossQueryClientTest {
                 USER_ID, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30));
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("건당정산 잡은 최근 3개월(이번 달 제외) MATCHED 정산 평균으로 손실을 계산한다")
+    void findExpectedIncomeLossByJob_perTask_usesRecentThreeMonthAverage() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("쿠팡플렉스")
+                .settlementType(SettlementType.PER_TASK).monthlyWage(null).perTaskWage(3000).taskPerHour(3.5f)
+                .monthlyExpectedIncome(null).build());
+
+        YearMonth thisMonth = YearMonth.now();
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(1).atDay(10), 500000L).build());
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(2).atDay(10), 700000L).build());
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(3).atDay(10), 600000L).build());
+        // 이번 달 정산은 아직 진행 중이라 평균 계산 대상에서 제외되어야 한다
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.atDay(1), 999999L).build());
+
+        LocalDate from = LocalDate.now();
+        LocalDate to = from.plusDays(29); // 30일
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(USER_ID, from, to);
+
+        // 평균 = (500000+700000+600000)/3 = 600000, 30일 방어기간이면 전액 손실
+        assertEquals(1, result.size());
+        assertEquals(600000L, result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("건당정산 잡이 최근 3개월 중 일부만 정산 이력이 있으면 있는 달만으로 평균낸다")
+    void findExpectedIncomeLossByJob_perTask_partialHistory_averagesOverAvailableMonthsOnly() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("쿠팡플렉스")
+                .settlementType(SettlementType.PER_TASK).monthlyWage(null).perTaskWage(3000).taskPerHour(3.5f)
+                .monthlyExpectedIncome(null).build());
+
+        YearMonth thisMonth = YearMonth.now();
+        // 최근 3개월 중 지난달 하나만 이력 존재 (신규 잡 등)
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(1).atDay(10), 450000L).build());
+
+        LocalDate from = LocalDate.now();
+        LocalDate to = from.plusDays(29);
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(USER_ID, from, to);
+
+        assertEquals(450000L, result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("건당정산 잡이 최근 3개월 정산 이력이 전혀 없으면 손실액이 null로 반환된다")
+    void findExpectedIncomeLossByJob_perTask_noHistory_returnsNullLoss() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("쿠팡플렉스")
+                .settlementType(SettlementType.PER_TASK).monthlyWage(null).perTaskWage(3000).taskPerHour(3.5f)
+                .monthlyExpectedIncome(null).build());
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(
+                USER_ID, LocalDate.now(), LocalDate.now().plusDays(29));
+
+        assertEquals(1, result.size());
+        assertNull(result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("건당정산 잡과 다른 정산방식 잡이 섞여 있어도 각자의 방식으로 계산된다")
+    void findExpectedIncomeLossByJob_mixedSettlementTypes_eachUsesOwnCalculation() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("본업").monthlyExpectedIncome(3000000L).build());
+        jobMapper.seed(baseJob().jobId(2L).jobName("쿠팡플렉스")
+                .settlementType(SettlementType.PER_TASK).monthlyWage(null).perTaskWage(3000).taskPerHour(3.5f)
+                .monthlyExpectedIncome(null).build());
+
+        YearMonth thisMonth = YearMonth.now();
+        settlementMapper.insert(matchedSettlement(2L, thisMonth.minusMonths(1).atDay(10), 500000L).build());
+
+        LocalDate from = LocalDate.now();
+        LocalDate to = from.plusDays(29);
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(USER_ID, from, to);
+
+        assertEquals(2, result.size());
+        assertEquals(3000000L, result.get(0).getExpectedIncomeLoss());
+        assertEquals(500000L, result.get(1).getExpectedIncomeLoss());
     }
 }

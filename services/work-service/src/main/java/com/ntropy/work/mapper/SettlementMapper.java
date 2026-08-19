@@ -30,4 +30,10 @@ public interface SettlementMapper {
     List<Settlement> findByUserIdInAndDepositDateRange(@Param("userIds") List<Long> userIds,
                                                          @Param("startDate") LocalDate startDate,
                                                          @Param("endDate") LocalDate endDate);
+
+    /** PER_TASK 잡의 최근 N개월 평균 소득 계산용: 여러 잡의 SETTLEMENT를 한 번에 조회한다. 결과는 jobId로 그룹핑해서 써야 한다. */
+    List<Settlement> findByJobIdInAndDepositDateRangeAndStatus(@Param("jobIds") List<Long> jobIds,
+                                                                 @Param("startDate") LocalDate startDate,
+                                                                 @Param("endDate") LocalDate endDate,
+                                                                 @Param("status") SettlementMatchStatus status);
 }
