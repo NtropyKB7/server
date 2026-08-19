@@ -85,8 +85,8 @@ public class TransactionPreClassificationService {
          *
          * 그 외 LOAN 거래는 정상 상환으로 보고 FINANCE / FIXED 소비로 분류합니다.
          * 여기서는 분류 정보(is_consumption/category/expense_type)만 저장하며 금액은
-         * 저장하지 않습니다. 월간 집계 금액(원금 제외, 이자만 소비)은 MonthlyExpenseMapper가
-         * ACCOUNT_TRANSACTION에서 별도로 결정적으로 계산합니다.
+         * 저장하지 않습니다. 월간 집계 금액(원금 포함 out_amount 전액, #169 후속 정책 변경)은
+         * MonthlyExpenseMapper가 ACCOUNT_TRANSACTION에서 별도로 결정적으로 계산합니다.
          */
         if ("LOAN".equals(transactionCategory)) {
             if (LoanDisbursementKeywords.matches(
