@@ -1,11 +1,15 @@
 package com.ntropy.account.integration.virtual;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
@@ -27,14 +31,25 @@ import com.ntropy.account.service.VirtualConnectionService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator;
+import com.ntropy.common.client.VirtualUserQueryClient;
+import com.ntropy.common.dto.user.VirtualDatasetContext;
+import com.ntropy.common.dto.user.VirtualUserDataset;
+import com.ntropy.common.dto.user.VirtualUserIdentity;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-/** RUN_VIRTUAL_FINANCIAL_DATA_TEST=true일 때 로컬 MySQL에 FIN-005 목데이터를 적재한다. */
+/**
+ * RUN_VIRTUAL_FINANCIAL_DATA_TEST=true일 때 로컬 MySQL에 FIN-005 목데이터를 적재한다.
+ * user-service가 먼저 기동돼 USERS 테이블에 provider=NTROPY_TEST 가상회원을 시딩해 둔 상태여야 한다
+ * (VirtualUserSeedInitializer, 이슈 #167). account-service 모듈은 user-service에 컴파일 의존성이
+ * 없으므로, 이 테스트는 USERS 테이블을 직접 조회하는 {@link VirtualUserQueryClient} 구현을 둔다.
+ */
 class VirtualFinancialDataManualVerificationTest {
 
-    private static final long FIRST_USER_ID = 9_000_046_001L;
-    private static final long LAST_USER_ID = 9_000_046_050L;
+    private static final String VIRTUAL_TEST_PROVIDER = "NTROPY_TEST";
+    private static final VirtualDatasetContext MANUAL_DATASET_CONTEXT = new VirtualDatasetContext(
+            "VIRTUAL-MULTI-DOMAIN-v1", LocalDate.of(2026, 8, 17), 20_260_817L
+    );
 
     @Test
     void generatesIdempotentVirtualFinancialDataset() {
@@ -46,86 +61,97 @@ class VirtualFinancialDataManualVerificationTest {
         try (AnnotationConfigApplicationContext context =
                      new AnnotationConfigApplicationContext(TestConfig.class)) {
             VirtualFinancialDataService service = context.getBean(VirtualFinancialDataService.class);
-            GenerationSummary first = service.generate();
-            GenerationSummary second = service.generate();
+            VirtualUserQueryClient virtualUserQueryClient = context.getBean(VirtualUserQueryClient.class);
             JdbcTemplate jdbc = new JdbcTemplate(context.getBean(DataSource.class));
 
+            VirtualUserDataset dataset = virtualUserQueryClient.findSeededVirtualUsers();
+            assumeTrue(!dataset.users().isEmpty(),
+                    "user-service가 먼저 가상회원을 시딩해 둬야 합니다 (provider=NTROPY_TEST)");
+
+            int userCount = dataset.users().size();
+            Set<Long> expectedUserIds = dataset.users().stream()
+                    .map(VirtualUserIdentity::userId)
+                    .collect(Collectors.toSet());
+
+            GenerationSummary first = service.generate();
+            GenerationSummary second = service.generate();
+
             assertEquals(first, second);
-            assertEquals(50, count(jdbc, """
-                    SELECT COUNT(*) FROM CODEF_CONNECTION
-                    WHERE provider = 'NTROPY' AND user_id BETWEEN ? AND ?
-                    """));
-            assertEquals(100, count(jdbc, """
-                    SELECT COUNT(*) FROM ACCOUNT
-                    WHERE user_id BETWEEN ? AND ?
-                    """));
-            assertEquals(15_000, count(jdbc, """
+            assertEquals(expectedUserIds.size(), userCount,
+                    "가상회원 userId는 중복이 없어야 합니다");
+            Set<Long> storedAccountUserIds = Set.copyOf(jdbc.queryForList("""
+                    SELECT DISTINCT account_row.user_id
+                    FROM ACCOUNT account_row
+                    JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                    WHERE seeded_user.provider = ?
+                    """, Long.class, VIRTUAL_TEST_PROVIDER));
+            assertEquals(expectedUserIds, storedAccountUserIds,
+                    "생성된 모든 Account.userId는 조회한 가상회원 userId 집합과 정확히 일치해야 합니다");
+            assertEquals(userCount, count(jdbc, """
+                    SELECT COUNT(*)
+                    FROM CODEF_CONNECTION connection_row
+                    JOIN USERS seeded_user ON seeded_user.user_id = connection_row.user_id
+                    WHERE connection_row.provider = 'NTROPY'
+                      AND seeded_user.provider = ?
+                    """, VIRTUAL_TEST_PROVIDER));
+            assertEquals(userCount * 2, count(jdbc, """
+                    SELECT COUNT(*)
+                    FROM ACCOUNT account_row
+                    JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                    WHERE seeded_user.provider = ?
+                    """, VIRTUAL_TEST_PROVIDER));
+            assertEquals(first.transactions(), count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
-                    """));
-            assertEquals(15, count(jdbc, """
-                    SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
-                    FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
-                      AND REPLACE(transaction_row.desc3, '홈)', '') IN (
-                          '우아한청년들', '쿠팡이츠정산', '위대한상상', '카카오모빌리티', 'GOOGLE',
-                          '쿠팡-용역비', '티맵모빌리티', 'CJ대한통운', '로젠택배', '생활연구소',
-                          '유한회사미소', '케어닥', '펫피플', 'PAYPAL', '네이버'
-                      )
-                    """));
+                    JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                    WHERE seeded_user.provider = ?
+                    """, VIRTUAL_TEST_PROVIDER));
             assertEquals(0, count(jdbc, """
                     SELECT COUNT(*) FROM (
                         SELECT transaction_row.account_id, transaction_row.fingerprint
                         FROM ACCOUNT_TRANSACTION transaction_row
                         JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                        WHERE account_row.user_id BETWEEN ? AND ?
+                        JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                        WHERE seeded_user.provider = ?
                         GROUP BY transaction_row.account_id, transaction_row.fingerprint
                         HAVING COUNT(*) > 1
                     ) duplicate_fingerprint
-                    """));
+                    """, VIRTUAL_TEST_PROVIDER));
             assertEquals(0, count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
+                    JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                    WHERE seeded_user.provider = ?
                       AND transaction_row.desc2 IN ('입금', '출금')
-                    """));
-            assertEquals(180, count(jdbc, """
-                    SELECT COUNT(*)
+                    """, VIRTUAL_TEST_PROVIDER));
+            int distinctIncomeCounterparties = count(jdbc, """
+                    SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
-                      AND account_row.organization_code = '0003'
-                      AND transaction_row.desc3 IN (
+                    JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                    WHERE seeded_user.provider = ?
+                      AND REPLACE(transaction_row.desc3, '홈)', '') IN (
                           '우아한청년들', '쿠팡이츠정산', '위대한상상', '카카오모빌리티', 'GOOGLE',
                           '쿠팡-용역비', '티맵모빌리티', 'CJ대한통운', '로젠택배', '생활연구소',
                           '유한회사미소', '케어닥', '펫피플', 'PAYPAL', '네이버'
                       )
-                      AND transaction_row.desc1 IS NOT NULL
-                    """));
-            assertEquals(225, count(jdbc, """
-                    SELECT COUNT(*)
-                    FROM ACCOUNT_TRANSACTION transaction_row
-                    JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
-                      AND REPLACE(transaction_row.desc3, '홈)', '') IN (
-                          '삼성생명 실손보험', '현대해상 건강보험', 'DB손해보험 운전자보험',
-                          'KB손해보험 암보험', '교보생명 종신보험', '한화생명 연금보험'
-                      )
-                    """));
-            assertEquals(6, count(jdbc, """
+                    """, VIRTUAL_TEST_PROVIDER);
+            // 소득 정산처 15종 전체가 등장하려면 사용자 수가 충분해야 한다(기본 50명 기준).
+            assertTrue(distinctIncomeCounterparties > 0 && distinctIncomeCounterparties <= 15);
+            int distinctInsuranceProducts = count(jdbc, """
                     SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
                     FROM ACCOUNT_TRANSACTION transaction_row
                     JOIN ACCOUNT account_row ON account_row.account_id = transaction_row.account_id
-                    WHERE account_row.user_id BETWEEN ? AND ?
+                    JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                    WHERE seeded_user.provider = ?
                       AND REPLACE(transaction_row.desc3, '홈)', '') IN (
                           '삼성생명 실손보험', '현대해상 건강보험', 'DB손해보험 운전자보험',
                           'KB손해보험 암보험', '교보생명 종신보험', '한화생명 연금보험'
                       )
-                    """));
+                    """, VIRTUAL_TEST_PROVIDER);
+            assertTrue(distinctInsuranceProducts > 0 && distinctInsuranceProducts <= 6);
 
             System.out.println("VIRTUAL_FINANCIAL_USERS=" + first.users());
             System.out.println("VIRTUAL_FINANCIAL_ACCOUNTS=" + first.accounts());
@@ -134,8 +160,8 @@ class VirtualFinancialDataManualVerificationTest {
         }
     }
 
-    private static int count(JdbcTemplate jdbc, String sql) {
-        Integer value = jdbc.queryForObject(sql, Integer.class, FIRST_USER_ID, LAST_USER_ID);
+    private static int count(JdbcTemplate jdbc, String sql, Object... arguments) {
+        Integer value = jdbc.queryForObject(sql, Integer.class, arguments);
         return value == null ? 0 : value;
     }
 
@@ -187,9 +213,42 @@ class VirtualFinancialDataManualVerificationTest {
 
         @Bean
         Clock clock() {
-            // 월말로 고정해 "현재 월"이 항상 완결된 3개월 창이 되도록 하고, 기존 고정 건수 검증값을 그대로 유지한다.
-            ZoneId zone = ZoneId.of("Asia/Seoul");
-            return Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
+            // generate()/generateForUsers()는 이 Clock 대신 VirtualDatasetContext.referenceDate()를 쓴다.
+            return Clock.systemDefaultZone();
+        }
+
+        /**
+         * user-service(이슈 #167)가 USERS에 시딩한 provider=NTROPY_TEST 가상회원을 직접 조회한다.
+         * account-service 모듈은 user-service에 컴파일 의존성이 없어 VirtualUserProviderId를 재사용할
+         * 수 없으므로, 같은 provider_id 형식(virtual-user-{순번6자리})만 이 테스트 안에서 다시 파싱한다.
+         * 실행 컨텍스트(dataset-version/reference-date/random-seed)는 user-service의 기본값과 같은
+         * 고정값을 사용한다. 수동 테스트 실행일이 바뀌어도 생성 결과는 달라지지 않는다.
+         */
+        @Bean
+        VirtualUserQueryClient virtualUserQueryClient(DataSource dataSource) {
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+            return () -> {
+                List<VirtualUserIdentity> users = jdbc.query(
+                        "SELECT user_id, provider_id FROM USERS WHERE provider = ? ORDER BY user_id",
+                        (resultSet, rowNumber) -> new VirtualUserIdentity(
+                                resultSet.getLong("user_id"),
+                                parseOrdinal(resultSet.getString("provider_id"))
+                        ),
+                        VIRTUAL_TEST_PROVIDER
+                );
+                List<VirtualUserIdentity> sorted = users.stream()
+                        .sorted(Comparator.comparingInt(VirtualUserIdentity::ordinal))
+                        .toList();
+                return new VirtualUserDataset(MANUAL_DATASET_CONTEXT, sorted);
+            };
+        }
+
+        private static int parseOrdinal(String providerId) {
+            String prefix = "virtual-user-";
+            if (providerId == null || !providerId.startsWith(prefix)) {
+                throw new IllegalStateException("가상회원 provider_id 형식이 올바르지 않습니다: " + providerId);
+            }
+            return Integer.parseInt(providerId.substring(prefix.length()));
         }
 
         @Bean
@@ -198,10 +257,11 @@ class VirtualFinancialDataManualVerificationTest {
                 AccountMapper accountMapper,
                 AccountTransactionMapper transactionMapper,
                 VirtualFinancialTransactionGenerator generator,
-                Clock clock
+                Clock clock,
+                VirtualUserQueryClient virtualUserQueryClient
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator, clock
+                    connectionService, accountMapper, transactionMapper, generator, clock, virtualUserQueryClient
             );
         }
     }
