@@ -59,4 +59,15 @@
         AND deposit_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
+    <select id="findByJobIdInAndDepositDateRangeAndStatus" resultMap="settlementResultMap">
+        SELECT *
+        FROM SETTLEMENT
+        WHERE job_id IN
+        <foreach collection="jobIds" item="jobId" open="(" separator="," close=")">
+            #{jobId}
+        </foreach>
+        AND deposit_date BETWEEN #{startDate} AND #{endDate}
+        AND status = #{status}
+    </select>
+
 </mapper>

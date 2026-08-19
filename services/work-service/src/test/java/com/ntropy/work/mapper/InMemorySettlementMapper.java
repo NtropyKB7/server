@@ -64,6 +64,21 @@ public class InMemorySettlementMapper implements SettlementMapper {
         return result;
     }
 
+    @Override
+    public List<Settlement> findByJobIdInAndDepositDateRangeAndStatus(List<Long> jobIds, LocalDate startDate,
+                                                                       LocalDate endDate, SettlementMatchStatus status) {
+        List<Settlement> result = new ArrayList<>();
+        for (Settlement settlement : store) {
+            if (jobIds.contains(settlement.getJobId())
+                    && !settlement.getDepositDate().isBefore(startDate)
+                    && !settlement.getDepositDate().isAfter(endDate)
+                    && settlement.getStatus() == status) {
+                result.add(settlement);
+            }
+        }
+        return result;
+    }
+
     public List<Settlement> findAll() {
         return store;
     }
