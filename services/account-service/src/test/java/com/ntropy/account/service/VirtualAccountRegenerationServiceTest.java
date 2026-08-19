@@ -39,7 +39,7 @@ class VirtualAccountRegenerationServiceTest {
         Clock clock = Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService dataService = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
-                new VirtualFinancialTransactionGenerator(), clock
+                new VirtualFinancialTransactionGenerator(), clock, null
         );
         VirtualAccountRegenerationService regenerationService =
                 new VirtualAccountRegenerationService(accountMapper, transactionMapper, dataService);
@@ -115,7 +115,7 @@ class VirtualAccountRegenerationServiceTest {
         Clock clock = Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService dataService = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
-                new VirtualFinancialTransactionGenerator(), clock
+                new VirtualFinancialTransactionGenerator(), clock, null
         );
         VirtualAccountRegenerationService regenerationService =
                 new VirtualAccountRegenerationService(accountMapper, transactionMapper, dataService);

@@ -182,6 +182,22 @@ class VirtualFinancialTransactionGeneratorTest {
     }
 
     @Test
+    void appliesDatasetRandomSeedToConsumerProfile() {
+        assertEquals(VirtualFinancialTransactionGenerator.ConsumerProfile.RATIONAL_FRUGAL,
+                VirtualFinancialTransactionGenerator.consumerProfileFor(1, 0L));
+        assertEquals(VirtualFinancialTransactionGenerator.ConsumerProfile.TREND_STATUS,
+                VirtualFinancialTransactionGenerator.consumerProfileFor(1, 1L));
+        assertEquals(VirtualFinancialTransactionGenerator.ConsumerProfile.IMPULSE_INDIFFERENT,
+                VirtualFinancialTransactionGenerator.consumerProfileFor(1, -1L));
+
+        GeneratedTransactions seeded = generator.generate(
+                REFERENCE_DATE, 1, 1L, PersonalBank.SHINHAN_BANK,
+                account(58L, AccountGroup.DEPOSIT_TRUST), account(59L, AccountGroup.DEPOSIT_TRUST)
+        );
+        assertTrue(hasMerchant(seeded, "신세계백화점"));
+    }
+
+    @Test
     void assignsLoggedInUserProfileByStableUserIdHash() {
         for (long userId = 1; userId <= 20; userId++) {
             int expectedIndex = Math.floorMod(Long.hashCode(userId), 4);
