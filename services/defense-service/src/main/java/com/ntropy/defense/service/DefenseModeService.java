@@ -32,6 +32,10 @@ import java.util.stream.Collectors;
 
 @Service
 public class DefenseModeService {
+    private static final int CRITICAL_REMAINING_DAYS = 30;
+    private static final int WARNING_REMAINING_DAYS = 60;
+    private static final int WARNING_REDUCTION_PERCENT = 20;
+
     private final DefenseModeMapper defenseModeMapper;
     private final DiagnosisQueryClient diagnosisQueryClient;
     private final FinancialCommitmentQueryClient financialCommitmentQueryClient;
@@ -259,7 +263,13 @@ public class DefenseModeService {
             dDayReduction = Math.max(defenseMode.getDDay() - dDayAfter, 0);
         }
 
-        FixedExpenseMaintainStatus maintainStatus = maintainStatus(commitment.getExpenseType());
+        FixedExpenseMaintainStatus maintainStatus = maintainStatus(
+                defenseMode.getAvailableAssetsSnapshot(),
+                defenseMode.getDDay(),
+                expectedAmount,
+                dDayAfter,
+                dDayReduction,
+                commitment.getAmountStatus());
         return new FixedExpenseSummary(
                 commitment.getCommitmentId(),
                 commitment.getAccountId(),
@@ -277,17 +287,37 @@ public class DefenseModeService {
                 maintainStatus);
     }
 
-    private FixedExpenseMaintainStatus maintainStatus(String expenseType) {
-        if ("LOAN_REPAYMENT".equals(expenseType)) {
-            return FixedExpenseMaintainStatus.NORMAL;
+    private FixedExpenseMaintainStatus maintainStatus(
+            Long availableAssets,
+            Integer dDayBefore,
+            Long expectedAmount,
+            Integer dDayAfter,
+            Integer dDayReduction,
+            String amountStatus) {
+        if (availableAssets == null
+                || dDayBefore == null
+                || expectedAmount == null
+                || expectedAmount < 0
+                || dDayAfter == null
+                || dDayReduction == null
+                || "INSUFFICIENT".equals(amountStatus)) {
+            return FixedExpenseMaintainStatus.UNDETERMINED;
         }
-        if ("INSURANCE_PREMIUM".equals(expenseType)) {
-            return FixedExpenseMaintainStatus.DIFFICULT;
-        }
-        if ("SAVING_PAYMENT".equals(expenseType)) {
+        if (expectedAmount > availableAssets || dDayAfter < CRITICAL_REMAINING_DAYS) {
             return FixedExpenseMaintainStatus.REVIEW_SUSPENSION;
         }
-        return FixedExpenseMaintainStatus.UNDETERMINED;
+        if (dDayAfter < WARNING_REMAINING_DAYS
+                || reductionPercentAtLeast(dDayBefore, dDayReduction, WARNING_REDUCTION_PERCENT)) {
+            return FixedExpenseMaintainStatus.DIFFICULT;
+        }
+        return FixedExpenseMaintainStatus.NORMAL;
+    }
+
+    private boolean reductionPercentAtLeast(Integer dDayBefore, Integer dDayReduction, int thresholdPercent) {
+        if (dDayBefore <= 0) {
+            return dDayReduction > 0;
+        }
+        return (long) dDayReduction * 100 >= (long) dDayBefore * thresholdPercent;
     }
 
     private String expenseName(String expenseType) {

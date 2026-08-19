@@ -106,14 +106,38 @@ class DefenseModeServiceTest {
         assertEquals(3, result.getExpenses().size());
         assertEquals(38, result.getExpenses().get(0).getDDayAfter());
         assertEquals(4, result.getExpenses().get(0).getDDayReduction());
-        assertEquals(FixedExpenseMaintainStatus.REVIEW_SUSPENSION,
+        assertEquals(FixedExpenseMaintainStatus.DIFFICULT,
                 result.getExpenses().get(0).getMaintainStatus());
         assertEquals(null, result.getExpenses().get(1).getDDayAfter());
         assertEquals(12_500_000L, result.getExpenses().get(1).getOutstandingBalance());
-        assertEquals(FixedExpenseMaintainStatus.NORMAL,
+        assertEquals(FixedExpenseMaintainStatus.UNDETERMINED,
                 result.getExpenses().get(1).getMaintainStatus());
         assertEquals(FixedExpenseMaintainStatus.DIFFICULT,
                 result.getExpenses().get(2).getMaintainStatus());
+    }
+
+    @Test
+    void calculatesMaintainStatusFromAssetsAndPaymentImpactInsteadOfExpenseType() {
+        DefenseModeService fixedExpenseService = new DefenseModeService(
+                new MemoryMapper(),
+                userId -> new DiagnosisDefenseSnapshot(9_000_000L, 0L, 3_000_000L),
+                (userId, fromDate, toDate) -> Arrays.asList(
+                        new FinancialCommitmentSummary(
+                                1L, 10L, "SAVING_PAYMENT", "소액 적금", null,
+                                100_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED"),
+                        new FinancialCommitmentSummary(
+                                2L, 20L, "SAVING_PAYMENT", "고액 적금", null,
+                                8_000_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED")),
+                (userId, fromDate, toDate) -> Collections.emptyList());
+        DefenseMode entered = fixedExpenseService.enter(new DefenseModeEnterCommand(
+                1L, "ACCIDENT_INJURY", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10)));
+
+        FixedExpenseCheckSummary result = fixedExpenseService.getFixedExpenseCheck(entered);
+
+        assertEquals(FixedExpenseMaintainStatus.NORMAL,
+                result.getExpenses().get(0).getMaintainStatus());
+        assertEquals(FixedExpenseMaintainStatus.REVIEW_SUSPENSION,
+                result.getExpenses().get(1).getMaintainStatus());
     }
 
     @Test
