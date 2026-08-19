@@ -101,19 +101,19 @@ class MonthlyExpenseServiceTest {
 
         @Override
         public Long findTotalExpense(
-                Long userId, LocalDate startDate, LocalDate endDate, List<String> loanDisbursementKeywords) {
+                Long userId, LocalDate startDate, LocalDate endDate) {
             return totalExpense;
         }
 
         @Override
         public List<CategoryExpenseAmount> findCategoryExpenses(
-                Long userId, LocalDate startDate, LocalDate endDate, List<String> loanDisbursementKeywords) {
+                Long userId, LocalDate startDate, LocalDate endDate) {
             return categoryExpenses;
         }
 
         @Override
         public Long findFixedExpense(
-                Long userId, LocalDate startDate, LocalDate endDate, List<String> loanDisbursementKeywords) {
+                Long userId, LocalDate startDate, LocalDate endDate) {
             return fixedExpense;
         }
     }

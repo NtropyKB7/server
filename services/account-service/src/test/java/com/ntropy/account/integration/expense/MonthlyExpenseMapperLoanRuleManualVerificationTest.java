@@ -32,11 +32,14 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * 이슈 #143/#169: LOAN 거래 원금 제외·이자 포함 규칙, INSTALLMENT 적립액(in_amount) 집계 규칙,
- * FinancialCommitmentMapper의 최근 정상 상환 선택 규칙이 실제 MySQL에서 의도한 대로
- * 동작하는지 검증하는 수동 테스트입니다.
- * {@code MonthlyExpenseMapperContractTest}는 XML 텍스트만 확인하므로 GREATEST/CASE/LEFT JOIN/
- * REGEXP_REPLACE 같은 실제 SQL 문법 오류나 계산값 자체는 여기서만 잡을 수 있습니다.
+ * 이슈 #143/#148/#169 최종: LOAN·INSTALLMENT의 소비 집계가 ORDINARY와 동일하게
+ * TXN_ANALYSIS(is_consumption/category/expense_type)를 그대로 신뢰하고, 금액만 거래
+ * 유형별 원천(LOAN은 out_amount, INSTALLMENT는 in_amount)에서 가져오는지 검증하는 수동
+ * 테스트입니다. 지급 판정 로직 자체는 더 이상 이 매퍼의 관심사가 아니며(ai-service
+ * TransactionPreClassificationService, #148의 책임), FinancialCommitmentMapper의 "최근
+ * 정상 상환 선택" 로직만 별도로 지급 거래 키워드를 계속 사용하므로 그 부분만 함께 검증한다.
+ * {@code MonthlyExpenseMapperContractTest}는 XML 텍스트만 확인하므로 CASE/INNER JOIN 같은
+ * 실제 SQL 문법 오류나 계산값 자체는 여기서만 잡을 수 있습니다.
  * RUN_MONTHLY_EXPENSE_LOAN_RULE_TEST=true일 때만 실행합니다.
  */
 class MonthlyExpenseMapperLoanRuleManualVerificationTest {
@@ -45,10 +48,10 @@ class MonthlyExpenseMapperLoanRuleManualVerificationTest {
     private static final YearMonth TARGET_MONTH = YearMonth.of(2031, 1);
 
     @Test
-    void loanInterestOnlyRuleAppliesConsistentlyAcrossTotalCategoryAndFixedExpense() throws Exception {
+    void loanAndInstallmentConsumptionFollowsTxnAnalysisJustLikeOrdinary() throws Exception {
         assumeTrue(
                 "true".equalsIgnoreCase(System.getenv("RUN_MONTHLY_EXPENSE_LOAN_RULE_TEST")),
-                "실제 MySQL이 필요한 이슈 #143 LOAN 소비 규칙 수동 검증용 테스트"
+                "실제 MySQL이 필요한 LOAN/INSTALLMENT 소비 규칙 수동 검증용 테스트"
         );
 
         try (AnnotationConfigApplicationContext context =
@@ -61,37 +64,44 @@ class MonthlyExpenseMapperLoanRuleManualVerificationTest {
                     context.getBean(FinancialCommitmentMapper.class);
             LocalDate startDate = TARGET_MONTH.atDay(1);
             LocalDate endDate = TARGET_MONTH.plusMonths(1).atDay(1);
-            List<String> loanDisbursementKeywords = LoanDisbursementKeywords.KEYWORDS;
 
-            Long totalExpense = mapper.findTotalExpense(USER_ID, startDate, endDate, loanDisbursementKeywords);
-            Long fixedExpense = mapper.findFixedExpense(USER_ID, startDate, endDate, loanDisbursementKeywords);
+            Long totalExpense = mapper.findTotalExpense(USER_ID, startDate, endDate);
+            Long fixedExpense = mapper.findFixedExpense(USER_ID, startDate, endDate);
             List<CategoryExpenseAmount> categoryRows =
-                    mapper.findCategoryExpenses(USER_ID, startDate, endDate, loanDisbursementKeywords);
+                    mapper.findCategoryExpenses(USER_ID, startDate, endDate);
             Map<String, Long> categories = categoryRows.stream()
                     .collect(Collectors.toMap(CategoryExpenseAmount::getCategory, CategoryExpenseAmount::getExpenseAmount));
 
-            // T1(FOOD/VARIABLE 50,000) + T2(HOUSING/FIXED 200,000) + T3(비소비, 제외)
-            // + T4(LOAN 원금+이자 중 이자 50,000) + T5(LOAN 원금만, 이자 null → 0)
-            // + T6(LOAN 이자만 30,000) + T7(LOAN out_amount 불일치, 이자 20,000만 반영)
-            // + T8(LOAN 이자 음수 → 제외) + T9(대상월 밖 LOAN, 제외)
-            // + T10(INSTALLMENT, TXN_ANALYSIS 없음, in_amount 150,000 반영)
-            // + T11(대출실행, 양수 이자가 있어도 제외)
-            // + T12(INSTALLMENT, TXN_ANALYSIS 있음, in_amount 80,000 반영, 중복 합산 없음)
-            // + T13(INSTALLMENT, in_amount=0 → 제외) + T14(대상월 밖 INSTALLMENT, 제외)
-            assertEquals(580_000L, totalExpense,
-                    "총소비: LOAN 원금은 제외하고 이자만, INSTALLMENT는 out_amount가 아닌 in_amount만 반영해야 합니다");
-            assertEquals(530_000L, fixedExpense,
-                    "고정지출: HOUSING(FIXED)·LOAN 이자(FINANCE)·INSTALLMENT(FINANCE)는 포함, "
+            // T1(ORDINARY FOOD/VARIABLE 50,000) + T2(ORDINARY HOUSING/FIXED 200,000)
+            // + T3(ORDINARY 비소비, 제외)
+            // + T4(LOAN, TXN_ANALYSIS TRUE/FINANCE/FIXED, out_amount 300,000 전액 반영 -
+            //     원금 포함, #169 최종 정책)
+            // + T5(LOAN, TXN_ANALYSIS FALSE/NULL/NULL - ai-service가 이미 지급 거래로
+            //     판정해둔 상태, out_amount가 있어도 제외)
+            // + T6(LOAN, TXN_ANALYSIS 없음 - 배치 전이라 ORDINARY처럼 그 달 집계에서 제외)
+            // + T7(INSTALLMENT, TXN_ANALYSIS TRUE/FINANCE/FIXED, in_amount 150,000 반영 -
+            //     out_amount는 0이라 무시됨)
+            // + T8(INSTALLMENT, TXN_ANALYSIS 없음 - 제외)
+            // + T9(대상월 밖 LOAN, TXN_ANALYSIS 있어도 날짜 필터로 제외)
+            // LOAN+INSTALLMENT 합계 = T4(300,000) + T7(150,000) = 450,000
+            assertEquals(700_000L, totalExpense,
+                    "총소비: LOAN/INSTALLMENT는 TXN_ANALYSIS.is_consumption을 그대로 따르고, "
+                            + "금액은 LOAN=out_amount·INSTALLMENT=in_amount여야 합니다");
+            assertEquals(650_000L, fixedExpense,
+                    "고정지출: HOUSING(FIXED)·LOAN(FIXED)·INSTALLMENT(FIXED)는 포함, "
                             + "FOOD(VARIABLE)는 제외해야 합니다");
-            assertEquals(Map.of("FOOD", 50_000L, "HOUSING", 200_000L, "FINANCE", 330_000L), categories,
-                    "카테고리별 소비: LOAN 이자·INSTALLMENT는 모두 FINANCE로 합산되어야 합니다");
+            assertEquals(Map.of("FOOD", 50_000L, "HOUSING", 200_000L, "FINANCE", 450_000L), categories,
+                    "카테고리별 소비: LOAN·INSTALLMENT는 TXN_ANALYSIS.category(FINANCE)를 그대로 써야 합니다");
             assertEquals(totalExpense, categories.values().stream().mapToLong(Long::longValue).sum(),
                     "카테고리별 합계는 총소비와 일치해야 합니다");
 
+            // FinancialCommitmentMapper의 "최근 정상 상환 선택"은 TXN_ANALYSIS와 무관하게
+            // loan_transaction_type_name 키워드로 독립 판정한다(방어모드 예상 납입액 추정용,
+            // 이번 정책 변경의 영향을 받지 않는 별도 로직).
             List<LoanCommitmentCandidateRow> loanCommitments =
                     financialCommitmentMapper.findLoanCommitmentCandidates(
                             USER_ID,
-                            loanDisbursementKeywords
+                            LoanDisbursementKeywords.KEYWORDS
                     );
             assertEquals(1, loanCommitments.size(), "LOAN 계좌별 후보는 한 건이어야 합니다");
             LoanCommitmentCandidateRow latestRepayment = loanCommitments.get(0);
@@ -141,65 +151,56 @@ class MonthlyExpenseMapperLoanRuleManualVerificationTest {
             insertOrdinaryTransaction(statement, ordinaryAccount, day5, 80_000, "e2e-143-t3");
             insertClassification(statement, false, null, null);
 
-            // T4: LOAN 원금+이자, out_amount와 원금+이자 합이 일치 - 이자 50,000만 반영.
+            // T4: LOAN, 일간 배치가 이미 정상 상환으로 분류·저장(TRUE/FINANCE/FIXED) - out_amount
+            // 300,000 전액이 소비로 반영돼야 한다(원금 포함, #169 최종 정책).
             insertLoanTransaction(statement, loanAccount, day5, 300_000, 250_000, 50_000, "e2e-143-t4");
-
-            // T5: LOAN 원금만(이자 null) - 총상환액 전체가 소비로 반영되면 안 된다(0 기여).
-            insertLoanTransaction(statement, loanAccount, day5, 250_000, 250_000, null, "e2e-143-t5");
-
-            // T6: LOAN 이자만 - 이자 전액 반영.
-            insertLoanTransaction(statement, loanAccount, day5, 30_000, null, 30_000, "e2e-143-t6");
-
-            // T7: LOAN out_amount(999,000)가 원금+이자 합(120,000)과 다름 - out_amount 무시하고 이자 20,000만 반영.
-            insertLoanTransaction(statement, loanAccount, day5, 999_000, 100_000, 20_000, "e2e-143-t7");
-
-            // T8: LOAN 이자가 음수(비정상 값) - 집계 대상에서 제외돼 총소비를 깎지 않아야 한다.
-            insertLoanTransaction(statement, loanAccount, day5, 95_000, 100_000, -5_000, "e2e-143-t8");
-
-            // T9: 대상월 밖 LOAN 거래 - 날짜 필터로 제외되어야 한다.
-            insertLoanTransaction(statement, loanAccount, previousMonthDay5, 999_999, null, 999_999, "e2e-143-t9");
-
-            // T10: INSTALLMENT 거래, TXN_ANALYSIS 없음 - out_amount가 아닌 in_amount(150,000)가
-            // TXN_ANALYSIS 유무와 무관하게 반영되어야 한다(이슈 #169, 기존에는 0원으로 집계되던 버그).
-            insertInstallmentTransaction(statement, installmentAccount, day5, 150_000, "e2e-169-t10");
-
-            // T11: 대출실행 거래 - 양수 이자가 있어도 상환 거래가 아니므로 제외돼야 한다.
-            insertLoanTransaction(
-                    statement, loanAccount, day5, 1_040_000, 1_000_000, 40_000,
-                    "대출실행", "e2e-143-t11"
-            );
-
-            // T12: INSTALLMENT 거래, TXN_ANALYSIS 있음(TRUE/FINANCE/FIXED) - 분석 행이 있어도
-            // in_amount(80,000)가 정확히 한 번만 합산되어야 한다(중복 집계 없음).
-            insertInstallmentTransaction(statement, installmentAccount, day5, 80_000, "e2e-169-t12");
             insertClassification(statement, true, "FINANCE", "FIXED");
 
-            // T13: INSTALLMENT 거래, in_amount=0 - 집계에 기여하지 않아야 한다.
-            insertInstallmentTransaction(statement, installmentAccount, day5, 0, "e2e-169-t13");
+            // T5: LOAN, 일간 배치가 이미 지급 거래로 분류·저장(FALSE/NULL/NULL) - out_amount가
+            // 있어도 is_consumption=FALSE이므로 제외돼야 한다.
+            insertLoanTransaction(statement, loanAccount, day5, 1_000_000, 1_000_000, null, "e2e-143-t5");
+            insertClassification(statement, false, null, null);
 
-            // T14: 대상월 밖 INSTALLMENT 거래 - 날짜 필터로 제외되어야 한다.
-            insertInstallmentTransaction(statement, installmentAccount, previousMonthDay5, 999_999, "e2e-169-t14");
+            // T6: LOAN, TXN_ANALYSIS 없음(배치 전) - ORDINARY와 동일하게 그 달 집계에서
+            // 제외돼야 한다(배치 지연에 따른 일시적 누락은 이제 이 쿼리가 신경 쓰지 않는다).
+            insertLoanTransaction(statement, loanAccount, day5, 500_000, 500_000, null, "e2e-143-t6");
 
-            // T15: FinancialCommitmentMapper가 선택해야 할 최근 정상 상환. 이자가 NULL이어서
-            // 월간 소비에는 기여하지 않지만 대출 납입 예정 후보에는 포함된다.
+            // T7: INSTALLMENT, TXN_ANALYSIS 있음(TRUE/FINANCE/FIXED) - out_amount는 0이므로
+            // in_amount(150,000)만 반영돼야 한다.
+            insertInstallmentTransaction(statement, installmentAccount, day5, 150_000, "e2e-169-t7");
+            insertClassification(statement, true, "FINANCE", "FIXED");
+
+            // T8: INSTALLMENT, TXN_ANALYSIS 없음(배치 전) - 제외돼야 한다.
+            insertInstallmentTransaction(statement, installmentAccount, day5, 80_000, "e2e-169-t8");
+
+            // T9: 대상월 밖 LOAN 거래(TXN_ANALYSIS 있음) - 날짜 필터로 제외되어야 한다.
+            insertLoanTransaction(statement, loanAccount, previousMonthDay5, 999_999, null, 999_999, "e2e-143-t9");
+            insertClassification(statement, true, "FINANCE", "FIXED");
+
+            // 아래는 FinancialCommitmentMapper 전용 픽스처다. TXN_ANALYSIS와 무관하게
+            // loan_transaction_type_name 키워드로만 "최근 정상 상환"을 고르므로 분석 행을
+            // 만들지 않는다(만들지 않아도 위 월간 소비 집계에는 영향이 없다 - TXN_ANALYSIS가
+            // 없으면 자동으로 제외되기 때문).
+
+            // T10: FinancialCommitmentMapper가 선택해야 할 최근 정상 상환(out_amount 123,000).
             insertLoanTransaction(
                     statement, loanAccount, day5, 123_000, 123_000, null,
-                    "정상상환", "e2e-169-t15"
+                    "정상상환", "e2e-169-t10"
             );
 
-            // T16~T18: T15보다 나중에 저장된 공백 포함 지급 거래. 월간 소비에서 제외되어야 하고,
-            // FinancialCommitmentMapper도 이 거래들을 건너뛰어 T15를 최근 정상 상환으로 선택해야 한다.
+            // T11~T13: T10보다 나중에 저장된 공백 포함 지급 거래. FinancialCommitmentMapper가
+            // 이 거래들을 건너뛰고 T10을 최근 정상 상환으로 선택해야 한다.
             insertLoanTransaction(
                     statement, loanAccount, day5, 2_100_000, 2_000_000, 100_000,
-                    "신 규", "e2e-169-t16"
+                    "신 규", "e2e-169-t11"
             );
             insertLoanTransaction(
                     statement, loanAccount, day5, 2_100_000, 2_000_000, 100_000,
-                    "실 행", "e2e-169-t17"
+                    "실 행", "e2e-169-t12"
             );
             insertLoanTransaction(
                     statement, loanAccount, day5, 2_100_000, 2_000_000, 100_000,
-                    "증 액", "e2e-169-t18"
+                    "증 액", "e2e-169-t13"
             );
         }
     }

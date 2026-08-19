@@ -58,9 +58,9 @@ import com.zaxxer.hikari.HikariDataSource;
  *
  * <p>단위 테스트는 in-memory Mapper로 애플리케이션 로직만 검증하지만, 이 테스트는
  * (1) 시점 기반 잔액 재구성의 상관 서브쿼리·DATE_ADD 활성 판정, (2) 월별 소비 집계에서
- * 계좌 상태 필터 제거, (3) 확정된 행을 보호하는 조건부 upsert SET절, (4) 이슈 #143의 LOAN
- * 원금 제외·이자 포함 집계 규칙(TXN_ANALYSIS 없이 loan_interest_amount에서 직접 계산, out_amount와의
- * 불일치 무시) - 네 가지 모두 실제 MySQL에서 의도한 대로 동작하는지 검증합니다. RUN_DIAGNOSIS_FINALIZATION_TEST=true일
+ * 계좌 상태 필터 제거, (3) 확정된 행을 보호하는 조건부 upsert SET절, (4) LOAN 집계 규칙(TXN_ANALYSIS를
+ * ORDINARY와 동일하게 신뢰하되 금액은 out_amount 전액, #169 최종 정책) - 네 가지 모두 실제 MySQL에서
+ * 의도한 대로 동작하는지 검증합니다. RUN_DIAGNOSIS_FINALIZATION_TEST=true일
  * 때만 실행합니다. account-service/diagnosis-service/defense-service를 모두 참조해야 해서
  * 세 모듈을 전부 의존성으로 갖는 api 모듈에 둡니다(DiagnosisDefenseWiringTest와 동일한 이유).</p>
  *
@@ -113,11 +113,12 @@ class DiagnosisFinalizationManualVerificationTest {
             assertEquals(1_950_000L, finalized.getLiquidAssets(), "시점 기반 자산 재구성 결과가 다릅니다");
             assertEquals(0L, finalized.getSafeAssets());
             // 비활성화된 계좌 B(100,000)가 소비 집계에서 빠지지 않았는지 확인한다.
-            // 650,000(기존 ORDINARY 소비) + 30,000(이슈 #143: LOAN 이자만, 원금·out_amount 불일치 무시) = 680,000.
-            assertEquals(680_000L, finalized.getTotalExpense(), "비활성 계좌의 과거 소비 또는 LOAN 이자 반영이 누락됐습니다");
-            // 400,000(기존 FIXED) + 30,000(LOAN 이자는 예정된 반복 상환이라 고정지출로도 집계) = 430,000.
-            assertEquals(430_000L, finalized.getFixedExpense());
-            assertEquals(2_320_000L, finalized.getNetCashFlow());
+            // 650,000(기존 ORDINARY 소비) + 320,000(LOAN 원금+이자 전액, #169 후속 정책 변경:
+            // c-1 200,000 + c-2 120,000) = 970,000.
+            assertEquals(970_000L, finalized.getTotalExpense(), "비활성 계좌의 과거 소비 또는 LOAN 상환액 반영이 누락됐습니다");
+            // 400,000(기존 FIXED) + 320,000(LOAN 상환액은 예정된 반복 상환이라 고정지출로도 집계) = 720,000.
+            assertEquals(720_000L, finalized.getFixedExpense());
+            assertEquals(2_030_000L, finalized.getNetCashFlow());
 
             // 확정된 행을 다른 값으로 다시 upsert 시도한다. 애플리케이션 사전 체크를 우회해
             // SQL의 조건부 SET절 자체가 실제 MySQL에서 보호하는지 직접 검증한다.
@@ -138,15 +139,16 @@ class DiagnosisFinalizationManualVerificationTest {
                     context.getBean(LocalDiagnosisAnalysisQueryClient.class);
             DiagnosisAnalysisSummary analysis = analysisQueryClient.getMonthlyAnalysis(USER_ID, targetMonth);
             assertTrue(analysis.isFinalized());
-            assertEquals(680_000L, analysis.getTotalExpense());
+            assertEquals(970_000L, analysis.getTotalExpense());
             assertFalse(analysis.getCategoryExpenses().isEmpty());
-            // 이슈 #143: LOAN 이자(30,000 + 0)만 category='FINANCE'로 합산되고 원금은 어디에도 섞이지 않는다.
+            // #169 후속 정책 변경: LOAN 상환액(200,000 + 120,000, 원금 포함)이 모두
+            // category='FINANCE'로 합산된다.
             long financeCategoryAmount = analysis.getCategoryExpenses().stream()
                     .filter(category -> "FINANCE".equals(category.getCategory()))
                     .mapToLong(category -> category.getAmount() == null ? 0L : category.getAmount())
                     .findFirst()
                     .orElse(-1L);
-            assertEquals(30_000L, financeCategoryAmount, "LOAN 이자 카테고리(FINANCE) 합계가 다릅니다");
+            assertEquals(320_000L, financeCategoryAmount, "LOAN 상환액 카테고리(FINANCE) 합계가 다릅니다");
             long categoryExpenseSum = analysis.getCategoryExpenses().stream()
                     .mapToLong(category -> category.getAmount() == null ? 0L : category.getAmount())
                     .sum();
@@ -264,9 +266,11 @@ class DiagnosisFinalizationManualVerificationTest {
             insertTransaction(statement, accountB, day15, 100_000, 0, 500_000, "e2e-138-b-1");
             insertClassification(statement, true, "INSURANCE", "FIXED");
 
-            // 계좌 C: LOAN 전용 계좌. 이슈 #143 - LOAN은 TXN_ANALYSIS 행 없이(무분석 상태) 원금은
-            // 제외하고 loan_interest_amount만 결정적으로 소비에 반영돼야 한다. deposit_type_code=40이라
-            // liquidAssets/safeAssets에는 섞이지 않는다(FinancialPositionService 참고).
+            // 계좌 C: LOAN 전용 계좌. LOAN도 이제 ORDINARY와 동일하게 TXN_ANALYSIS를 그대로
+            // 신뢰하므로(ai-service TransactionPreClassificationService가 이미 분류·저장했다고
+            // 가정), 두 거래 모두 TRUE/FINANCE/FIXED로 분류해둔다. 금액은 out_amount 전액이
+            // 소비로 반영된다(원금 포함, #169 최종 정책).
+            // deposit_type_code=40이라 liquidAssets/safeAssets에는 섞이지 않는다(FinancialPositionService 참고).
             statement.execute(
                     "INSERT INTO ACCOUNT (codef_connection_id, user_id, organization_code, account_group, "
                             + "deposit_type_code, account_no_masked, account_no_hash, balance, currency_code, "
@@ -278,12 +282,14 @@ class DiagnosisFinalizationManualVerificationTest {
 
             // out_amount(200,000)가 원금+이자 합(180,000)과 다른 실제 CODEF 케이스를 재현한다 - CODEF가
             // resTranAmount를 총상환액으로 별도 제공하고 원금·이자와 반드시 일치하지 않을 수 있다는 전제(참고
-            // LoanTransactionResponseParser.repaymentAmount). out_amount는 무시하고 loan_interest_amount
-            // (30,000)만 소비로 반영돼야 한다. TXN_ANALYSIS 행은 만들지 않는다(무분석 상태).
+            // LoanTransactionResponseParser.repaymentAmount). #169 최종 정책으로 원금+이자 합과의
+            // 불일치 여부와 무관하게 out_amount(200,000)를 그대로 소비로 반영한다.
             insertLoanTransaction(statement, accountC, day5, 200_000, 150_000, 30_000, 4_850_000, "e2e-143-c-1");
+            insertClassification(statement, true, "FINANCE", "FIXED");
 
-            // 원금만 있고 이자가 null인 거래 - 총상환액(120,000) 전체가 소비로 반영되면 안 되고 0을 기여해야 한다.
+            // 원금만 있고 이자가 null인 거래 - 원금도 이제 소비이므로 out_amount(120,000) 전액을 반영한다.
             insertLoanTransaction(statement, accountC, day8, 120_000, 120_000, null, 4_730_000, "e2e-143-c-2");
+            insertClassification(statement, true, "FINANCE", "FIXED");
         }
     }
 
