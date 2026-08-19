@@ -142,8 +142,15 @@ public class VirtualFinancialTransactionGenerator {
 
     public GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, PersonalBank bank,
                                           Account ordinaryAccount, Account secondaryAccount) {
+        return generate(referenceDate, userOrdinal, 0L, bank, ordinaryAccount, secondaryAccount);
+    }
+
+    /** 공용 데이터셋 seed와 사용자 순번으로 소비 프로필을 결정해 거래를 생성한다. */
+    public GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, long randomSeed,
+                                          PersonalBank bank, Account ordinaryAccount, Account secondaryAccount) {
         return generate(
-                referenceDate, userOrdinal, consumerProfileFor(userOrdinal), bank, ordinaryAccount, secondaryAccount
+                referenceDate, userOrdinal, consumerProfileFor(userOrdinal, randomSeed),
+                bank, ordinaryAccount, secondaryAccount
         );
     }
 
@@ -168,7 +175,7 @@ public class VirtualFinancialTransactionGenerator {
         if (referenceDate == null) {
             throw new IllegalArgumentException("기준일이 필요합니다");
         }
-        if (userOrdinal < 1 || userOrdinal > VirtualFinancialDataService.USER_COUNT) {
+        if (userOrdinal < 1) {
             throw new IllegalArgumentException("가상 사용자 순번이 범위를 벗어났습니다: " + userOrdinal);
         }
 
@@ -681,8 +688,13 @@ public class VirtualFinancialTransactionGenerator {
     }
 
     static ConsumerProfile consumerProfileFor(int userOrdinal) {
+        return consumerProfileFor(userOrdinal, 0L);
+    }
+
+    static ConsumerProfile consumerProfileFor(int userOrdinal, long randomSeed) {
         ConsumerProfile[] profiles = ConsumerProfile.values();
-        return profiles[Math.floorMod(userOrdinal - 1, profiles.length)];
+        int index = (int) Math.floorMod((userOrdinal - 1L) + randomSeed, (long) profiles.length);
+        return profiles[index];
     }
 
     static ConsumerProfile consumerProfileForUser(Long userId) {
