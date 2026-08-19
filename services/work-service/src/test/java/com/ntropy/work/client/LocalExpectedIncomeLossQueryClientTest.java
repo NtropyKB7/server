@@ -19,8 +19,11 @@ import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 import com.ntropy.work.service.CategoryService;
 import com.ntropy.work.service.JobService;
+import com.ntropy.work.service.RecommendedWorkHoursService;
+import com.ntropy.work.service.SavingGoalService;
 
 class LocalExpectedIncomeLossQueryClientTest {
 
@@ -34,8 +37,13 @@ class LocalExpectedIncomeLossQueryClientTest {
         jobMapper = new InMemoryJobMapper();
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
+        InMemoryAllocationGoalMapper allocationGoalMapper = new InMemoryAllocationGoalMapper();
+        SavingGoalService savingGoalService = new SavingGoalService(new InMemorySavingGoalMapper(), allocationGoalMapper);
+        RecommendedWorkHoursService recommendedWorkHoursService =
+                new RecommendedWorkHoursService(savingGoalService, jobMapper, allocationGoalMapper);
         JobService jobService = new JobService(
-                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(categoryMapper), new InMemoryAllocationGoalMapper());
+                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(categoryMapper),
+                allocationGoalMapper, recommendedWorkHoursService);
         client = new LocalExpectedIncomeLossQueryClient(jobService);
     }
 

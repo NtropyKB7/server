@@ -21,6 +21,7 @@ import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
+import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 
 class JobServiceTest {
 
@@ -36,7 +37,12 @@ class JobServiceTest {
         jobScheduleMapper = new InMemoryJobScheduleMapper();
         InMemoryCategoryMapper categoryMapper = new InMemoryCategoryMapper();
         categoryMapper.seed(Category.builder().categoryId(1L).name("배달").build());
-        jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper), new InMemoryAllocationGoalMapper());
+        InMemoryAllocationGoalMapper allocationGoalMapper = new InMemoryAllocationGoalMapper();
+        SavingGoalService savingGoalService = new SavingGoalService(new InMemorySavingGoalMapper(), allocationGoalMapper);
+        RecommendedWorkHoursService recommendedWorkHoursService =
+                new RecommendedWorkHoursService(savingGoalService, jobMapper, allocationGoalMapper);
+        jobService = new JobService(jobMapper, jobScheduleMapper, new CategoryService(categoryMapper),
+                allocationGoalMapper, recommendedWorkHoursService);
     }
 
     private Job.JobBuilder baseJob() {

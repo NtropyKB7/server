@@ -9,14 +9,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
-import com.ntropy.work.mapper.InMemoryCategoryMapper;
 import com.ntropy.work.mapper.InMemoryJobMapper;
-import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
 import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 
 class RecommendedWorkHoursServiceTest {
@@ -35,30 +32,6 @@ class RecommendedWorkHoursServiceTest {
         savingGoalMapper = new InMemorySavingGoalMapper();
         allocationGoalMapper = new InMemoryAllocationGoalMapper();
 
-        /*
-         * JobService가 잡 등록 시 카테고리 존재 여부를 확인하므로
-         * 테스트용 카테고리를 준비합니다.
-         */
-        InMemoryCategoryMapper categoryMapper =
-                new InMemoryCategoryMapper();
-
-        categoryMapper.seed(
-                Category.builder()
-                        .categoryId(1L)
-                        .name("테스트 카테고리")
-                        .build()
-        );
-
-        CategoryService categoryService =
-                new CategoryService(categoryMapper);
-
-        JobService jobService = new JobService(
-                jobMapper,
-                new InMemoryJobScheduleMapper(),
-                categoryService,
-                allocationGoalMapper
-        );
-
         SavingGoalService savingGoalService =
                 new SavingGoalService(
                         savingGoalMapper,
@@ -67,7 +40,7 @@ class RecommendedWorkHoursServiceTest {
 
         service = new RecommendedWorkHoursService(
                 savingGoalService,
-                jobService,
+                jobMapper,
                 allocationGoalMapper
         );
     }

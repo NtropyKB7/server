@@ -53,8 +53,12 @@ class CalendarServiceTest {
         workLogMapper = new InMemoryWorkLogMapper();
         allocationGoalMapper = new InMemoryAllocationGoalMapper();
         savingGoalMapper = new InMemorySavingGoalMapper();
+        SavingGoalService savingGoalService = new SavingGoalService(savingGoalMapper, allocationGoalMapper);
+        RecommendedWorkHoursService recommendedWorkHoursService =
+                new RecommendedWorkHoursService(savingGoalService, jobMapper, allocationGoalMapper);
         jobService = new JobService(
-                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()), new InMemoryAllocationGoalMapper()
+                jobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()),
+                allocationGoalMapper, recommendedWorkHoursService
         );
 
         calendarService = new CalendarService(
@@ -205,8 +209,15 @@ class CalendarServiceTest {
     @DisplayName("일간 요약의 피로도 게이지는 FatigueService 결과를 그대로 담는다")
     void dailySummary_attachesFatigueGaugeFromFatigueService() {
         CalendarFatigueGauge gauge = new CalendarFatigueGauge(42, "LOW", false);
+        InMemoryJobMapper freshJobMapper = new InMemoryJobMapper();
+        InMemoryAllocationGoalMapper freshAllocationGoalMapper = new InMemoryAllocationGoalMapper();
+        SavingGoalService freshSavingGoalService =
+                new SavingGoalService(new InMemorySavingGoalMapper(), freshAllocationGoalMapper);
+        RecommendedWorkHoursService freshRecommendedWorkHoursService =
+                new RecommendedWorkHoursService(freshSavingGoalService, freshJobMapper, freshAllocationGoalMapper);
         JobService jobService = new JobService(
-                new InMemoryJobMapper(), new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()), new InMemoryAllocationGoalMapper()
+                freshJobMapper, new InMemoryJobScheduleMapper(), new CategoryService(new InMemoryCategoryMapper()),
+                freshAllocationGoalMapper, freshRecommendedWorkHoursService
         );
         CalendarService service = new CalendarService(
                 workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(gauge),
