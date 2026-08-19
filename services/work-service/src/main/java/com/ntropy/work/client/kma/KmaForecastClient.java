@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -31,6 +33,10 @@ public class KmaForecastClient {
     private final RestTemplate restTemplate;
     private final WeatherProperties properties;
 
+    // 격자(nx, ny) 단위 캐시. 기상청 단기예보는 발표시각(baseDateTime) 단위로만 갱신되므로,
+    // 같은 격자에 대해 발표시각이 그대로면 캐시를 그대로 쓰고, 발표시각이 바뀌면 갱신한다.
+    private final Map<GridKey, CacheEntry> forecastCache = new ConcurrentHashMap<>();
+
     public KmaForecastClient(
             @Qualifier("weatherRestTemplate") RestTemplate restTemplate,
             WeatherProperties properties
@@ -42,6 +48,18 @@ public class KmaForecastClient {
     public List<KmaForecastItem> fetchForecastItems(int nx, int ny) {
         BaseDateTime baseDateTime = resolveBaseDateTime(LocalDateTime.now());
 
+        GridKey gridKey = new GridKey(nx, ny);
+        CacheEntry cached = forecastCache.get(gridKey);
+        if (cached != null && cached.baseDateTime().equals(baseDateTime)) {
+            return cached.items();
+        }
+
+        List<KmaForecastItem> items = fetchFromKma(nx, ny, baseDateTime);
+        forecastCache.put(gridKey, new CacheEntry(baseDateTime, items));
+        return items;
+    }
+
+    private List<KmaForecastItem> fetchFromKma(int nx, int ny, BaseDateTime baseDateTime) {
         String encodedQuery = UriComponentsBuilder.newInstance()
                 .queryParam("dataType", "JSON")
                 .queryParam("numOfRows", 1000)
@@ -87,6 +105,12 @@ public class KmaForecastClient {
     }
 
     private record BaseDateTime(LocalDate date, int hour) {
+    }
+
+    private record GridKey(int nx, int ny) {
+    }
+
+    private record CacheEntry(BaseDateTime baseDateTime, List<KmaForecastItem> items) {
     }
 }
 
