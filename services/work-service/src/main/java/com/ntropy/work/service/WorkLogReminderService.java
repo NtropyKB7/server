@@ -11,6 +11,7 @@ import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
+import com.ntropy.work.domain.WorkLogStatus;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.WorkLogMapper;
 
@@ -27,7 +28,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WorkLogReminderService {
 
-    private static final String STATUS_PLANNED = "PLANNED";
+    private static final String STATUS_PLANNED = WorkLogStatus.PLANNED;
     private static final int UNCONFIRMED_REMINDER_DELAY_MINUTES = 60;
 
     private final ActiveUserQueryClient activeUserQueryClient;

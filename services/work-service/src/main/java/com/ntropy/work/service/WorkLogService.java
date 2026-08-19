@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.work.domain.WorkLogSettlementStatusCalculator;
+import com.ntropy.work.domain.WorkLogStatus;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
 import com.ntropy.work.domain.entity.Platform;
@@ -30,8 +31,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WorkLogService {
 
-    private static final String STATUS_PLANNED = "PLANNED";
-    private static final String STATUS_CONFIRMED = "CONFIRMED";
+    private static final String STATUS_PLANNED = WorkLogStatus.PLANNED;
+    private static final String STATUS_CONFIRMED = WorkLogStatus.CONFIRMED;
     private static final String TRIGGER_ON_DEMAND = "ON_DEMAND";
 
     private final WorkLogMapper workLogMapper;

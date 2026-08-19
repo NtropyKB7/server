@@ -23,14 +23,17 @@ import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
 import com.ntropy.common.dto.work.summary.CalendarWorkBrief;
 import com.ntropy.common.dto.work.summary.WeatherForecast;
 import com.ntropy.common.dto.work.summary.WeatherForecastList;
+import com.ntropy.work.domain.WorkLogStatus;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.AllocationGoalMapper;
 import com.ntropy.work.mapper.SavingGoalMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
+import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.util.WorkTimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -56,6 +59,7 @@ public class CalendarService {
     }
 
     private final WorkLogMapper workLogMapper;
+    private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private final AllocationGoalMapper allocationGoalMapper;
     private final SavingGoalMapper savingGoalMapper;
     private final JobService jobService;
@@ -74,6 +78,8 @@ public class CalendarService {
         List<Long> jobIds = jobs.stream().map(Job::getJobId).collect(Collectors.toList());
 
         List<WorkLog> workLogs = workLogMapper.findByUserIdAndDateRange(userId, startDate, endDate);
+        List<WorkLogPlatformIncome> confirmedIncomes =
+                workLogPlatformIncomeMapper.findConfirmedByUserIdAndDateRange(userId, startDate, endDate);
         List<AllocationGoal> allocationGoals = jobIds.isEmpty()
                 ? List.of()
                 : allocationGoalMapper.findByJobIdsAndTargetMonth(jobIds, targetMonth);
@@ -81,7 +87,7 @@ public class CalendarService {
 
         Map<LocalDate, WeatherForecast> weatherByDate = weatherByDate(latitude, longitude);
 
-        CalendarMonthlyHours hours = summarizeHours(workLogs, allocationGoals, savingGoal);
+        CalendarMonthlyHours hours = summarizeHours(workLogs, confirmedIncomes, allocationGoals, savingGoal);
         List<CalendarDaySummary> days = summarizeDays(workLogs, jobNames, weatherByDate);
 
         return new CalendarMonthlySummary(year, month, hours, days);
@@ -134,27 +140,44 @@ public class CalendarService {
     }
 
     /**
-     * plannedHours: 해당 월 ALLOCATION_GOAL(잡별 추천 근무시간) 합
-     * actualHours: 해당 월 WORK_LOG 전체(PLANNED+CONFIRMED) 근무시간 합
+     * goalHours: 해당 월 ALLOCATION_GOAL(잡별 추천 근무시간) 합
+     * confirmedHours/scheduledHours: 해당 월 WORK_LOG를 status(CONFIRMED/PLANNED) 기준으로 나눈 근무시간 합
+     * expectedSettlementIncome: expectedIncome(전체 예상소득) - CONFIRMED 근무일지에 딸린
+     *   WORK_LOG_PLATFORM_INCOME 행 중 이미 COMPLETED로 정산 완료된 행들의 expectedAmount 합.
+     *   플랫폼별 income 행 단위로 계산하므로, 여러 플랫폼 중 일부만 정산된 PARTIAL 근무일지도
+     *   완료된 플랫폼 몫만 정확히 제외된다. 실제 입금액(actualIncome)은 SETTLEMENT 테이블
+     *   기반이라 여기서는 계산하지 않는다 - IncomeAnalysisQueryClient를 따로 써야 한다.
      * targetAmount: 해당 월 SAVING_GOAL이 없으면 null (달성률 미표시는 프론트 책임)
      */
-    private CalendarMonthlyHours summarizeHours(List<WorkLog> workLogs, List<AllocationGoal> allocationGoals,
-                                                 SavingGoal savingGoal) {
-        int plannedHours = allocationGoals.stream()
+    private CalendarMonthlyHours summarizeHours(List<WorkLog> workLogs, List<WorkLogPlatformIncome> confirmedIncomes,
+                                                 List<AllocationGoal> allocationGoals, SavingGoal savingGoal) {
+        int goalHours = allocationGoals.stream()
                 .mapToInt(goal -> goal.getRecommendHour() == null ? 0 : goal.getRecommendHour().intValue())
                 .sum();
 
-        int actualHours = 0;
+        int confirmedHours = 0;
+        int scheduledHours = 0;
         long expectedIncome = 0;
         for (WorkLog workLog : workLogs) {
-            actualHours += WorkTimeUtils.durationHours(workLog.getStartTime(), workLog.getEndTime());
-            if (workLog.getEstimatedIncome() != null) {
-                expectedIncome += workLog.getEstimatedIncome();
+            int hours = WorkTimeUtils.durationHours(workLog.getStartTime(), workLog.getEndTime());
+            long income = workLog.getEstimatedIncome() == null ? 0 : workLog.getEstimatedIncome();
+            if (WorkLogStatus.CONFIRMED.equals(workLog.getStatus())) {
+                confirmedHours += hours;
+            } else if (WorkLogStatus.PLANNED.equals(workLog.getStatus())) {
+                scheduledHours += hours;
             }
+            expectedIncome += income;
         }
 
+        long completedFromPlatforms = confirmedIncomes.stream()
+                .filter(income -> SettlementStatus.COMPLETED.equals(income.getSettlementStatus()))
+                .mapToLong(income -> income.getExpectedAmount() == null ? 0 : income.getExpectedAmount())
+                .sum();
+        long expectedSettlementIncome = expectedIncome - completedFromPlatforms;
+
         Long targetAmount = savingGoal == null ? null : savingGoal.getTargetAmount();
-        return new CalendarMonthlyHours(plannedHours, actualHours, expectedIncome, targetAmount);
+        return new CalendarMonthlyHours(goalHours, confirmedHours, scheduledHours, expectedIncome,
+                expectedSettlementIncome, targetAmount);
     }
 
     private List<CalendarDaySummary> summarizeDays(List<WorkLog> workLogs, Map<Long, String> jobNames,
