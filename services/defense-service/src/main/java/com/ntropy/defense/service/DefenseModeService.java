@@ -24,8 +24,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,6 +43,7 @@ public class DefenseModeService {
     private final DiagnosisQueryClient diagnosisQueryClient;
     private final FinancialCommitmentQueryClient financialCommitmentQueryClient;
     private final ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient;
+    private final Clock clock;
 
     @Autowired
     public DefenseModeService(
@@ -53,7 +57,8 @@ public class DefenseModeService {
                 financialCommitmentQueryClientProvider.getIfAvailable(
                         () -> (userId, fromDate, toDate) -> Collections.emptyList()),
                 expectedIncomeLossQueryClientProvider.getIfAvailable(
-                        () -> (userId, fromDate, toDate) -> Collections.emptyList()));
+                        () -> (userId, fromDate, toDate) -> Collections.emptyList()),
+                Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
     public DefenseModeService(
@@ -61,10 +66,21 @@ public class DefenseModeService {
             DiagnosisQueryClient diagnosisQueryClient,
             FinancialCommitmentQueryClient financialCommitmentQueryClient,
             ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient) {
+        this(defenseModeMapper, diagnosisQueryClient, financialCommitmentQueryClient,
+                expectedIncomeLossQueryClient, Clock.system(ZoneId.of("Asia/Seoul")));
+    }
+
+    public DefenseModeService(
+            DefenseModeMapper defenseModeMapper,
+            DiagnosisQueryClient diagnosisQueryClient,
+            FinancialCommitmentQueryClient financialCommitmentQueryClient,
+            ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient,
+            Clock clock) {
         this.defenseModeMapper = defenseModeMapper;
         this.diagnosisQueryClient = diagnosisQueryClient;
         this.financialCommitmentQueryClient = financialCommitmentQueryClient;
         this.expectedIncomeLossQueryClient = expectedIncomeLossQueryClient;
+        this.clock = clock;
     }
 
     @Transactional
@@ -94,6 +110,10 @@ public class DefenseModeService {
             throw new ServiceException(DefenseErrorCode.NOT_FOUND);
         }
         return defenseMode;
+    }
+
+    public Integer getCurrentDDay(DefenseMode defenseMode) {
+        return currentDefenseState(defenseMode).dDay;
     }
 
     public List<DefenseMode> getCalendarPeriods(Long userId, LocalDate from, LocalDate to) {
@@ -247,25 +267,26 @@ public class DefenseModeService {
     private FixedExpenseSummary toFixedExpense(
             DefenseMode defenseMode,
             FinancialCommitmentSummary commitment) {
+        CurrentDefenseState currentState = currentDefenseState(defenseMode);
         Integer dDayAfter = null;
         Integer dDayReduction = null;
         Long expectedAmount = commitment.getExpectedAmount();
-        if (defenseMode.getDDay() != null
-                && defenseMode.getAvailableAssetsSnapshot() != null
+        if (currentState.dDay != null
+                && currentState.availableAssets != null
                 && defenseMode.getDailyExpense() != null
                 && defenseMode.getDailyExpense() > 0
                 && expectedAmount != null
                 && expectedAmount >= 0
                 && !"INSUFFICIENT".equals(commitment.getAmountStatus())) {
-            long assetsAfterPayment = Math.max(defenseMode.getAvailableAssetsSnapshot() - expectedAmount, 0L);
+            long assetsAfterPayment = Math.max(currentState.availableAssets - expectedAmount, 0L);
             long calculatedDays = assetsAfterPayment / defenseMode.getDailyExpense();
             dDayAfter = calculatedDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculatedDays;
-            dDayReduction = Math.max(defenseMode.getDDay() - dDayAfter, 0);
+            dDayReduction = Math.max(currentState.dDay - dDayAfter, 0);
         }
 
         FixedExpenseMaintainStatus maintainStatus = maintainStatus(
-                defenseMode.getAvailableAssetsSnapshot(),
-                defenseMode.getDDay(),
+                currentState.availableAssets,
+                currentState.dDay,
                 expectedAmount,
                 dDayAfter,
                 dDayReduction,
@@ -281,10 +302,46 @@ public class DefenseModeService {
                 commitment.getNextPaymentDate(),
                 commitment.getAmountStatus(),
                 commitment.getDateStatus(),
-                defenseMode.getDDay(),
+                currentState.dDay,
                 dDayAfter,
                 dDayReduction,
                 maintainStatus);
+    }
+
+    private CurrentDefenseState currentDefenseState(DefenseMode defenseMode) {
+        if (defenseMode == null
+                || defenseMode.getAvailableAssetsSnapshot() == null
+                || defenseMode.getDailyExpense() == null
+                || defenseMode.getDailyExpense() <= 0
+                || defenseMode.getDDay() == null) {
+            return new CurrentDefenseState(null, null);
+        }
+
+        long elapsedDays = Math.max(
+                ChronoUnit.DAYS.between(defenseMode.getUnavailableStartDate(), LocalDate.now(clock)),
+                0L);
+        long availableAssets = defenseMode.getAvailableAssetsSnapshot();
+        long dailyExpense = defenseMode.getDailyExpense();
+        long remainingAssets;
+        if (elapsedDays > availableAssets / dailyExpense) {
+            remainingAssets = 0L;
+        } else {
+            remainingAssets = availableAssets - dailyExpense * elapsedDays;
+        }
+
+        long calculatedDays = remainingAssets / dailyExpense;
+        int remainingDDay = calculatedDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculatedDays;
+        return new CurrentDefenseState(remainingAssets, remainingDDay);
+    }
+
+    private static class CurrentDefenseState {
+        private final Long availableAssets;
+        private final Integer dDay;
+
+        private CurrentDefenseState(Long availableAssets, Integer dDay) {
+            this.availableAssets = availableAssets;
+            this.dDay = dDay;
+        }
     }
 
     private FixedExpenseMaintainStatus maintainStatus(
