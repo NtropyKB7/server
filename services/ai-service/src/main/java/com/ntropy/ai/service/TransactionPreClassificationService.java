@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.common.domain.LoanDisbursementKeywords;
 import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
 import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
 
@@ -15,14 +16,6 @@ import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
  */
 @Service
 public class TransactionPreClassificationService {
-
-    private static final List<String> LOAN_DISBURSEMENT_KEYWORDS =
-            List.of(
-                    "신규",
-                    "실행",
-                    "대출실행",
-                    "증액"
-            );
 
     private static final List<String> FINANCIAL_TRANSFER_KEYWORDS =
             List.of(
@@ -87,14 +80,17 @@ public class TransactionPreClassificationService {
 
         /*
          * LOAN 신규·실행·증액은 대출금 지급 거래이므로 비소비입니다.
+         * 판정 키워드는 LoanDisbursementKeywords(common)를 MonthlyExpenseMapper·
+         * FinancialCommitmentMapper의 SQL 판정과 공유합니다.
          *
-         * 그 외 LOAN 거래는 정상 상환으로 보고 총상환액 전체를
-         * FINANCE / FIXED 소비로 처리합니다.
+         * 그 외 LOAN 거래는 정상 상환으로 보고 FINANCE / FIXED 소비로 분류합니다.
+         * 여기서는 분류 정보(is_consumption/category/expense_type)만 저장하며 금액은
+         * 저장하지 않습니다. 월간 집계 금액(원금 제외, 이자만 소비)은 MonthlyExpenseMapper가
+         * ACCOUNT_TRANSACTION에서 별도로 결정적으로 계산합니다.
          */
         if ("LOAN".equals(transactionCategory)) {
-            if (containsAny(
-                    transaction.getLoanTransactionTypeName(),
-                    LOAN_DISBURSEMENT_KEYWORDS
+            if (LoanDisbursementKeywords.matches(
+                    transaction.getLoanTransactionTypeName()
             )) {
                 return Optional.of(
                         nonConsumption(transaction.getTransactionId())
