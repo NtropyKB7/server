@@ -43,7 +43,7 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
 
     @Override
     public DefenseModeSummary enter(DefenseModeEnterCommand command) {
-        return toSummary(defenseModeService.enter(command), null, null, null);
+        return toSummary(defenseModeService.enter(command), null, null, null, null);
     }
 
     @Override
@@ -55,7 +55,12 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
                 true,
                 "DISPLAY_ONLY",
                 "근무 추천과 자동 저축을 잠시 멈춘 상태입니다.");
-        return toSummary(defenseMode, fixedExpenseCheck, expectedIncomeLoss, growthMode);
+        return toSummary(
+                defenseMode,
+                fixedExpenseCheck,
+                expectedIncomeLoss,
+                growthMode,
+                defenseModeService.getCurrentDDay(defenseMode));
     }
 
     @Override
@@ -72,14 +77,15 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
 
     @Override
     public DefenseModeSummary release(Long defenseId, DefenseModeReleaseCommand command) {
-        return toSummary(defenseModeService.release(defenseId, command), null, null, null);
+        return toSummary(defenseModeService.release(defenseId, command), null, null, null, null);
     }
 
     private DefenseModeSummary toSummary(
             DefenseMode defenseMode,
             FixedExpenseCheckSummary fixedExpenseCheck,
             ExpectedIncomeLossSummary expectedIncomeLoss,
-            GrowthModeSummary growthMode) {
+            GrowthModeSummary growthMode,
+            Integer dDayOverride) {
         List<DefenseChecklistSummary> checklist = DefenseChecklistCatalog.findBy(defenseMode.getCauseCode()).stream()
                 .map(item -> new DefenseChecklistSummary(item.name(), item.getTitle(), item.getDescription()))
                 .collect(Collectors.toList());
@@ -89,7 +95,8 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
                 defenseMode.getUnavailableStartDate(), defenseMode.getExpectedReturnDate(),
                 defenseMode.getReturnDate(), defenseMode.getReserveAmountSnapshot(),
                 defenseMode.getSafeAssetAmountSnapshot(), defenseMode.getAvailableAssetsSnapshot(),
-                defenseMode.getAverageMonthlyExpense(), defenseMode.getDailyExpense(), defenseMode.getDDay(),
+                defenseMode.getAverageMonthlyExpense(), defenseMode.getDailyExpense(),
+                dDayOverride == null ? defenseMode.getDDay() : dDayOverride,
                 defenseMode.getCalculationStatus() == null ? null : defenseMode.getCalculationStatus().name(),
                 defenseMode.getStatus().name(),
                 defenseMode.getCreatedAt(), checklist, fixedExpenseCheck, expectedIncomeLoss, growthMode);

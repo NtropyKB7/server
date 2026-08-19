@@ -15,7 +15,9 @@ import com.ntropy.defense.domain.DefenseModeStatus;
 import com.ntropy.defense.mapper.DefenseModeMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
@@ -96,7 +98,8 @@ class DefenseModeServiceTest {
                         new FinancialCommitmentSummary(
                                 3L, 30L, "INSURANCE_PREMIUM", "실비 보험", null,
                                 100_000L, LocalDate.of(2026, 8, 7), "CONFIRMED", "CONFIRMED")),
-                (userId, fromDate, toDate) -> Collections.emptyList());
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                clockAt(LocalDate.of(2026, 8, 3)));
         DefenseMode entered = fixedExpenseService.enter(new DefenseModeEnterCommand(
                 1L, "ACCIDENT_INJURY", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10)));
 
@@ -106,14 +109,64 @@ class DefenseModeServiceTest {
         assertEquals(3, result.getExpenses().size());
         assertEquals(38, result.getExpenses().get(0).getDDayAfter());
         assertEquals(4, result.getExpenses().get(0).getDDayReduction());
-        assertEquals(FixedExpenseMaintainStatus.REVIEW_SUSPENSION,
+        assertEquals(FixedExpenseMaintainStatus.DIFFICULT,
                 result.getExpenses().get(0).getMaintainStatus());
         assertEquals(null, result.getExpenses().get(1).getDDayAfter());
         assertEquals(12_500_000L, result.getExpenses().get(1).getOutstandingBalance());
-        assertEquals(FixedExpenseMaintainStatus.NORMAL,
+        assertEquals(FixedExpenseMaintainStatus.UNDETERMINED,
                 result.getExpenses().get(1).getMaintainStatus());
         assertEquals(FixedExpenseMaintainStatus.DIFFICULT,
                 result.getExpenses().get(2).getMaintainStatus());
+    }
+
+    @Test
+    void calculatesMaintainStatusFromAssetsAndPaymentImpactInsteadOfExpenseType() {
+        DefenseModeService fixedExpenseService = new DefenseModeService(
+                new MemoryMapper(),
+                userId -> new DiagnosisDefenseSnapshot(9_000_000L, 0L, 3_000_000L),
+                (userId, fromDate, toDate) -> Arrays.asList(
+                        new FinancialCommitmentSummary(
+                                1L, 10L, "SAVING_PAYMENT", "소액 적금", null,
+                                100_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED"),
+                        new FinancialCommitmentSummary(
+                                2L, 20L, "SAVING_PAYMENT", "고액 적금", null,
+                                8_000_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED")),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                clockAt(LocalDate.of(2026, 8, 3)));
+        DefenseMode entered = fixedExpenseService.enter(new DefenseModeEnterCommand(
+                1L, "ACCIDENT_INJURY", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10)));
+
+        FixedExpenseCheckSummary result = fixedExpenseService.getFixedExpenseCheck(entered);
+
+        assertEquals(FixedExpenseMaintainStatus.NORMAL,
+                result.getExpenses().get(0).getMaintainStatus());
+        assertEquals(FixedExpenseMaintainStatus.REVIEW_SUSPENSION,
+                result.getExpenses().get(1).getMaintainStatus());
+    }
+
+    @Test
+    void calculatesCurrentDDayFromElapsedDaysWithoutChangingEntrySnapshot() {
+        MemoryMapper currentMapper = new MemoryMapper();
+        DefenseModeService currentService = new DefenseModeService(
+                currentMapper,
+                userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
+                (userId, fromDate, toDate) -> Collections.singletonList(
+                        new FinancialCommitmentSummary(
+                                1L, 10L, "SAVING_PAYMENT", "청년희망적금", null,
+                                500_000L, LocalDate.of(2026, 8, 15), "CONFIRMED", "CONFIRMED")),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                clockAt(LocalDate.of(2026, 8, 13)));
+        DefenseMode entered = currentService.enter(new DefenseModeEnterCommand(
+                1L, "ACCIDENT_INJURY", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 31)));
+
+        assertEquals(32, currentService.getCurrentDDay(entered));
+        assertEquals(42, entered.getDDay());
+        assertEquals(42, currentMapper.findById(entered.getDefenseId()).getDDay());
+
+        FixedExpenseCheckSummary result = currentService.getFixedExpenseCheck(entered);
+        assertEquals(32, result.getExpenses().get(0).getDDayBefore());
+        assertEquals(28, result.getExpenses().get(0).getDDayAfter());
+        assertEquals(4, result.getExpenses().get(0).getDDayReduction());
     }
 
     @Test
@@ -184,5 +237,10 @@ class DefenseModeServiceTest {
             data.put(defenseMode.getDefenseId(), defenseMode);
             return 1;
         }
+    }
+
+    private static Clock clockAt(LocalDate date) {
+        ZoneId zoneId = ZoneId.of("Asia/Seoul");
+        return Clock.fixed(date.atStartOfDay(zoneId).toInstant(), zoneId);
     }
 }
