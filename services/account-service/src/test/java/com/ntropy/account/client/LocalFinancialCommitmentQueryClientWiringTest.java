@@ -50,7 +50,8 @@ class LocalFinancialCommitmentQueryClientWiringTest {
                 }
 
                 @Override
-                public List<LoanCommitmentCandidateRow> findLoanCommitmentCandidates(Long userId) {
+                public List<LoanCommitmentCandidateRow> findLoanCommitmentCandidates(
+                        Long userId, List<String> loanDisbursementKeywords) {
                     return List.of();
                 }
 

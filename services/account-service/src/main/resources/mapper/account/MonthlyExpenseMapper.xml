@@ -6,76 +6,109 @@
 <mapper namespace="com.ntropy.account.mapper.MonthlyExpenseMapper">
 
     <!--
-        이슈 #143: LOAN 거래는 원금을 소비에서 제외하고 이자만 반영한다.
-        LOAN은 FinancialDataQueryMapper.classificationTargetFilter에서 항상 AI 분류 대상 밖이라
-        TXN_ANALYSIS 행이 생기지 않는다 - 그래서 TXN_ANALYSIS를 거치지 않고 이 쿼리가
-        ACCOUNT_TRANSACTION.loan_interest_amount에서 직접, AI 분류 결과와 무관하게 결정적으로 계산한다.
-        out_amount·loan_principal_amount와의 합계가 실제로 일치하는지는 보지 않는다(원천 신뢰).
-        loan_interest_amount가 NULL이거나 음수이면 0으로 취급해 총상환액이 그대로 새어 들어가거나
-        음수가 총소비를 깎는 것을 막는다. 실제 포함 대상은 loanInterestConsumptionFilter에서
-        양수 이자가 있는 정상 상환 거래로 한 번 더 제한한다.
+        이슈 #143/#148/#169: 일간 분류 대상인 LOAN(out_amount > 0)·
+        INSTALLMENT(in_amount > 0)는 매일 02:00 배치(#148,
+        ai-service TransactionPreClassificationService)가 정상 처리하면 TXN_ANALYSIS 행이 생긴다
+        (LOAN 정상상환/INSTALLMENT는 TRUE/FINANCE/FIXED, LOAN 지급은 FALSE/NULL/NULL).
+        하지만 이 월간 집계 쿼리는 그 값을 참조하지 않고 ACCOUNT_TRANSACTION에서
+        직접 재계산한다. 이유는 "TXN_ANALYSIS 행이 없어서"가 아니라 다음 정책 때문이다.
+
+          1. 배치 실행 여부·성공 여부와 무관하게 진단 조회·확정에서도 즉시 결정적으로
+             계산할 수 있어야 한다(배치 전/실패 시에도 값이 새거나 누락되면 안 된다).
+          2. LOAN 원금은 소비에서 제외하고 loan_interest_amount만 반영해야 하는데,
+             이 원금/이자 분리는 TXN_ANALYSIS에 없는 정보라 어차피 원본 컬럼이 필요하다.
+          3. INSTALLMENT는 적립액이 in_amount에 들어오므로 일반 out_amount 합산 규칙을
+             그대로 쓰면 항상 0원으로 집계된다(#169에서 발견, INSTALLMENT 전용 분기 추가).
+
+        LOAN 신규·실행·증액(대출금 지급) 판정 키워드는 common 모듈의
+        LoanDisbursementKeywords와 단일 소스를 공유하며, 호출 측이
+        loanDisbursementKeywords 파라미터로 전달한다(FinancialCommitmentMapper의
+        상환 후보 판정과도 동일 목록을 쓴다).
+
+        loan_interest_amount가 NULL이거나 음수이면 0으로 취급해 총상환액이 그대로
+        새어 들어가거나 음수가 총소비를 깎는 것을 막는다. out_amount와
+        loan_principal_amount+loan_interest_amount 합이 실제로 일치하는지는 보지
+        않는다(원천 신뢰, 불일치는 이 쿼리의 관심사가 아니다).
     -->
     <sql id="loanAwareAmount">
         CASE
             WHEN transaction_row.transaction_category = 'LOAN'
                 THEN GREATEST(COALESCE(transaction_row.loan_interest_amount, 0), 0)
+            WHEN transaction_row.transaction_category = 'INSTALLMENT'
+                THEN GREATEST(COALESCE(transaction_row.in_amount, 0), 0)
             ELSE transaction_row.out_amount
         END
     </sql>
 
-    <!-- 카테고리별 집계 전용: LOAN 이자는 AI가 분류하지 않으므로 category를 'FINANCE'로 고정한다. -->
+    <!--
+        카테고리별 집계 전용: LOAN 이자·INSTALLMENT 적립액은 TXN_ANALYSIS.category와
+        무관하게 항상 'FINANCE'로 고정한다(#169 요약표 참고).
+    -->
     <sql id="loanAwareCategory">
         CASE
-            WHEN transaction_row.transaction_category = 'LOAN' THEN 'FINANCE'
+            WHEN transaction_row.transaction_category IN ('LOAN', 'INSTALLMENT') THEN 'FINANCE'
             ELSE analysis_row.category
         END
     </sql>
 
     <!--
-        LOAN 소비 집계 대상은 양수 이자가 있는 정상 상환 거래로 한정한다.
-        FinancialCommitmentMapper의 상환 후보 규칙과 동일하게 신규·실행·대출실행·증액 거래를 제외한다.
-        거래구분명이 NULL/빈 문자열이면 제외 사유가 없는 것으로 보고 상환 후보로 인정한다.
+        LOAN 신규·실행·증액(대출금 지급) 거래를 제외한다. 판정 의미는
+        "공백 정규화 후 부분 문자열 포함"이며, LoanDisbursementKeywords와 동일하다.
+        loan_transaction_type_name이 NULL이면 COALESCE로 빈 문자열이 되어 어떤
+        키워드와도 매치되지 않으므로 별도 NULL 분기 없이 상환 후보로 인정된다.
     -->
+    <sql id="loanDisbursementExclusion">
+        <foreach collection="loanDisbursementKeywords" item="keyword" separator=" AND ">
+            REGEXP_REPLACE(
+                COALESCE(transaction_row.loan_transaction_type_name, ''),
+                '[[:space:]]+',
+                ''
+            ) NOT LIKE CONCAT('%', #{keyword}, '%')
+        </foreach>
+    </sql>
+
+    <!-- LOAN 소비 집계 대상은 양수 이자가 있는 정상 상환(비지급) 거래로 한정한다. -->
     <sql id="loanInterestConsumptionFilter">
         transaction_row.transaction_category = 'LOAN'
         AND transaction_row.out_amount &gt; 0
         AND transaction_row.loan_interest_amount &gt; 0
-        AND (
-            transaction_row.loan_transaction_type_name IS NULL
-            OR (
-                transaction_row.loan_transaction_type_name NOT LIKE '%신규%'
-                AND transaction_row.loan_transaction_type_name NOT LIKE '%실행%'
-                AND transaction_row.loan_transaction_type_name NOT LIKE '%대출실행%'
-                AND transaction_row.loan_transaction_type_name NOT LIKE '%증액%'
-            )
-        )
+        AND (<include refid="loanDisbursementExclusion"/>)
+    </sql>
+
+    <!-- INSTALLMENT 소비 집계 대상은 양수 적립액이 들어온 거래로 한정한다. -->
+    <sql id="installmentConsumptionFilter">
+        transaction_row.transaction_category = 'INSTALLMENT'
+        AND transaction_row.in_amount &gt; 0
     </sql>
 
     <!--
-        총소비·카테고리별 소비 포함 대상: LOAN은 TXN_ANALYSIS 유무와 무관하게
-        loanInterestConsumptionFilter를 만족하는 상환 거래만 포함한다. 그 외 거래는 기존과 동일하게
-        is_consumption = TRUE인 것만 포함하되, LOAN이 분류 행을 통해 우회하지 못하게 거래 유형을 분리한다.
+        총소비·카테고리별 소비 포함 대상: LOAN·INSTALLMENT는 TXN_ANALYSIS 유무와 무관하게
+        각자의 결정적 필터를 만족하는 거래만 포함한다. 그 외 거래는 기존과 동일하게
+        is_consumption = TRUE인 것만 포함하되, LOAN·INSTALLMENT가 분류 행을 통해
+        중복·우회 집계되지 않도록 거래 유형을 명시적으로 분리한다.
     -->
     <sql id="consumptionFilter">
         (
             (<include refid="loanInterestConsumptionFilter"/>)
+            OR (<include refid="installmentConsumptionFilter"/>)
             OR (
-                transaction_row.transaction_category &lt;&gt; 'LOAN'
+                transaction_row.transaction_category NOT IN ('LOAN', 'INSTALLMENT')
                 AND analysis_row.is_consumption = TRUE
             )
         )
     </sql>
 
     <!--
-        고정지출 포함 대상: loanInterestConsumptionFilter를 만족하는 대출 원리금 상환은
-        예정된 반복 상환이므로 이자분을 고정지출로도 집계한다.
-        그 외 거래는 기존과 동일하게 is_consumption = TRUE AND expense_type = 'FIXED'만 포함한다.
+        고정지출 포함 대상: 정상 상환 LOAN 이자와 INSTALLMENT 적립액은 예정된 반복
+        지출이므로 고정지출로도 집계한다. 그 외 거래는 기존과 동일하게
+        is_consumption = TRUE AND expense_type = 'FIXED'만 포함한다.
     -->
     <sql id="fixedConsumptionFilter">
         (
             (<include refid="loanInterestConsumptionFilter"/>)
+            OR (<include refid="installmentConsumptionFilter"/>)
             OR (
-                transaction_row.transaction_category &lt;&gt; 'LOAN'
+                transaction_row.transaction_category NOT IN ('LOAN', 'INSTALLMENT')
                 AND analysis_row.is_consumption = TRUE
                 AND analysis_row.expense_type = 'FIXED'
             )
@@ -85,9 +118,9 @@
     <!--
         월별 총소비 금액을 조회합니다.
 
-        집계 대상은 (1) is_consumption = TRUE인 일반 거래의 out_amount 전액, (2) LOAN 거래의
-        loanAwareAmount(이자만, 원금 제외)입니다. INSTALLMENT, 내부이체 여부는 분류 결과에
-        반영된 값을 따릅니다. 거래는 발생 당시 기록을 기준으로 집계하며, 계좌가 이후 비활성화되더라도
+        집계 대상은 (1) is_consumption = TRUE인 일반 거래의 out_amount 전액, (2) LOAN
+        거래의 loanAwareAmount(이자만, 원금 제외), (3) INSTALLMENT 거래의 in_amount입니다.
+        거래는 발생 당시 기록을 기준으로 집계하며, 계좌가 이후 비활성화되더라도
         과거 거래는 계속 포함해야 하므로 account_row.status 필터는 쓰지 않는다.
     -->
     <select id="findTotalExpense"
@@ -108,8 +141,9 @@
     </select>
 
     <!--
-        월별 카테고리 소비 금액을 조회합니다. status 필터를 쓰지 않는 이유와 LOAN 처리 방식은
-        findTotalExpense와 동일합니다. LOAN 이자는 category = 'FINANCE'로 고정됩니다.
+        월별 카테고리 소비 금액을 조회합니다. status 필터를 쓰지 않는 이유와 LOAN·INSTALLMENT
+        처리 방식은 findTotalExpense와 동일합니다. LOAN 이자·INSTALLMENT 적립액은
+        category = 'FINANCE'로 고정됩니다.
     -->
     <select id="findCategoryExpenses"
             resultType="com.ntropy.common.dto.account.CategoryExpenseAmount">
@@ -134,8 +168,9 @@
     </select>
 
     <!--
-        월별 고정지출 합계를 조회합니다. status 필터를 쓰지 않는 이유는 findTotalExpense와 동일하고,
-        LOAN 이자를 고정지출에 포함하는 이유는 fixedConsumptionFilter를 참고한다.
+        월별 고정지출 합계를 조회합니다. status 필터를 쓰지 않는 이유는 findTotalExpense와
+        동일하고, LOAN 이자·INSTALLMENT 적립액을 고정지출에 포함하는 이유는
+        fixedConsumptionFilter를 참고한다.
     -->
     <select id="findFixedExpense"
             resultType="java.lang.Long">

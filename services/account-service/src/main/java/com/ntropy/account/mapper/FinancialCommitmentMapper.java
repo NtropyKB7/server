@@ -16,7 +16,14 @@ public interface FinancialCommitmentMapper {
 
     List<SavingCommitmentCandidateRow> findSavingCommitmentCandidates(@Param("userId") Long userId);
 
-    List<LoanCommitmentCandidateRow> findLoanCommitmentCandidates(@Param("userId") Long userId);
+    /**
+     * loanDisbursementKeywords는 LOAN 신규·실행·증액(대출금 지급) 판정에 사용되며,
+     * 호출 측은 com.ntropy.common.domain.LoanDisbursementKeywords.KEYWORDS를 전달해야 합니다.
+     */
+    List<LoanCommitmentCandidateRow> findLoanCommitmentCandidates(
+            @Param("userId") Long userId,
+            @Param("loanDisbursementKeywords") List<String> loanDisbursementKeywords
+    );
 
     List<InsuranceOutflowRow> findInsuranceOutflowCandidates(
             @Param("userId") Long userId,

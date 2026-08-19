@@ -39,15 +39,33 @@ class FinancialCommitmentMapperContractTest {
         assertTrue(query.contains("latest_tx.loan_interest_amount AS expectedInterestAmount"));
         assertTrue(query.contains("transaction_category = 'LOAN'"));
         assertTrue(query.contains("loan_row.out_amount > 0"));
-        assertTrue(query.contains("loan_transaction_type_name IS NULL"));
-        assertTrue(query.contains("NOT LIKE '%신규%'"));
-        assertTrue(query.contains("NOT LIKE '%실행%'"));
-        assertTrue(query.contains("NOT LIKE '%대출실행%'"));
-        assertTrue(query.contains("NOT LIKE '%증액%'"));
+        assertTrue(query.contains("<include refid=\"loanDisbursementExclusion\"/>"));
         assertTrue(query.contains("loan_row.account_id = account_row.account_id"));
         assertTrue(query.contains("ORDER BY loan_row.tran_date DESC"));
         assertTrue(query.contains("LIMIT 1"));
         assertFalse(query.contains("ROW_NUMBER()"));
+    }
+
+    /**
+     * 이슈 #169: LOAN 지급 판정 키워드는 MonthlyExpenseMapper와 동일한 common
+     * LoanDisbursementKeywords를 파라미터로 전달받아야 하며, SQL에 리터럴로 남아있지 않아야 한다.
+     */
+    @Test
+    void loanDisbursementExclusionUsesSharedKeywordParameterNotLiterals() throws IOException {
+        String fragment = sqlFragmentBody(readMapper(), "loanDisbursementExclusion");
+
+        assertTrue(fragment.contains("<foreach"));
+        assertTrue(fragment.contains("collection=\"loanDisbursementKeywords\""));
+        assertTrue(fragment.contains("separator=\" AND \""));
+        assertTrue(fragment.contains("NOT LIKE CONCAT('%', #{keyword}, '%')"));
+        assertFalse(fragment.contains("${keyword}"),
+                "키워드 바인딩은 문자열 치환(${keyword})이 아니라 #{keyword}를 써야 합니다");
+        assertTrue(fragment.contains("REGEXP_REPLACE"),
+                "loan_transaction_type_name의 공백을 정규화한 뒤 비교해야 합니다");
+        assertFalse(fragment.contains("신규"),
+                "키워드 리터럴은 SQL에 직접 남아있지 않아야 합니다(common LoanDisbursementKeywords 사용)");
+        assertFalse(fragment.contains("대출실행"),
+                "키워드 리터럴은 SQL에 직접 남아있지 않아야 합니다(common LoanDisbursementKeywords 사용)");
     }
 
     @Test
@@ -68,6 +86,12 @@ class FinancialCommitmentMapperContractTest {
     private static String selectBody(String mapper, String selectId) {
         int start = mapper.indexOf("<select id=\"" + selectId + "\"");
         int end = mapper.indexOf("</select>", start);
+        return mapper.substring(start, end);
+    }
+
+    private static String sqlFragmentBody(String mapper, String sqlId) {
+        int start = mapper.indexOf("<sql id=\"" + sqlId + "\"");
+        int end = mapper.indexOf("</sql>", start);
         return mapper.substring(start, end);
     }
 
