@@ -22,8 +22,25 @@ import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
+import com.ntropy.common.client.VirtualUserQueryClient;
+import com.ntropy.common.dto.user.VirtualDatasetContext;
+import com.ntropy.common.dto.user.VirtualUserDataset;
+import com.ntropy.common.dto.user.VirtualUserIdentity;
 
 class VirtualFinancialDataServiceTest {
+
+    // 실제 USERS.user_id는 AUTO_INCREMENT 값이라 순번과 무관하다는 것을 드러내기 위해 순번과 다른 배수로 잡는다.
+    private static long userIdFor(int ordinal) {
+        return 8_000_000_000L + ordinal * 3L;
+    }
+
+    private static List<VirtualUserIdentity> fiftyUserDataset() {
+        List<VirtualUserIdentity> users = new ArrayList<>();
+        for (int ordinal = 1; ordinal <= 50; ordinal++) {
+            users.add(new VirtualUserIdentity(userIdFor(ordinal), ordinal));
+        }
+        return users;
+    }
 
     @Test
     void generatesExpectedDatasetAndIsIdempotent() {
@@ -32,17 +49,22 @@ class VirtualFinancialDataServiceTest {
         InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
         ZoneId zone = ZoneId.of("Asia/Seoul");
         // 월말을 기준일로 고정해 "현재 월"이 항상 완결된 3개월 창이 되도록 하고, 기존 고정 건수 검증값을 그대로 유지한다.
-        Clock clock = Clock.fixed(LocalDate.of(2026, 6, 30).atStartOfDay(zone).toInstant(), zone);
+        Clock clock = Clock.fixed(LocalDate.of(2020, 1, 1).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService service = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper),
                 accountMapper,
                 transactionMapper,
                 new VirtualFinancialTransactionGenerator(),
-                clock
+                clock,
+                null // generateForUsers()를 직접 호출하므로 VirtualUserQueryClient는 쓰이지 않는다.
+        );
+        List<VirtualUserIdentity> users = fiftyUserDataset();
+        VirtualDatasetContext context = new VirtualDatasetContext(
+                "FIN-005-test-v1", LocalDate.of(2026, 6, 30), 1L
         );
 
-        GenerationSummary first = service.generate();
-        GenerationSummary second = service.generate();
+        GenerationSummary first = service.generateForUsers(users, context);
+        GenerationSummary second = service.generateForUsers(users, context);
 
         assertEquals(50, first.users());
         assertEquals(100, first.accounts());
@@ -55,7 +77,7 @@ class VirtualFinancialDataServiceTest {
 
         // 사용자 순번 1은 적금(installment), 26은 대출(loan) 보조계좌를 받는다.
         Account installmentAccount = accountMapper.store.values().stream()
-                .filter(account -> account.getUserId() == 9_000_046_001L
+                .filter(account -> account.getUserId() == userIdFor(1)
                         && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.DEPOSIT_TRUST
                         && "12".equals(account.getDepositTypeCode()))
                 .findFirst().orElseThrow();
@@ -66,7 +88,7 @@ class VirtualFinancialDataServiceTest {
         assertEquals(lastTransactionDate(transactionMapper, installmentAccount), installmentAccount.getLastTranDate());
 
         Account loanAccount = accountMapper.store.values().stream()
-                .filter(account -> account.getUserId() == 9_000_046_026L
+                .filter(account -> account.getUserId() == userIdFor(26)
                         && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.LOAN)
                 .findFirst().orElseThrow();
         assertEquals(java.math.BigDecimal.valueOf(80_000_000L), loanAccount.getLoanContractPrincipal());
@@ -74,6 +96,37 @@ class VirtualFinancialDataServiceTest {
         assertEquals(LocalDate.of(2036, 6, 30), loanAccount.getMaturityDate());
         assertEquals(LocalDate.of(2026, 7, 25), loanAccount.getNextPaymentDate());
         assertEquals(lastTransactionDate(transactionMapper, loanAccount), loanAccount.getLastTranDate());
+    }
+
+    @Test
+    void generateDelegatesToVirtualUserQueryClientDatasetUsingContextReferenceDate() {
+        InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
+        InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
+        ZoneId zone = ZoneId.of("Asia/Seoul");
+        // Clock은 generate()/generateForUsers() 경로에서 쓰이지 않아야 하므로, context와 다른 날짜로 고정해 둔다.
+        Clock clock = Clock.fixed(LocalDate.of(2099, 1, 1).atStartOfDay(zone).toInstant(), zone);
+        List<VirtualUserIdentity> users = List.of(
+                new VirtualUserIdentity(7_000_000_001L, 1),
+                new VirtualUserIdentity(7_000_000_002L, 2),
+                new VirtualUserIdentity(7_000_000_003L, 3),
+                new VirtualUserIdentity(7_000_000_004L, 4)
+        );
+        VirtualDatasetContext context = new VirtualDatasetContext(
+                "FIN-005-test-v2", LocalDate.of(2026, 6, 30), 42L
+        );
+        VirtualUserQueryClient stubClient = () -> new VirtualUserDataset(context, users);
+        VirtualFinancialDataService service = new VirtualFinancialDataService(
+                new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
+                new VirtualFinancialTransactionGenerator(), clock, stubClient
+        );
+
+        GenerationSummary summary = service.generate();
+
+        assertEquals(4, summary.users());
+        assertEquals(8, summary.accounts());
+        assertEquals(context.referenceDate(), summary.endDate());
+        assertEquals(1_200, summary.transactions());
     }
 
     @Test
@@ -86,7 +139,7 @@ class VirtualFinancialDataServiceTest {
         Clock clock = Clock.fixed(LocalDate.of(2028, 2, 29).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService service = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
-                new VirtualFinancialTransactionGenerator(), clock
+                new VirtualFinancialTransactionGenerator(), clock, null
         );
 
         assertDoesNotThrow(() -> service.generateForUser(9_000_046_001L, com.ntropy.account.domain.PersonalBank.NH_BANK));
@@ -107,7 +160,7 @@ class VirtualFinancialDataServiceTest {
         Clock clock = Clock.fixed(LocalDate.of(2026, 6, 15).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService service = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
-                new VirtualFinancialTransactionGenerator(), clock
+                new VirtualFinancialTransactionGenerator(), clock, null
         );
 
         service.generateForUser(9_000_046_001L, com.ntropy.account.domain.PersonalBank.NH_BANK);

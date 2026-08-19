@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BiFunction;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,10 @@ import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator.GeneratedTransactions;
+import com.ntropy.common.client.VirtualUserQueryClient;
+import com.ntropy.common.dto.user.VirtualDatasetContext;
+import com.ntropy.common.dto.user.VirtualUserDataset;
+import com.ntropy.common.dto.user.VirtualUserIdentity;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +38,6 @@ public class VirtualFinancialDataService {
     public static final int ACCOUNTS_PER_USER = 2;
     public static final int EXPECTED_TRANSACTION_COUNT = 15_000;
 
-    private static final long LOGICAL_USER_ID_BASE = 9_000_046_000L;
     private static final String DATASET_VERSION = "FIN-005-v1";
     private static final String CURRENCY_KRW = "KRW";
     private static final int TRANSACTION_BATCH_SIZE = 500;
@@ -43,25 +47,47 @@ public class VirtualFinancialDataService {
     private final AccountTransactionMapper accountTransactionMapper;
     private final VirtualFinancialTransactionGenerator transactionGenerator;
     private final Clock clock;
+    private final VirtualUserQueryClient virtualUserQueryClient;
 
+    /** user-service가 시딩한 실제 가상회원 목록을 조회해 이 서비스의 생성기를 호출하는 조합 지점. */
     @Transactional
     public GenerationSummary generate() {
-        LocalDate referenceDate = LocalDate.now(clock);
+        VirtualUserDataset dataset = virtualUserQueryClient.findSeededVirtualUsers();
+        return generateForUsers(dataset.users(), dataset.context());
+    }
+
+    /** 실제 USERS.user_id 목록과 실행 컨텍스트를 받아 가상 금융 데이터셋을 멱등하게 생성한다. */
+    @Transactional
+    public GenerationSummary generateForUsers(List<VirtualUserIdentity> users, VirtualDatasetContext context) {
+        if (users == null || users.isEmpty()) {
+            throw new IllegalArgumentException("가상회원 목록이 필요합니다");
+        }
+        if (context == null) {
+            throw new IllegalArgumentException("데이터셋 실행 컨텍스트가 필요합니다");
+        }
+        LocalDate referenceDate = context.referenceDate();
+        int totalUsers = users.size();
         int generatedAccounts = 0;
         int generatedTransactions = 0;
         PersonalBank[] banks = PersonalBank.values();
 
-        for (int userOrdinal = 1; userOrdinal <= USER_COUNT; userOrdinal++) {
-            Long userId = LOGICAL_USER_ID_BASE + userOrdinal;
-            PersonalBank bank = banks[(userOrdinal - 1) % banks.length];
-            UserGenerationResult result = generateForUser(userId, bank, userOrdinal, false, referenceDate);
+        for (VirtualUserIdentity identity : users) {
+            int userOrdinal = identity.ordinal();
+            PersonalBank bank = bankFor(userOrdinal, context.randomSeed(), banks);
+            UserGenerationResult result = generateAccountsAndTransactions(
+                    identity.userId(), bank, userOrdinal, totalUsers, referenceDate,
+                    (ordinaryAccount, secondaryAccount) -> transactionGenerator.generate(
+                            referenceDate, userOrdinal, context.randomSeed(), bank,
+                            ordinaryAccount, secondaryAccount
+                    )
+            );
             generatedAccounts += result.accounts();
             generatedTransactions += result.transactions();
         }
 
         // 지난 2개월은 사용자당 200건 고정이고, 현재 월은 기준일까지만 생성돼 사용자당 0~100건이다.
-        int minimumExpected = USER_COUNT * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 2;
-        int maximumExpected = USER_COUNT * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 3;
+        int minimumExpected = totalUsers * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 2;
+        int maximumExpected = totalUsers * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 3;
         if (generatedTransactions < minimumExpected || generatedTransactions > maximumExpected) {
             throw new IllegalStateException(
                     "가상 거래 총 건수 불일치: expected=[" + minimumExpected + "," + maximumExpected + "]"
@@ -69,7 +95,7 @@ public class VirtualFinancialDataService {
             );
         }
         return new GenerationSummary(
-                USER_COUNT, generatedAccounts, VirtualFinancialTransactionGenerator.INCOME_COUNTERPARTY_COUNT,
+                totalUsers, generatedAccounts, VirtualFinancialTransactionGenerator.INCOME_COUNTERPARTY_COUNT,
                 generatedTransactions,
                 YearMonth.from(referenceDate).minusMonths(2).atDay(1),
                 referenceDate
@@ -87,7 +113,12 @@ public class VirtualFinancialDataService {
         }
         LocalDate referenceDate = LocalDate.now(clock);
         int ordinal = stableUserOrdinal(userId);
-        UserGenerationResult result = generateForUser(userId, bank, ordinal, true, referenceDate);
+        UserGenerationResult result = generateAccountsAndTransactions(
+                userId, bank, ordinal, USER_COUNT, referenceDate,
+                (ordinaryAccount, secondaryAccount) -> transactionGenerator.generateForUser(
+                        referenceDate, userId, bank, ordinaryAccount, secondaryAccount
+                )
+        );
         return new GenerationSummary(
                 1, result.accounts(), result.incomeCounterparties(), result.transactions(),
                 YearMonth.from(referenceDate).minusMonths(2).atDay(1),
@@ -95,8 +126,9 @@ public class VirtualFinancialDataService {
         );
     }
 
-    private UserGenerationResult generateForUser(Long userId, PersonalBank bank, int userOrdinal,
-                                                  boolean useUserIdProfile, LocalDate referenceDate) {
+    private UserGenerationResult generateAccountsAndTransactions(
+            Long userId, PersonalBank bank, int userOrdinal, int totalUsers, LocalDate referenceDate,
+            BiFunction<Account, Account, GeneratedTransactions> transactionsSupplier) {
         CodefConnection connection = virtualConnectionService.getOrCreateConnection(userId);
         virtualConnectionService.registerInstitution(connection, bank.getOrganizationCode());
 
@@ -104,11 +136,9 @@ public class VirtualFinancialDataService {
                 buildOrdinaryAccount(userOrdinal, userId, connection, bank, referenceDate)
         );
         Account secondaryAccount = saveAccount(
-                buildSecondaryAccount(userOrdinal, userId, connection, bank, referenceDate)
+                buildSecondaryAccount(userOrdinal, totalUsers, userId, connection, bank, referenceDate)
         );
-        GeneratedTransactions generated = useUserIdProfile
-                ? transactionGenerator.generateForUser(referenceDate, userId, bank, ordinaryAccount, secondaryAccount)
-                : transactionGenerator.generate(referenceDate, userOrdinal, bank, ordinaryAccount, secondaryAccount);
+        GeneratedTransactions generated = transactionsSupplier.apply(ordinaryAccount, secondaryAccount);
 
         ordinaryAccount.setBalance(generated.finalBalances().get(ordinaryAccount.getId()));
         secondaryAccount.setBalance(generated.finalBalances().get(secondaryAccount.getId()));
@@ -121,6 +151,12 @@ public class VirtualFinancialDataService {
         validateStoredBalance(ordinaryAccount, referenceDate);
         validateStoredBalance(secondaryAccount, referenceDate);
         return new UserGenerationResult(2, generated.transactions().size(), generated.userIncomeCounterpartyCount());
+    }
+
+    /** 은행 배정: 순번을 randomSeed만큼 순환시켜, 데이터셋 버전(랜덤시드)이 바뀌면 배정도 함께 바뀌도록 한다. */
+    private static PersonalBank bankFor(int userOrdinal, long randomSeed, PersonalBank[] banks) {
+        int index = (int) Math.floorMod((userOrdinal - 1L) + randomSeed, (long) banks.length);
+        return banks[index];
     }
 
     private static int stableUserOrdinal(Long userId) {
@@ -155,11 +191,11 @@ public class VirtualFinancialDataService {
         return account;
     }
 
-    private static Account buildSecondaryAccount(int userOrdinal, Long userId,
+    private static Account buildSecondaryAccount(int userOrdinal, int totalUsers, Long userId,
                                                  CodefConnection connection, PersonalBank bank,
                                                  LocalDate referenceDate) {
         Account account = baseAccount(userOrdinal, userId, connection, bank, 2, referenceDate);
-        boolean installment = userOrdinal <= USER_COUNT / 2;
+        boolean installment = userOrdinal <= totalUsers / 2;
         account.setAccountGroup(installment ? AccountGroup.DEPOSIT_TRUST : AccountGroup.LOAN);
         account.setDepositTypeCode(installment ? "12" : "40");
         account.setAccountName(bank.getDisplayName() + (installment ? " 가상 적금" : " 가상 대출"));

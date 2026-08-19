@@ -29,6 +29,7 @@ import com.ntropy.account.service.VirtualConnectionService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator;
+import com.ntropy.common.client.VirtualUserQueryClient;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -172,15 +173,26 @@ class VirtualAccountRegenerationManualVerificationTest {
         }
 
         @Bean
+        VirtualUserQueryClient virtualUserQueryClient() {
+            // 이 테스트는 generateForUser(userId, bank)만 사용하므로 실제로 호출되지 않는다.
+            return () -> {
+                throw new UnsupportedOperationException(
+                        "이 수동 검증 테스트는 배치 시딩 경로를 사용하지 않습니다"
+                );
+            };
+        }
+
+        @Bean
         VirtualFinancialDataService virtualFinancialDataService(
                 VirtualConnectionService connectionService,
                 AccountMapper accountMapper,
                 AccountTransactionMapper transactionMapper,
                 VirtualFinancialTransactionGenerator generator,
-                Clock clock
+                Clock clock,
+                VirtualUserQueryClient virtualUserQueryClient
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator, clock
+                    connectionService, accountMapper, transactionMapper, generator, clock, virtualUserQueryClient
             );
         }
 
