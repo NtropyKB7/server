@@ -16,8 +16,8 @@ class MonthlyExpenseMapperContractTest {
         String query = selectBody(readMapper(), "findTotalExpense");
 
         assertTrue(!query.contains("status = 'ACTIVE'"));
-        assertTrue(query.contains("<include refid=\"consumptionFilter\"/>"));
-        assertTrue(query.contains("<include refid=\"loanAwareAmount\"/>"));
+        assertTrue(query.contains("analysis_row.is_consumption = TRUE"));
+        assertTrue(query.contains("<include refid=\"expenseAmount\"/>"));
     }
 
     @Test
@@ -25,9 +25,9 @@ class MonthlyExpenseMapperContractTest {
         String query = selectBody(readMapper(), "findCategoryExpenses");
 
         assertTrue(!query.contains("status = 'ACTIVE'"));
-        assertTrue(query.contains("<include refid=\"consumptionFilter\"/>"));
-        assertTrue(query.contains("<include refid=\"loanAwareCategory\"/>"));
-        assertTrue(query.contains("<include refid=\"loanAwareAmount\"/>"));
+        assertTrue(query.contains("analysis_row.is_consumption = TRUE"));
+        assertTrue(query.contains("analysis_row.category AS category"));
+        assertTrue(query.contains("<include refid=\"expenseAmount\"/>"));
     }
 
     @Test
@@ -35,112 +35,64 @@ class MonthlyExpenseMapperContractTest {
         String query = selectBody(readMapper(), "findFixedExpense");
 
         assertTrue(!query.contains("status = 'ACTIVE'"));
-        assertTrue(query.contains("<include refid=\"fixedConsumptionFilter\"/>"));
-        assertTrue(query.contains("<include refid=\"loanAwareAmount\"/>"));
+        assertTrue(query.contains("analysis_row.is_consumption = TRUE"));
+        assertTrue(query.contains("analysis_row.expense_type = 'FIXED'"));
+        assertTrue(query.contains("<include refid=\"expenseAmount\"/>"));
     }
 
     /**
-     * 이슈 #143/#169: 세 쿼리 모두 같은 loanAwareAmount fragment로 금액을 계산해야 계산식이 갈라지지 않는다.
-     * TXN_ANALYSIS 행이 없는 LOAN·INSTALLMENT 거래도 걸려야 하므로 INNER JOIN이 아닌 LEFT JOIN을 써야 한다.
+     * 이슈 #143/#169 최종: 세 쿼리 모두 같은 expenseAmount fragment로 금액을 계산해야 계산식이
+     * 갈라지지 않는다. LOAN·INSTALLMENT의 소비 판정도 이제 TXN_ANALYSIS를 그대로 신뢰하므로
+     * (ORDINARY와 동일 경로), TXN_ANALYSIS가 없는 거래는 그 달 집계에서 빠지는 것이 의도된
+     * 동작이라 INNER JOIN을 쓴다.
      */
     @Test
-    void allThreeQueriesShareTheSameLoanAmountAndUseLeftJoinForOptionalAnalysis() throws IOException {
+    void allThreeQueriesShareTheSameAmountFragmentAndUseInnerJoinOnAnalysis() throws IOException {
         String mapper = readMapper();
         for (String selectId : new String[] {"findTotalExpense", "findCategoryExpenses", "findFixedExpense"}) {
             String query = selectBody(mapper, selectId);
-            assertTrue(query.contains("<include refid=\"loanAwareAmount\"/>"),
-                    selectId + "는 공통 loanAwareAmount fragment를 재사용해야 합니다");
-            assertTrue(query.contains("LEFT JOIN TXN_ANALYSIS analysis_row"),
-                    selectId + "는 TXN_ANALYSIS가 없는 LOAN·INSTALLMENT 거래도 포함하도록 LEFT JOIN을 써야 합니다");
+            assertTrue(query.contains("<include refid=\"expenseAmount\"/>"),
+                    selectId + "는 공통 expenseAmount fragment를 재사용해야 합니다");
+            assertTrue(query.contains("INNER JOIN TXN_ANALYSIS analysis_row"),
+                    selectId + "는 TXN_ANALYSIS가 없는 거래를 배제하도록 INNER JOIN을 써야 합니다");
+            assertFalse(query.contains("LEFT JOIN TXN_ANALYSIS"),
+                    selectId + "는 더 이상 TXN_ANALYSIS 유무와 무관한 LOAN/INSTALLMENT 특례가 없어야 합니다");
         }
     }
 
+    /**
+     * INSTALLMENT는 적립액이 in_amount에 들어오므로(out_amount는 항상 0) 별도 분기가 필요하다.
+     * LOAN은 이제 일반 out_amount 규칙과 같아 별도 분기가 없어야 한다(원금 포함, #169 최종 정책).
+     */
     @Test
-    void loanAwareAmountExcludesPrincipalAndClampsInterestAtZero() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "loanAwareAmount");
-
-        assertTrue(fragment.contains("transaction_category = 'LOAN'"));
-        assertTrue(fragment.contains("loan_interest_amount"));
-        assertTrue(fragment.contains("GREATEST("),
-                "음수 loan_interest_amount가 총소비를 깎지 않도록 0으로 클램프해야 합니다");
-        assertFalse(fragment.contains("loan_principal_amount"),
-                "LOAN 원금(loan_principal_amount)은 소비 금액 계산에 쓰지 않아야 합니다");
-    }
-
-    @Test
-    void loanAwareAmountUsesInAmountForInstallment() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "loanAwareAmount");
+    void expenseAmountOnlyBranchesForInstallmentInAmount() throws IOException {
+        String fragment = sqlFragmentBody(readMapper(), "expenseAmount");
 
         assertTrue(fragment.contains("transaction_category = 'INSTALLMENT'"));
-        assertTrue(fragment.contains("in_amount"),
-                "INSTALLMENT 적립액은 out_amount가 아닌 in_amount에서 가져와야 합니다");
+        assertTrue(fragment.contains("in_amount"));
+        assertFalse(fragment.contains("'LOAN'"),
+                "LOAN은 out_amount를 그대로 쓰는 ELSE 분기와 동일하므로 별도 WHEN 분기가 없어야 합니다");
+        assertFalse(fragment.contains("loan_interest_amount"),
+                "금액 계산은 더 이상 loan_interest_amount를 쓰지 않아야 합니다");
+        assertFalse(fragment.contains("loan_principal_amount"),
+                "금액 계산은 loan_principal_amount 컬럼을 직접 쓰지 않아야 합니다");
     }
 
+    /**
+     * LOAN 지급(신규·실행·증액) 판정과 카테고리·고정지출 강제는 이제 account-service SQL이 아니라
+     * ai-service TransactionPreClassificationService(#148)의 책임이다. 중복 판정 로직이 SQL에
+     * 남아있지 않은지 확인한다.
+     */
     @Test
-    void loanAwareCategoryFixesLoanAndInstallmentToFinance() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "loanAwareCategory");
+    void mapperNoLongerDuplicatesLoanClassificationLogic() throws IOException {
+        String mapper = readMapper();
 
-        assertTrue(fragment.contains("'LOAN'"));
-        assertTrue(fragment.contains("'INSTALLMENT'"));
-        assertTrue(fragment.contains("'FINANCE'"));
-        assertTrue(fragment.contains("analysis_row.category"));
-    }
-
-    @Test
-    void loanDisbursementExclusionUsesSharedKeywordParameterNotLiterals() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "loanDisbursementExclusion");
-
-        assertTrue(fragment.contains("<foreach"));
-        assertTrue(fragment.contains("collection=\"loanDisbursementKeywords\""));
-        assertTrue(fragment.contains("separator=\" AND \""));
-        assertTrue(fragment.contains("NOT LIKE CONCAT('%', #{keyword}, '%')"));
-        assertFalse(fragment.contains("${keyword}"),
-                "키워드 바인딩은 문자열 치환(${keyword})이 아니라 #{keyword}를 써야 합니다");
-        assertTrue(fragment.contains("REGEXP_REPLACE"),
-                "loan_transaction_type_name의 공백을 정규화한 뒤 비교해야 합니다");
-        assertFalse(fragment.contains("신규"),
-                "키워드 리터럴은 SQL에 직접 남아있지 않아야 합니다(common LoanDisbursementKeywords 사용)");
-        assertFalse(fragment.contains("대출실행"),
-                "키워드 리터럴은 SQL에 직접 남아있지 않아야 합니다(common LoanDisbursementKeywords 사용)");
-    }
-
-    @Test
-    void loanInterestConsumptionFilterOnlyIncludesPositiveInterestRepayments() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "loanInterestConsumptionFilter");
-
-        assertTrue(fragment.contains("transaction_row.transaction_category = 'LOAN'"));
-        assertTrue(fragment.contains("transaction_row.out_amount &gt; 0"));
-        assertTrue(fragment.contains("transaction_row.loan_interest_amount &gt; 0"));
-        assertTrue(fragment.contains("<include refid=\"loanDisbursementExclusion\"/>"));
-    }
-
-    @Test
-    void installmentConsumptionFilterRequiresPositiveInAmount() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "installmentConsumptionFilter");
-
-        assertTrue(fragment.contains("transaction_row.transaction_category = 'INSTALLMENT'"));
-        assertTrue(fragment.contains("transaction_row.in_amount &gt; 0"));
-    }
-
-    @Test
-    void consumptionFilterIncludesEligibleLoanOrInstallmentOrClassifiedOther() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "consumptionFilter");
-
-        assertTrue(fragment.contains("<include refid=\"loanInterestConsumptionFilter\"/>"));
-        assertTrue(fragment.contains("<include refid=\"installmentConsumptionFilter\"/>"));
-        assertTrue(fragment.contains("transaction_row.transaction_category NOT IN ('LOAN', 'INSTALLMENT')"));
-        assertTrue(fragment.contains("analysis_row.is_consumption = TRUE"));
-    }
-
-    @Test
-    void fixedConsumptionFilterIncludesEligibleLoanOrInstallmentAndKeepsFixedTypeForOther() throws IOException {
-        String fragment = sqlFragmentBody(readMapper(), "fixedConsumptionFilter");
-
-        assertTrue(fragment.contains("<include refid=\"loanInterestConsumptionFilter\"/>"));
-        assertTrue(fragment.contains("<include refid=\"installmentConsumptionFilter\"/>"));
-        assertTrue(fragment.contains("transaction_row.transaction_category NOT IN ('LOAN', 'INSTALLMENT')"));
-        assertTrue(fragment.contains("analysis_row.is_consumption = TRUE"));
-        assertTrue(fragment.contains("analysis_row.expense_type = 'FIXED'"));
+        assertFalse(mapper.contains("loanDisbursementKeywords"),
+                "LOAN 지급 판정 키워드 파라미터는 더 이상 이 매퍼에서 쓰이지 않아야 합니다");
+        assertFalse(mapper.contains("REGEXP_REPLACE"),
+                "지급 거래 정규화/제외 로직은 더 이상 SQL에 없어야 합니다");
+        assertFalse(mapper.contains("'FINANCE'"),
+                "category='FINANCE' 강제는 더 이상 SQL에 없어야 합니다(TXN_ANALYSIS.category를 그대로 씀)");
     }
 
     private static String sqlFragmentBody(String mapper, String sqlId) {
