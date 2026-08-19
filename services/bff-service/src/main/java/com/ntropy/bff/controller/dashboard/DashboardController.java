@@ -15,6 +15,7 @@ import com.ntropy.bff.dto.common.ErrorCode;
 import com.ntropy.bff.dto.dashboard.response.DashboardHoursResponse;
 import com.ntropy.bff.dto.dashboard.response.DashboardIncomeResponse;
 import com.ntropy.bff.dto.dashboard.response.DashboardResponse;
+import com.ntropy.bff.dto.dashboard.response.DashboardSettlementResponse;
 import com.ntropy.bff.dto.dashboard.response.JobRecommendationsResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.CalendarQueryClient;
@@ -34,12 +35,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 
-/**
- * 홈 대시보드 조합 엔드포인트.
- * realWage(실질 시급)는 계산 공식이 아직 없어서 뺐다.
- * 잡별 추천 근무시간(ROI 계산)은 장아연님이 만든 계약(RecommendedWorkHoursQueryClient)을
- * 가져다 /api/dashboard/recommendation-hours로 노출만 한다 — 계산 로직은 work-service에 있다.
- */
 @Api(tags = "대시보드")
 @RestController
 @RequestMapping("/api/dashboard")
@@ -79,6 +74,7 @@ public class DashboardController {
                 user.name(),
                 new DashboardHoursResponse(hours.getActualHours(), hours.getPlannedHours()),
                 new DashboardIncomeResponse(incomeAnalysis.getTotalIncome(), hours.getTargetAmount()),
+                DashboardSettlementResponse.from(incomeAnalysis.getEarnedDepositComparisons()),
                 fatigueScore
         );
         return ApiResponse.success(response);
