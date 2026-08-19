@@ -30,7 +30,7 @@ public interface UserMapper {
 
     Optional<User> findByRefreshToken(String refreshToken);
 
-    List<Long> findActiveUserIds();
+    List<Long> findActiveUserIds(@Param("scope") String scope, @Param("virtualProvider") String virtualProvider);
 
     List<User> findAllByProvider(@Param("provider") String provider);
 }

@@ -19,12 +19,14 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.ai.client.fastapi.FastApiProductRecommendationClient;
+import com.ntropy.ai.config.AiReportBatchUserScopeProperties;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationRequest;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.IncomeAnalysisQueryClient;
 import com.ntropy.common.client.MonthlyExpenseQueryClient;
+import com.ntropy.common.domain.UserScope;
 import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 
@@ -37,7 +39,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     void runBatch_whenTargetUserListIsEmpty_completesWithoutException() {
         MonthlyAiReportOrchestrationService orchestrationService =
                 createService(
-                        List::of,
+                        scope -> List.of(),
                         (userId, yearMonth) -> null,
                         (userId, yearMonth) -> null,
                         new CapturingRecommendationClient(),
@@ -58,7 +60,7 @@ class MonthlyAiReportOrchestrationServiceTest {
                 new RecordingIncomeAnalysisQueryClient();
 
         MonthlyAiReportOrchestrationService service = createService(
-                () -> List.of(1L, 2L, 3L),
+                scope -> List.of(1L, 2L, 3L),
                 income,
                 (userId, yearMonth) -> null,
                 new CapturingRecommendationClient(),
@@ -227,7 +229,7 @@ class MonthlyAiReportOrchestrationServiceTest {
                 new CapturingAiReportService();
 
         MonthlyAiReportOrchestrationService service = createService(
-                () -> List.of(1L),
+                scope -> List.of(1L),
                 (userId, yearMonth) -> null,
                 (userId, yearMonth) ->
                         "2026-07".equals(yearMonth)
@@ -276,7 +278,7 @@ class MonthlyAiReportOrchestrationServiceTest {
             }
         };
         MonthlyAiReportOrchestrationService service = createService(
-                () -> List.of(1L),
+                scope -> List.of(1L),
                 (userId, yearMonth) -> null,
                 (userId, yearMonth) -> null,
                 new CapturingRecommendationClient(),
@@ -306,7 +308,7 @@ class MonthlyAiReportOrchestrationServiceTest {
             }
         };
         MonthlyAiReportOrchestrationService service = createService(
-                () -> List.of(1L),
+                scope -> List.of(1L),
                 (userId, yearMonth) -> null,
                 (userId, yearMonth) -> null,
                 new CapturingRecommendationClient(),
@@ -340,7 +342,7 @@ class MonthlyAiReportOrchestrationServiceTest {
             }
         };
         MonthlyAiReportOrchestrationService service = createService(
-                () -> List.of(1L, 2L),
+                scope -> List.of(1L, 2L),
                 (userId, yearMonth) -> null,
                 (userId, yearMonth) -> null,
                 new CapturingRecommendationClient(),
@@ -354,9 +356,29 @@ class MonthlyAiReportOrchestrationServiceTest {
         assertEquals(List.of(1L, 2L), attemptedDeliveryUserIds);
     }
 
+    @Test
+    @DisplayName("설정된 batch.ai-report.user-scope를 ActiveUserQueryClient에 그대로 전달한다")
+    void runBatch_passesConfiguredUserScopeToClient() {
+        List<UserScope> requestedScopes = new ArrayList<>();
+        MonthlyAiReportOrchestrationService service = createService(
+                scope -> {
+                    requestedScopes.add(scope);
+                    return List.of();
+                },
+                (userId, yearMonth) -> null,
+                (userId, yearMonth) -> null,
+                new CapturingRecommendationClient(),
+                new CapturingAiReportService()
+        );
+
+        service.runBatch(YearMonth.of(2026, 7));
+
+        assertEquals(List.of(UserScope.REAL_ONLY), requestedScopes);
+    }
+
     private MonthlyAiReportOrchestrationService createUnitService() {
         return createService(
-                List::of,
+                scope -> List.of(),
                 (userId, yearMonth) -> null,
                 (userId, yearMonth) -> null,
                 new CapturingRecommendationClient(),
@@ -391,6 +413,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     ) {
         return new MonthlyAiReportOrchestrationService(
                 activeUserQueryClient,
+                new AiReportBatchUserScopeProperties("REAL_ONLY"),
                 incomeAnalysisQueryClient,
                 monthlyExpenseQueryClient,
                 recommendationClient,

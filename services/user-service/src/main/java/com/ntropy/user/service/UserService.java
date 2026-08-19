@@ -6,11 +6,13 @@ import com.ntropy.user.client.oauth.KakaoOAuthClient;
 import com.ntropy.user.config.VirtualTestProperties;
 import com.ntropy.user.dto.OAuthLoginResponse;
 import com.ntropy.user.security.JwtProvider;
+import com.ntropy.common.domain.UserScope;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.user.dto.TokenRefreshResponseDto;
 import com.ntropy.user.exception.UserErrorCode;
 import com.ntropy.user.mapper.UserMapper;
 import com.ntropy.user.domain.entity.User;
+import com.ntropy.user.virtual.VirtualUserProviderId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -177,9 +180,10 @@ public class UserService {
     }
 
     /**
-     * 월간 AI 리포트 배치 대상 활성 사용자 ID를 조회합니다.
+     * 배치 대상 활성 사용자 ID를 scope(REAL_ONLY/VIRTUAL_ONLY/ALL) 기준으로 조회합니다.
      */
-    public List<Long> findActiveUserIds() {
-        return userMapper.findActiveUserIds();
+    public List<Long> findActiveUserIds(UserScope scope) {
+        Objects.requireNonNull(scope, "scope가 필요합니다");
+        return userMapper.findActiveUserIds(scope.name(), VirtualUserProviderId.PROVIDER);
     }
 }

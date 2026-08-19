@@ -106,13 +106,20 @@
         ORDER BY provider_id
     </select>
 
-    <!-- 월간 배치 대상 활성 사용자 ID 조회 -->
+    <!-- 배치 대상 활성 사용자 ID 조회. scope=REAL_ONLY는 가상회원(virtualProvider)을 제외하고,
+         VIRTUAL_ONLY는 가상회원만, ALL은 필터 없이 조회한다. -->
     <select id="findActiveUserIds"
             resultType="java.lang.Long">
 
         SELECT user_id
         FROM USERS
         WHERE status = 'ACTIVE'
+        <if test="scope == 'REAL_ONLY'">
+            AND (provider IS NULL OR provider != #{virtualProvider})
+        </if>
+        <if test="scope == 'VIRTUAL_ONLY'">
+            AND provider = #{virtualProvider}
+        </if>
         ORDER BY user_id
 
     </select>

@@ -15,10 +15,12 @@ import org.junit.jupiter.api.Test;
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
+import com.ntropy.common.domain.UserScope;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.work.client.holiday.HolidayApiClient;
+import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.entity.Holiday;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
@@ -70,7 +72,8 @@ class SettlementServiceTest {
         jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).build());
         incomingTransactionQueryClient = new StubIncomingTransactionQueryClient();
         service = new SettlementService(
-                incomingTransactionQueryClient, activeUserQueryClient, platformMapper, jobMapper,
+                incomingTransactionQueryClient, activeUserQueryClient,
+                new SettlementBatchUserScopeProperties("REAL_ONLY"), platformMapper, jobMapper,
                 jobPlatformMappingMapper, workLogMapper, workLogPlatformIncomeMapper, settlementMapper, holidayService,
                 notificationCommandClient);
     }
@@ -341,6 +344,14 @@ class SettlementServiceTest {
     }
 
     @Test
+    @DisplayName("설정된 batch.settlement.user-scope를 ActiveUserQueryClient에 그대로 전달한다")
+    void runDailyBatch_passesConfiguredUserScopeToClient() {
+        service.runDailyBatch();
+
+        assertEquals(UserScope.REAL_ONLY, activeUserQueryClient.lastRequestedScope);
+    }
+
+    @Test
     @DisplayName("runDailyBatch에서 여러 날짜의 정산이 생성돼도 유저당 정산 완료 알림은 1건만 발송된다")
     void runDailyBatch_settlementCreatedOnMultipleDays_sendsSingleNotificationPerUser() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
@@ -436,9 +447,11 @@ class SettlementServiceTest {
 
     private static final class StubActiveUserQueryClient implements ActiveUserQueryClient {
         private List<Long> userIds = List.of();
+        private UserScope lastRequestedScope;
 
         @Override
-        public List<Long> findActiveUserIds() {
+        public List<Long> findActiveUserIds(UserScope scope) {
+            this.lastRequestedScope = scope;
             return userIds;
         }
     }

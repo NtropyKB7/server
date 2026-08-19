@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.ai.client.fastapi.FastApiProductRecommendationClient;
+import com.ntropy.ai.config.AiReportBatchUserScopeProperties;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
 import com.ntropy.ai.mapper.AiReportMapper;
@@ -96,7 +97,8 @@ class MonthlyAiReportTransactionIntegrationTest {
                 .thenReturn(new ProductRecommendationResponse());
 
         return new MonthlyAiReportOrchestrationService(
-                () -> java.util.List.of(USER_ID),
+                scope -> java.util.List.of(USER_ID),
+                new AiReportBatchUserScopeProperties("REAL_ONLY"),
                 incomeClient,
                 (userId, yearMonth) -> null,
                 recommendationClient,

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
+import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.WorkLogMapper;
 
@@ -30,13 +31,14 @@ public class WorkLogReminderService {
     private static final int UNCONFIRMED_REMINDER_DELAY_MINUTES = 60;
 
     private final ActiveUserQueryClient activeUserQueryClient;
+    private final WorkReminderBatchUserScopeProperties userScopeProperties;
     private final WorkLogMapper workLogMapper;
     private final NotificationCommandClient notificationCommandClient;
 
     /** 매일 지정된 시각에 실행. 오늘 근무 기록이 없는 유저에게 리마인더를 보낸다. */
     public void checkNoWorkLogToday() {
         LocalDate today = LocalDate.now();
-        for (Long userId : activeUserQueryClient.findActiveUserIds()) {
+        for (Long userId : activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope())) {
             List<WorkLog> logs = workLogMapper.findByUserIdAndWorkDate(userId, today);
             if (logs.isEmpty()) {
                 notificationCommandClient.create(new NotificationCreateCommand(
@@ -58,7 +60,7 @@ public class WorkLogReminderService {
     public void checkUnconfirmedWorkLogs() {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
-        for (Long userId : activeUserQueryClient.findActiveUserIds()) {
+        for (Long userId : activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope())) {
             for (WorkLog workLog : workLogMapper.findByUserIdAndWorkDate(userId, today)) {
                 if (!STATUS_PLANNED.equals(workLog.getStatus())) {
                     continue;

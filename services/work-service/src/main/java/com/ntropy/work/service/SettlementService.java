@@ -13,6 +13,7 @@ import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
+import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.PlatformMatchResult;
 import com.ntropy.work.domain.PlatformMatcher;
 import com.ntropy.work.domain.SettlementPeriod;
@@ -74,6 +75,7 @@ public class SettlementService {
 
     private final IncomingTransactionQueryClient incomingTransactionQueryClient;
     private final ActiveUserQueryClient activeUserQueryClient;
+    private final SettlementBatchUserScopeProperties userScopeProperties;
     private final PlatformMapper platformMapper;
     private final JobMapper jobMapper;
     private final JobPlatformMappingMapper jobPlatformMappingMapper;
@@ -89,7 +91,7 @@ public class SettlementService {
      * 예외가 나도 다른 사용자 처리에 영향을 주지 않도록 사용자 단위로 예외를 격리한다.
      */
     public void runDailyBatch() {
-        List<Long> userIds = activeUserQueryClient.findActiveUserIds();
+        List<Long> userIds = activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope());
         if (userIds == null || userIds.isEmpty()) {
             log.info("[정산 배치] 대상 사용자가 없습니다.");
             return;
