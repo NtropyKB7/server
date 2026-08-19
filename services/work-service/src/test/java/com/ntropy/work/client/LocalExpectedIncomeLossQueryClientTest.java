@@ -233,4 +233,42 @@ class LocalExpectedIncomeLossQueryClientTest {
         assertEquals(3000000L, result.get(0).getExpectedIncomeLoss());
         assertEquals(500000L, result.get(1).getExpectedIncomeLoss());
     }
+
+    @Test
+    @DisplayName("비정기(스케줄 없는) 시급 잡도 monthly_expected_income이 null이라 최근 3개월 평균으로 계산된다")
+    void findExpectedIncomeLossByJob_irregularHourly_usesRecentThreeMonthAverage() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("단기 물류센터")
+                .settlementType(SettlementType.HOURLY).monthlyWage(null).hourlyWage(12000)
+                .monthlyExpectedIncome(null).build());
+
+        YearMonth thisMonth = YearMonth.now();
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(1).atDay(10), 400000L).build());
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(2).atDay(10), 800000L).build());
+
+        LocalDate from = LocalDate.now();
+        LocalDate to = from.plusDays(29);
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(USER_ID, from, to);
+
+        // 평균 = (400000+800000)/2 = 600000
+        assertEquals(1, result.size());
+        assertEquals(600000L, result.get(0).getExpectedIncomeLoss());
+    }
+
+    @Test
+    @DisplayName("monthly_expected_income이 이미 있는 잡은 정산 이력이 있어도 스냅샷 값을 그대로 쓴다")
+    void findExpectedIncomeLossByJob_hasSnapshot_ignoresSettlementHistory() {
+        jobMapper.seed(baseJob().jobId(1L).jobName("본업").monthlyExpectedIncome(3000000L).build());
+
+        YearMonth thisMonth = YearMonth.now();
+        // 스냅샷이 있는 잡인데 정산 이력이 있어도 평균 계산에 쓰이면 안 된다
+        settlementMapper.insert(matchedSettlement(1L, thisMonth.minusMonths(1).atDay(10), 100L).build());
+
+        LocalDate from = LocalDate.now();
+        LocalDate to = from.plusDays(29);
+
+        List<JobExpectedIncomeLossSummary> result = client.findExpectedIncomeLossByJob(USER_ID, from, to);
+
+        assertEquals(3000000L, result.get(0).getExpectedIncomeLoss());
+    }
 }
