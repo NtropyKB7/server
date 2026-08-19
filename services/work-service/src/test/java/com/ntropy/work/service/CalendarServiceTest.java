@@ -22,6 +22,7 @@ import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
 import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.domain.enums.SettlementType;
 import com.ntropy.work.mapper.InMemoryAllocationGoalMapper;
@@ -30,15 +31,19 @@ import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryJobScheduleMapper;
 import com.ntropy.work.mapper.InMemorySavingGoalMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
+import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
 
 class CalendarServiceTest {
 
     private static final Long USER_ID = 1L;
     private static final Long JOB_A = 10L;
     private static final Long JOB_B = 20L;
+    private static final Long PLATFORM_A = 100L;
+    private static final Long PLATFORM_B = 200L;
     private static final String TARGET_MONTH = "2026-08";
 
     private InMemoryWorkLogMapper workLogMapper;
+    private InMemoryWorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private InMemoryAllocationGoalMapper allocationGoalMapper;
     private InMemorySavingGoalMapper savingGoalMapper;
     private JobService jobService;
@@ -51,6 +56,7 @@ class CalendarServiceTest {
         jobMapper.seed(job(JOB_B, "쿠팡이츠 배달"));
 
         workLogMapper = new InMemoryWorkLogMapper();
+        workLogPlatformIncomeMapper = new InMemoryWorkLogPlatformIncomeMapper(workLogMapper);
         allocationGoalMapper = new InMemoryAllocationGoalMapper();
         savingGoalMapper = new InMemorySavingGoalMapper();
         SavingGoalService savingGoalService = new SavingGoalService(savingGoalMapper, allocationGoalMapper);
@@ -62,8 +68,8 @@ class CalendarServiceTest {
         );
 
         calendarService = new CalendarService(
-                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
-                new StubWeatherQueryClient(List.of())
+                workLogMapper, workLogPlatformIncomeMapper, allocationGoalMapper, savingGoalMapper, jobService,
+                new StubFatigueService(null), new StubWeatherQueryClient(List.of())
         );
     }
 
@@ -82,9 +88,9 @@ class CalendarServiceTest {
         return job;
     }
 
-    private void seedWorkLog(Long jobId, LocalDate date, LocalTime start, LocalTime end,
-                              String status, SettlementStatus settlementStatus, Long estimatedIncome) {
-        workLogMapper.insert(WorkLog.builder()
+    private WorkLog seedWorkLog(Long jobId, LocalDate date, LocalTime start, LocalTime end,
+                                 String status, SettlementStatus settlementStatus, Long estimatedIncome) {
+        WorkLog workLog = WorkLog.builder()
                 .userId(USER_ID)
                 .jobId(jobId)
                 .workDate(date)
@@ -93,11 +99,23 @@ class CalendarServiceTest {
                 .status(status)
                 .settlementStatus(settlementStatus)
                 .estimatedIncome(estimatedIncome)
+                .build();
+        workLogMapper.insert(workLog);
+        return workLog;
+    }
+
+    private void seedIncome(Long logId, Long platformId, long expectedAmount, SettlementStatus settlementStatus) {
+        workLogPlatformIncomeMapper.insert(WorkLogPlatformIncome.builder()
+                .logId(logId)
+                .platformId(platformId)
+                .expectedAmount(expectedAmount)
+                .settlementStatus(settlementStatus)
                 .build());
     }
 
+
     @Test
-    @DisplayName("월간 요약은 목표시간 합/근무시간 합/예상수입 합/저축 목표 금액을 계산한다")
+    @DisplayName("월간 요약은 목표시간 합/예상수입 합/저축 목표 금액을 계산한다")
     void monthlySummary_aggregatesPlannedActualAndIncome() {
         allocationGoalMapper.insert(AllocationGoal.builder().jobId(JOB_A).targetMonth(TARGET_MONTH).recommendHour(20L).build());
         allocationGoalMapper.insert(AllocationGoal.builder().jobId(JOB_B).targetMonth(TARGET_MONTH).recommendHour(10L).build());
@@ -110,10 +128,50 @@ class CalendarServiceTest {
 
         CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
-        assertEquals(30, summary.getSummary().getPlannedHours());
-        assertEquals(8, summary.getSummary().getActualHours());
+        assertEquals(30, summary.getSummary().getGoalHours());
         assertEquals(68000L, summary.getSummary().getExpectedIncome());
         assertEquals(2_500_000L, summary.getSummary().getTargetAmount());
+    }
+
+    @Test
+    @DisplayName("월간 요약의 근무시간은 status 기준으로 confirmedHours/scheduledHours에 나뉘어 집계된다")
+    void monthlySummary_splitsHoursByStatus() {
+        seedWorkLog(JOB_A, LocalDate.of(2026, 8, 3), LocalTime.of(18, 0), LocalTime.of(22, 0),
+                "PLANNED", SettlementStatus.NONE, 48000L);
+        seedWorkLog(JOB_B, LocalDate.of(2026, 8, 5), LocalTime.of(10, 0), LocalTime.of(14, 0),
+                "CONFIRMED", SettlementStatus.PENDING, 20000L);
+
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
+
+        assertEquals(4, summary.getSummary().getConfirmedHours());
+        assertEquals(4, summary.getSummary().getScheduledHours());
+    }
+
+    @Test
+    @DisplayName("예상 정산 소득은 PLANNED 근무와, CONFIRMED 근무일지 중 아직 COMPLETED 안 된 플랫폼 몫을 합산한다")
+    void monthlySummary_expectedSettlementIncome_includesPlannedAndConfirmedNotCompleted() {
+        WorkLog completed = seedWorkLog(JOB_A, LocalDate.of(2026, 8, 3), LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
+        seedIncome(completed.getLogId(), PLATFORM_A, 36000L, SettlementStatus.COMPLETED);
+
+        WorkLog pending = seedWorkLog(JOB_A, LocalDate.of(2026, 8, 5), LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "CONFIRMED", SettlementStatus.PENDING, 30000L);
+        seedIncome(pending.getLogId(), PLATFORM_A, 30000L, SettlementStatus.PENDING);
+
+        // 플랫폼 2개짜리 잡: 하나만 완료된 PARTIAL 근무. COMPLETED 몫(12000)은 정산 완료 처리되어
+        // 나머지 PENDING 몫(8000)만 expectedSettlementIncome으로 들어가야 한다.
+        WorkLog partial = seedWorkLog(JOB_A, LocalDate.of(2026, 8, 7), LocalTime.of(9, 0), LocalTime.of(12, 0),
+                "CONFIRMED", SettlementStatus.PARTIAL, 20000L);
+        seedIncome(partial.getLogId(), PLATFORM_A, 12000L, SettlementStatus.COMPLETED);
+        seedIncome(partial.getLogId(), PLATFORM_B, 8000L, SettlementStatus.PENDING);
+
+        seedWorkLog(JOB_B, LocalDate.of(2026, 8, 10), LocalTime.of(18, 0), LocalTime.of(22, 0),
+                "PLANNED", SettlementStatus.NONE, 48000L);
+
+        CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
+
+        // expectedSettlementIncome = 30000(pending) + 8000(partial의 미완료 몫) + 48000(planned) = 86000
+        assertEquals(86000L, summary.getSummary().getExpectedSettlementIncome());
     }
 
     @Test
@@ -124,7 +182,8 @@ class CalendarServiceTest {
 
         CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
-        assertEquals(0, summary.getSummary().getActualHours());
+        assertEquals(0, summary.getSummary().getConfirmedHours());
+        assertEquals(0, summary.getSummary().getScheduledHours());
         assertTrue(summary.getDays().isEmpty());
     }
 
@@ -166,8 +225,9 @@ class CalendarServiceTest {
     void monthlySummary_noDataReturnsZeroedSummary() {
         CalendarMonthlySummary summary = calendarService.getMonthlySummary(USER_ID, 2026, 8, null, null);
 
-        assertEquals(0, summary.getSummary().getPlannedHours());
-        assertEquals(0, summary.getSummary().getActualHours());
+        assertEquals(0, summary.getSummary().getGoalHours());
+        assertEquals(0, summary.getSummary().getConfirmedHours());
+        assertEquals(0, summary.getSummary().getScheduledHours());
         assertEquals(0L, summary.getSummary().getExpectedIncome());
         assertTrue(summary.getDays().isEmpty());
     }
@@ -220,8 +280,8 @@ class CalendarServiceTest {
                 freshAllocationGoalMapper, freshRecommendedWorkHoursService
         );
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(gauge),
-                new StubWeatherQueryClient(List.of())
+                workLogMapper, workLogPlatformIncomeMapper, allocationGoalMapper, savingGoalMapper, jobService,
+                new StubFatigueService(gauge), new StubWeatherQueryClient(List.of())
         );
 
         CalendarDailySummary summary = service.getDailySummary(USER_ID, LocalDate.of(2026, 8, 3), null, null);
@@ -236,8 +296,8 @@ class CalendarServiceTest {
         LocalDate noForecastDate = LocalDate.of(2026, 8, 10);
         WeatherForecast forecast = new WeatherForecast(forecastDate, "맑음", "없음", false, 28);
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
-                new StubWeatherQueryClient(List.of(forecast))
+                workLogMapper, workLogPlatformIncomeMapper, allocationGoalMapper, savingGoalMapper, jobService,
+                new StubFatigueService(null), new StubWeatherQueryClient(List.of(forecast))
         );
         seedWorkLog(JOB_A, forecastDate, LocalTime.of(9, 0), LocalTime.of(12, 0),
                 "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
@@ -255,8 +315,8 @@ class CalendarServiceTest {
     void monthlySummary_weatherQueryFails_degradesToNullWeather() {
         LocalDate date = LocalDate.of(2026, 8, 3);
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
-                new ThrowingWeatherQueryClient()
+                workLogMapper, workLogPlatformIncomeMapper, allocationGoalMapper, savingGoalMapper, jobService,
+                new StubFatigueService(null), new ThrowingWeatherQueryClient()
         );
         seedWorkLog(JOB_A, date, LocalTime.of(9, 0), LocalTime.of(12, 0),
                 "CONFIRMED", SettlementStatus.COMPLETED, 36000L);
@@ -271,8 +331,8 @@ class CalendarServiceTest {
     void dailySummary_forecastListIsNull_returnsNullWeather() {
         LocalDate date = LocalDate.of(2026, 8, 3);
         CalendarService service = new CalendarService(
-                workLogMapper, allocationGoalMapper, savingGoalMapper, jobService, new StubFatigueService(null),
-                new StubWeatherQueryClient(null)
+                workLogMapper, workLogPlatformIncomeMapper, allocationGoalMapper, savingGoalMapper, jobService,
+                new StubFatigueService(null), new StubWeatherQueryClient(null)
         );
         seedWorkLog(JOB_A, date, LocalTime.of(9, 0), LocalTime.of(12, 0),
                 "PLANNED", SettlementStatus.NONE, 48000L);

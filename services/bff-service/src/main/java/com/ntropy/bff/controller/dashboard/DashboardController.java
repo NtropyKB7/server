@@ -15,7 +15,6 @@ import com.ntropy.bff.dto.common.ErrorCode;
 import com.ntropy.bff.dto.dashboard.response.DashboardHoursResponse;
 import com.ntropy.bff.dto.dashboard.response.DashboardIncomeResponse;
 import com.ntropy.bff.dto.dashboard.response.DashboardResponse;
-import com.ntropy.bff.dto.dashboard.response.DashboardSettlementResponse;
 import com.ntropy.bff.dto.dashboard.response.JobRecommendationsResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.CalendarQueryClient;
@@ -72,9 +71,8 @@ public class DashboardController {
 
         DashboardResponse response = new DashboardResponse(
                 user.name(),
-                new DashboardHoursResponse(hours.getActualHours(), hours.getPlannedHours()),
-                new DashboardIncomeResponse(incomeAnalysis.getTotalIncome(), hours.getTargetAmount()),
-                DashboardSettlementResponse.from(incomeAnalysis.getEarnedDepositComparisons()),
+                new DashboardHoursResponse(hours.getConfirmedHours(), hours.getScheduledHours(), hours.getGoalHours()),
+                new DashboardIncomeResponse(incomeAnalysis.getTotalIncome(), hours.getExpectedSettlementIncome(), hours.getTargetAmount()),
                 fatigueScore
         );
         return ApiResponse.success(response);

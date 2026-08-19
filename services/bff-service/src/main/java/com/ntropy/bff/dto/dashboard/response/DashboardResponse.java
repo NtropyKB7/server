@@ -10,6 +10,5 @@ public class DashboardResponse {
     private String greetingName;
     private DashboardHoursResponse goalHours;
     private DashboardIncomeResponse goalIncome;
-    private DashboardSettlementResponse settlement;
     private Integer fatigueScore;
 }

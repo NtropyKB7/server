@@ -7,6 +7,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class DashboardHoursResponse {
 
-    private int current;
-    private int target;
+    private int confirmedHours;
+    private int scheduledHours;
+    private int goalHours;
 }
