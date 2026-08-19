@@ -16,11 +16,14 @@ public interface MonthlyExpenseMapper {
 
     /**
      * 특정 기간의 총소비 금액을 조회합니다.
+     * loanDisbursementKeywords는 LOAN 신규·실행·증액(대출금 지급) 판정에 사용되며,
+     * 호출 측은 com.ntropy.common.domain.LoanDisbursementKeywords.KEYWORDS를 전달해야 합니다.
      */
     Long findTotalExpense(
             @Param("userId") Long userId,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
+            @Param("endDate") LocalDate endDate,
+            @Param("loanDisbursementKeywords") List<String> loanDisbursementKeywords
     );
 
     /**
@@ -29,7 +32,8 @@ public interface MonthlyExpenseMapper {
     List<CategoryExpenseAmount> findCategoryExpenses(
             @Param("userId") Long userId,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
+            @Param("endDate") LocalDate endDate,
+            @Param("loanDisbursementKeywords") List<String> loanDisbursementKeywords
     );
 
     /**
@@ -38,6 +42,7 @@ public interface MonthlyExpenseMapper {
     Long findFixedExpense(
             @Param("userId") Long userId,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
+            @Param("endDate") LocalDate endDate,
+            @Param("loanDisbursementKeywords") List<String> loanDisbursementKeywords
     );
 }

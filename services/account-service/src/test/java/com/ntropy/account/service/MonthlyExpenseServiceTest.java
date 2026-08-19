@@ -100,17 +100,20 @@ class MonthlyExpenseServiceTest {
         private List<CategoryExpenseAmount> categoryExpenses = List.of();
 
         @Override
-        public Long findTotalExpense(Long userId, LocalDate startDate, LocalDate endDate) {
+        public Long findTotalExpense(
+                Long userId, LocalDate startDate, LocalDate endDate, List<String> loanDisbursementKeywords) {
             return totalExpense;
         }
 
         @Override
-        public List<CategoryExpenseAmount> findCategoryExpenses(Long userId, LocalDate startDate, LocalDate endDate) {
+        public List<CategoryExpenseAmount> findCategoryExpenses(
+                Long userId, LocalDate startDate, LocalDate endDate, List<String> loanDisbursementKeywords) {
             return categoryExpenses;
         }
 
         @Override
-        public Long findFixedExpense(Long userId, LocalDate startDate, LocalDate endDate) {
+        public Long findFixedExpense(
+                Long userId, LocalDate startDate, LocalDate endDate, List<String> loanDisbursementKeywords) {
             return fixedExpense;
         }
     }

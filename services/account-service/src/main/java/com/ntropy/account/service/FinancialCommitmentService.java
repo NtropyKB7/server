@@ -20,6 +20,7 @@ import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.projection.InsuranceOutflowRow;
 import com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow;
 import com.ntropy.account.mapper.projection.SavingCommitmentCandidateRow;
+import com.ntropy.common.domain.LoanDisbursementKeywords;
 import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.exception.ServiceException;
 
@@ -87,7 +88,8 @@ public class FinancialCommitmentService {
 
     private List<FinancialCommitmentSummary> buildLoanCommitments(Long userId, LocalDate fromDate, LocalDate toDate) {
         List<FinancialCommitmentSummary> result = new ArrayList<>();
-        for (LoanCommitmentCandidateRow row : financialCommitmentMapper.findLoanCommitmentCandidates(userId)) {
+        for (LoanCommitmentCandidateRow row : financialCommitmentMapper.findLoanCommitmentCandidates(
+                userId, LoanDisbursementKeywords.KEYWORDS)) {
             if (!withinRangeOrUnknown(row.getNextPaymentDate(), fromDate, toDate)) {
                 continue;
             }

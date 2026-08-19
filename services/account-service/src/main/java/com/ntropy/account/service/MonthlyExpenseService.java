@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ntropy.account.mapper.MonthlyExpenseMapper;
+import com.ntropy.common.domain.LoanDisbursementKeywords;
 import com.ntropy.common.dto.account.CategoryExpenseAmount;
 import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 
@@ -58,21 +59,24 @@ public class MonthlyExpenseService {
                 monthlyExpenseMapper.findTotalExpense(
                         userId,
                         startDate,
-                        endDate
+                        endDate,
+                        LoanDisbursementKeywords.KEYWORDS
                 );
 
         Long fixedExpense =
                 monthlyExpenseMapper.findFixedExpense(
                         userId,
                         startDate,
-                        endDate
+                        endDate,
+                        LoanDisbursementKeywords.KEYWORDS
                 );
 
         List<CategoryExpenseAmount> rows =
                 monthlyExpenseMapper.findCategoryExpenses(
                         userId,
                         startDate,
-                        endDate
+                        endDate,
+                        LoanDisbursementKeywords.KEYWORDS
                 );
 
         Map<String, Long> categoryExpenses =
