@@ -251,12 +251,13 @@ class SettlementServiceTest {
     }
 
     @Test
-    @DisplayName("BUSINESS_DAY 플랫폼은 HolidayService에서 조회한 공휴일까지 건너뛰고 기간을 계산한다")
-    void processSettlement_businessDayPlatform_skipsInjectedHoliday() {
+    @DisplayName("BUSINESS_DAY 플랫폼은 공휴일까지 건너뛰어 workDate를 역산하고, 그 공휴일에 일한 근무일지도 같은 기간으로 매칭한다")
+    void processSettlement_businessDayPlatform_skipsInjectedHolidayAndCoversItInPeriod() {
         Long businessDayPlatformId = 40L;
         LocalDate paymentDate = LocalDate.of(2026, 8, 17); // 월요일
         LocalDate holiday = LocalDate.of(2026, 8, 14); // 금요일 - 공휴일로 주입
-        LocalDate expectedWorkDate = LocalDate.of(2026, 8, 13); // 목요일 - 공휴일까지 건너뛴 결과
+        LocalDate expectedWorkDate = LocalDate.of(2026, 8, 13); // 목요일 - 공휴일까지 건너뛴 역산 결과
+        LocalDate expectedPeriodEnd = LocalDate.of(2026, 8, 16); // 일요일 - 다음 영업일(월, 8/17) 직전까지 확장
 
         platformMapper.seed(Platform.builder()
                 .platformId(businessDayPlatformId)
@@ -270,22 +271,25 @@ class SettlementServiceTest {
         holidayMapperForTest.seed(Holiday.builder()
                 .holidayDate(holiday).name("임시공휴일").build());
 
-        WorkLog expectedLog = workLog(expectedWorkDate, "CONFIRMED", 40_000L);
-        WorkLog fridayLog = workLog(holiday, "CONFIRMED", 40_000L);
-        workLogMapper.insert(expectedLog);
-        workLogMapper.insert(fridayLog);
-        insertIncome(expectedLog, businessDayPlatformId, 40_000L, SettlementStatus.PENDING);
+        WorkLog thursdayLog = workLog(expectedWorkDate, "CONFIRMED", 40_000L);
+        // 공휴일(8/14, 금)에 실제로 일한 근무일지 - 기간이 확장되면서 같이 매칭돼야 한다
+        WorkLog holidayWorkLog = workLog(holiday, "CONFIRMED", 25_000L);
+        workLogMapper.insert(thursdayLog);
+        workLogMapper.insert(holidayWorkLog);
+        insertIncome(thursdayLog, businessDayPlatformId, 40_000L, SettlementStatus.PENDING);
+        insertIncome(holidayWorkLog, businessDayPlatformId, 25_000L, SettlementStatus.PENDING);
         incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, paymentDate, LocalTime.NOON, "배민커넥트테스트", BigDecimal.valueOf(40_000L))
+                new NormalizedIncomingTransaction(1L, paymentDate, LocalTime.NOON, "배민커넥트테스트", BigDecimal.valueOf(65_000L))
         );
 
         service.processSettlement(USER_ID, paymentDate);
 
         Settlement settlement = settlementMapper.findAll().get(0);
         assertEquals(expectedWorkDate, settlement.getPeriodStart());
-        assertEquals(expectedWorkDate, settlement.getPeriodEnd());
-        assertEquals(SettlementStatus.COMPLETED, workLogMapper.findById(expectedLog.getLogId()).getSettlementStatus());
-        assertEquals(SettlementStatus.NONE, workLogMapper.findById(fridayLog.getLogId()).getSettlementStatus());
+        assertEquals(expectedPeriodEnd, settlement.getPeriodEnd());
+        assertEquals(65_000L, settlement.getExpectedAmount());
+        assertEquals(SettlementStatus.COMPLETED, workLogMapper.findById(thursdayLog.getLogId()).getSettlementStatus());
+        assertEquals(SettlementStatus.COMPLETED, workLogMapper.findById(holidayWorkLog.getLogId()).getSettlementStatus());
     }
 
     @Test
