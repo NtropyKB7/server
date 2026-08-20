@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT
     UNIQUE KEY uk_account_connection_hash (codef_connection_id, account_no_hash),
     INDEX ix_account_user_status (user_id, status),
     CONSTRAINT fk_account_codef_connection FOREIGN KEY (codef_connection_id)
-        REFERENCES CODEF_CONNECTION (codef_connection_id)
+        REFERENCES CODEF_CONNECTION (codef_connection_id) ON DELETE CASCADE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_TRANSACTION
     updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_transaction_fingerprint (account_id, fingerprint),
     INDEX ix_account_transaction_account_date (account_id, tran_date),
-    CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id)
+    CONSTRAINT fk_account_transaction_account FOREIGN KEY (account_id) REFERENCES ACCOUNT (account_id) ON DELETE CASCADE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS ACCOUNT_SYNC_STATE
     updated_at                  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_account_sync_state_connection_org (codef_connection_id, organization_code),
     CONSTRAINT fk_account_sync_state_codef_connection FOREIGN KEY (codef_connection_id)
-        REFERENCES CODEF_CONNECTION (codef_connection_id)
+        REFERENCES CODEF_CONNECTION (codef_connection_id) ON DELETE CASCADE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -154,6 +154,6 @@ CREATE TABLE IF NOT EXISTS TXN_ANALYSIS
 
     CONSTRAINT fk_txn_analysis_transaction
     FOREIGN KEY (account_transaction_id)
-    REFERENCES ACCOUNT_TRANSACTION (account_transaction_id)
+    REFERENCES ACCOUNT_TRANSACTION (account_transaction_id) ON DELETE CASCADE
     ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4;

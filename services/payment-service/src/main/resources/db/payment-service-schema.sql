@@ -43,7 +43,7 @@ ALTER TABLE `PAYMENT` ADD CONSTRAINT `FK_SUBSCRIPTION_TO_PAYMENT_1` FOREIGN KEY 
     )
     REFERENCES `SUBSCRIPTION` (
                                `subscription_id`
-        );
+        ) ON DELETE CASCADE;
 
 -- ============================================================
 -- Unique Constraint
