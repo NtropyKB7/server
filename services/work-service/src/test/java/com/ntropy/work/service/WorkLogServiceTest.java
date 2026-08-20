@@ -377,15 +377,48 @@ class WorkLogServiceTest {
     }
 
     @Test
-    @DisplayName("확정된 근무일지는 수정할 수 없다")
-    void editWorkLog_confirmed_throws() {
-        Job job = hourlyJob();
-        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+    @DisplayName("정산이 진행된(COMPLETED) 확정 근무일지는 수정할 수 없다")
+    void editWorkLog_settlementCompleted_throws() {
+        Job job = onDemandJob(); // ON_DEMAND 플랫폼이라 확정 즉시 COMPLETED
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(20, 0), LocalTime.of(22, 0)));
         workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
 
         WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
 
         assertThrows(ServiceException.class, () -> workLogService.editWorkLog(USER_ID, plan.getLogId(), patch));
+    }
+
+    @Test
+    @DisplayName("확정됐지만 아직 정산이 시작되지 않은(PENDING) 근무일지는 수정할 수 있다")
+    void editWorkLog_confirmedButPending_isAllowed() {
+        Job job = hourlyJob(); // 플랫폼 매핑이 없어 확정해도 PENDING 유지
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+        workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+
+        WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build();
+        WorkLog result = workLogService.editWorkLog(USER_ID, plan.getLogId(), patch);
+
+        assertEquals("CONFIRMED", result.getStatus());
+        assertEquals(LocalTime.of(23, 0), result.getEndTime());
+        assertEquals(60000L, result.getEstimatedIncome());
+    }
+
+    @Test
+    @DisplayName("자동정산 플랫폼 잡을 확정 후(PENDING) 수정하면 income 행이 새 소득 기준으로 재생성된다")
+    void editWorkLog_autoPlatformPending_regeneratesIncomeRows() {
+        Job job = multiPlatformJob(); // AUTO 트리거 플랫폼 2개 매핑, 확정해도 PENDING 유지
+        WorkLog plan = workLogService.registerPlan(planOf(job.getJobId(), LocalTime.of(18, 0), LocalTime.of(22, 0)));
+        WorkLog confirmed = workLogService.confirmWorkLog(USER_ID, plan.getLogId(), WorkLog.builder().build());
+        assertEquals(SettlementStatus.PENDING, confirmed.getSettlementStatus());
+
+        WorkLog patch = WorkLog.builder().endTime(LocalTime.of(23, 0)).build(); // 4시간 -> 5시간, 40000 -> 50000
+        WorkLog result = workLogService.editWorkLog(USER_ID, plan.getLogId(), patch);
+
+        assertEquals(50000L, result.getEstimatedIncome());
+        List<WorkLogPlatformIncome> incomes = workLogPlatformIncomeMapper.findByLogId(result.getLogId());
+        assertEquals(2, incomes.size());
+        long total = incomes.stream().mapToLong(WorkLogPlatformIncome::getExpectedAmount).sum();
+        assertEquals(50000L, total);
     }
 
     @Test

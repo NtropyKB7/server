@@ -89,8 +89,11 @@ public class WorkLogService {
     }
 
     /**
-     * 근무일지 수정. PLANNED 상태에서만 가능하다. 확정(CONFIRMED) 이후에는
-     * WORK_LOG_PLATFORM_INCOME과의 정합성이 깨질 수 있어 수정할 수 없고, 삭제만 가능하다.
+     * 근무일지 수정. PLANNED 상태는 항상 가능하다. CONFIRMED 상태는 아직 어느 플랫폼도
+     * 정산되지 않은 경우(settlementStatus == PENDING)에 한해 허용한다 - 하나라도
+     * 실제 입금과 매칭(PARTIAL/COMPLETED)된 이후에는 그 기록을 보존해야 하므로 여전히
+     * 수정할 수 없고 삭제만 가능하다. CONFIRMED 상태를 수정하면 소득이 바뀔 수 있어
+     * WORK_LOG_PLATFORM_INCOME을 지우고 다시 배분한다.
      * 넘어온 필드만 덮어쓰고 나머지는 기존 값을 유지한다.
      *
      * @param requesterUserId 요청자 userId. 근무일지 소유자와 다르면 예외
@@ -99,18 +102,30 @@ public class WorkLogService {
     public WorkLog editWorkLog(Long requesterUserId, Long logId, WorkLog patch) {
         WorkLog existing = findById(logId);
         verifyOwnership(requesterUserId, existing.getUserId(), logId);
-        if (STATUS_CONFIRMED.equals(existing.getStatus())) {
-            throw new ServiceException(WorkErrorCode.WORK_LOG_ALREADY_CONFIRMED, "logId=" + logId);
+        boolean wasConfirmed = STATUS_CONFIRMED.equals(existing.getStatus());
+        if (wasConfirmed && existing.getSettlementStatus() != SettlementStatus.PENDING) {
+            throw new ServiceException(WorkErrorCode.WORK_LOG_SETTLEMENT_IN_PROGRESS, "logId=" + logId);
         }
         applyPatch(existing, patch);
         validateNoOverlap(existing.getUserId(), existing.getWorkDate(), existing.getStartTime(), existing.getEndTime(),
                 existing.getLogId());
 
         Job job = jobService.findById(existing.getJobId());
+        if (wasConfirmed) {
+            validateTaskCountIfPerTask(job, existing.getTaskCount());
+        }
         existing.setEstimatedIncome(
                 calculateEstimatedIncome(job, existing.getStartTime(), existing.getEndTime(), existing.getTaskCount()));
 
-        workLogMapper.update(existing);
+        if (wasConfirmed) {
+            workLogPlatformIncomeMapper.deleteByLogId(existing.getLogId());
+            List<WorkLogPlatformIncome> incomes = resolvePlatformIncomes(job.getJobId(), existing.getEstimatedIncome());
+            existing.setSettlementStatus(WorkLogSettlementStatusCalculator.calculate(incomes));
+            workLogMapper.update(existing);
+            saveIncomes(existing.getLogId(), incomes);
+        } else {
+            workLogMapper.update(existing);
+        }
         return existing;
     }
 
