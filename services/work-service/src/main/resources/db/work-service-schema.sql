@@ -85,7 +85,8 @@ CREATE TABLE `ALLOCATION_GOAL` (
 	`allocation_goal_id`	BIGINT	NOT NULL AUTO_INCREMENT,
 	`job_id`	BIGINT	NOT NULL,
 	`target_month`	VARCHAR(7)	NOT NULL,
-	`recommend_hour`	BIGINT	NOT NULL
+	`recommend_hour`	BIGINT	NOT NULL,
+	PRIMARY KEY (`allocation_goal_id`)
 );
 
 -- 8. SAVING_GOAL (월별 저축 목표: 목표 소득액 + 적정 피로도)
@@ -147,10 +148,6 @@ ALTER TABLE `PLATFORM` ADD CONSTRAINT `PK_PLATFORM` PRIMARY KEY (
 	`platform_id`
 );
 
-ALTER TABLE `ALLOCATION_GOAL` ADD CONSTRAINT `PK_ALLOCATION_GOAL` PRIMARY KEY (
-	`allocation_goal_id`
-);
-
 -- ============================================================
 -- Foreign Key (work-service 내부 참조만 - 서비스 내부는 FK 유지)
 -- ============================================================
@@ -174,7 +171,7 @@ ALTER TABLE `JOBPLATFORMMAPPING` ADD CONSTRAINT `FK_JOB_TO_JOBPLATFORMMAPPING_1`
 )
 REFERENCES `JOB` (
 	`job_id`
-);
+) ON DELETE CASCADE;
 
 ALTER TABLE `JOBPLATFORMMAPPING` ADD CONSTRAINT `FK_PLATFORM_TO_JOBPLATFORMMAPPING_1` FOREIGN KEY (
 	`platform_id`
@@ -188,21 +185,21 @@ ALTER TABLE `JOB_SCHEDULE` ADD CONSTRAINT `FK_JOB_TO_JOB_SCHEDULE_1` FOREIGN KEY
 )
 REFERENCES `JOB` (
 	`job_id`
-);
+) ON DELETE CASCADE;
 
 ALTER TABLE `WORK_LOG` ADD CONSTRAINT `FK_JOB_TO_WORK_LOG_1` FOREIGN KEY (
 	`job_id`
 )
 REFERENCES `JOB` (
 	`job_id`
-);
+) ON DELETE CASCADE;
 
 ALTER TABLE `WORK_LOG_PLATFORM_INCOME` ADD CONSTRAINT `FK_WORK_LOG_TO_WORK_LOG_PLATFORM_INCOME_1` FOREIGN KEY (
 	`log_id`
 )
 REFERENCES `WORK_LOG` (
 	`log_id`
-);
+) ON DELETE CASCADE;
 
 ALTER TABLE `WORK_LOG_PLATFORM_INCOME` ADD CONSTRAINT `FK_PLATFORM_TO_WORK_LOG_PLATFORM_INCOME_1` FOREIGN KEY (
 	`platform_id`
@@ -216,14 +213,14 @@ ALTER TABLE `SETTLEMENT` ADD CONSTRAINT `FK_JOB_TO_SETTLEMENT_1` FOREIGN KEY (
 )
 REFERENCES `JOB` (
 	`job_id`
-);
+) ON DELETE CASCADE;
 
 ALTER TABLE `ALLOCATION_GOAL` ADD CONSTRAINT `FK_JOB_TO_ALLOCATION_GOAL_1` FOREIGN KEY (
 	`job_id`
 )
 REFERENCES `JOB` (
 	`job_id`
-);
+) ON DELETE CASCADE;
 
 -- ============================================================
 -- Index (job_id 기준 - 체크리스트 항목)
