@@ -255,14 +255,17 @@ class CalendarServiceTest {
     @DisplayName("일간 요약은 근무 목록과 요일 한글 표기를 채운다")
     void dailySummary_returnsWorksAndKoreanDayOfWeek() {
         LocalDate monday = LocalDate.of(2026, 8, 3);
-        seedWorkLog(JOB_A, monday, LocalTime.of(18, 0), LocalTime.of(22, 0),
+        WorkLog log = seedWorkLog(JOB_A, monday, LocalTime.of(18, 0), LocalTime.of(22, 0),
                 "PLANNED", SettlementStatus.NONE, 48000L);
+        log.setFatigue(3L);
+        workLogMapper.update(log);
 
         CalendarDailySummary summary = calendarService.getDailySummary(USER_ID, monday, null, null);
 
         assertEquals("월", summary.getDayOfWeek());
         assertEquals(1, summary.getWorks().size());
         assertEquals("배민 배달", summary.getWorks().get(0).getJobName());
+        assertEquals(3L, summary.getWorks().get(0).getFatigue());
     }
 
     @Test

@@ -30,6 +30,7 @@ public enum WorkErrorCode implements ServiceErrorCode {
     WORK_LOG_ACCESS_DENIED(403, "본인 소유가 아닌 근무일지입니다."),
     INVALID_WORK_TIME_RANGE(400, "시작 시간과 종료 시간이 같을 수 없습니다."),
     WORK_LOG_ALREADY_CONFIRMED(409, "이미 확정된 근무일지입니다."),
+    WORK_LOG_SETTLEMENT_IN_PROGRESS(409, "정산이 진행 중이거나 완료된 근무일지는 수정할 수 없습니다."),
 
     CATEGORY_NOT_FOUND(404, "존재하지 않는 카테고리입니다."),
     PLATFORM_NOT_FOUND(404, "존재하지 않는 플랫폼입니다."),

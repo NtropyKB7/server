@@ -111,7 +111,7 @@ public class CalendarService {
 
         List<CalendarWorkBrief> works = workLogs.stream()
                 .map(w -> new CalendarWorkBrief(w.getLogId(), w.getJobId(), jobNames.get(w.getJobId()),
-                        w.getStartTime(), w.getEndTime(), w.getStatus()))
+                        w.getStartTime(), w.getEndTime(), w.getStatus(), w.getTaskCount(), w.getFatigue()))
                 .collect(Collectors.toList());
 
         String dayOfWeek = KOREAN_DAY_OF_WEEK.get(date.getDayOfWeek());
