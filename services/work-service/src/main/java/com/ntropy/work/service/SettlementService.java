@@ -125,7 +125,9 @@ public class SettlementService {
         }
 
         List<Platform> platforms = platformMapper.findAll();
-        List<Job> jobs = jobMapper.findByUserId(userId);
+        List<Job> jobs = jobMapper.findByUserId(userId).stream()
+                .filter(job -> Boolean.TRUE.equals(job.getIsActive()))
+                .toList();
 
         boolean settlementCreated = false;
         long unmatchedAmount = 0;
