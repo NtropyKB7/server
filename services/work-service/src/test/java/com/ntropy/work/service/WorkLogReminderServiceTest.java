@@ -3,9 +3,11 @@ package com.ntropy.work.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +19,9 @@ import com.ntropy.common.domain.UserScope;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
+import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 
 class WorkLogReminderServiceTest {
@@ -26,6 +30,7 @@ class WorkLogReminderServiceTest {
     private static final Long JOB_ID = 100L;
 
     private final InMemoryWorkLogMapper workLogMapper = new InMemoryWorkLogMapper();
+    private final InMemoryJobMapper jobMapper = new InMemoryJobMapper();
     private final StubActiveUserQueryClient activeUserQueryClient = new StubActiveUserQueryClient();
     private final StubNotificationCommandClient notificationCommandClient = new StubNotificationCommandClient();
     private final WorkLogReminderService service =
@@ -33,11 +38,13 @@ class WorkLogReminderServiceTest {
                     activeUserQueryClient,
                     new WorkReminderBatchUserScopeProperties("REAL_ONLY"),
                     workLogMapper,
+                    jobMapper,
                     notificationCommandClient);
 
     @BeforeEach
     void setUp() {
         activeUserQueryClient.userIds = List.of(USER_ID);
+        jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).jobName("배달의민족").isActive(true).build());
     }
 
     @Test
@@ -62,7 +69,7 @@ class WorkLogReminderServiceTest {
     @Test
     @DisplayName("종료 후 1시간이 지난 PLANNED 근무일지가 있으면 건별로 미확정 리마인더를 보낸다")
     void checkUnconfirmedWorkLogs_pastDelay_sendsNotificationPerWorkLog() {
-        WorkLog log = workLog(LocalDate.now(), "PLANNED", LocalTime.now().minusHours(1).minusMinutes(1));
+        WorkLog log = workLogEndingAt(LocalDateTime.now().minusHours(1).minusMinutes(1), "PLANNED");
         workLogMapper.insert(log);
 
         service.checkUnconfirmedWorkLogs();
@@ -72,9 +79,55 @@ class WorkLogReminderServiceTest {
     }
 
     @Test
+    @DisplayName("미확정 리마인더 본문에 날짜와 근무명이 담긴다")
+    void checkUnconfirmedWorkLogs_pastDelay_bodyContainsDateAndJobName() {
+        LocalDateTime endAt = LocalDateTime.now().minusHours(2);
+        WorkLog log = WorkLog.builder()
+                .userId(USER_ID)
+                .jobId(JOB_ID)
+                .workDate(endAt.toLocalDate())
+                .status("PLANNED")
+                .startTime(endAt.minusHours(1).toLocalTime())
+                .endTime(endAt.toLocalTime())
+                .build();
+        workLogMapper.insert(log);
+
+        service.checkUnconfirmedWorkLogs();
+
+        assertEquals(1, notificationCommandClient.created.size());
+        String expectedDate = endAt.toLocalDate().format(DateTimeFormatter.ofPattern("yy.M.d", Locale.KOREA));
+        assertEquals(
+                "종료되었는데 확정되지 않은 근무가 있어요. (" + expectedDate + " 배달의민족)",
+                notificationCommandClient.created.get(0).body());
+    }
+
+    @Test
+    @DisplayName("근무(Job) 조회가 안 되면 근무명 없이 날짜만 본문에 담는다")
+    void checkUnconfirmedWorkLogs_jobNotFound_bodyContainsDateOnly() {
+        LocalDateTime endAt = LocalDateTime.now().minusHours(2);
+        WorkLog log = WorkLog.builder()
+                .userId(USER_ID)
+                .jobId(999L) // 시딩되지 않은 jobId
+                .workDate(endAt.toLocalDate())
+                .status("PLANNED")
+                .startTime(endAt.minusHours(1).toLocalTime())
+                .endTime(endAt.toLocalTime())
+                .build();
+        workLogMapper.insert(log);
+
+        service.checkUnconfirmedWorkLogs();
+
+        assertEquals(1, notificationCommandClient.created.size());
+        String expectedDate = endAt.toLocalDate().format(DateTimeFormatter.ofPattern("yy.M.d", Locale.KOREA));
+        assertEquals(
+                "종료되었는데 확정되지 않은 근무가 있어요. (" + expectedDate + ")",
+                notificationCommandClient.created.get(0).body());
+    }
+
+    @Test
     @DisplayName("종료 후 1시간이 지나지 않았으면 미확정 리마인더를 보내지 않는다")
     void checkUnconfirmedWorkLogs_beforeDelayElapsed_doesNotSendNotification() {
-        workLogMapper.insert(workLog(LocalDate.now(), "PLANNED", LocalTime.now().minusMinutes(30)));
+        workLogMapper.insert(workLogEndingAt(LocalDateTime.now().minusMinutes(30), "PLANNED"));
 
         service.checkUnconfirmedWorkLogs();
 
@@ -84,7 +137,7 @@ class WorkLogReminderServiceTest {
     @Test
     @DisplayName("종료 후 1시간이 지났어도 CONFIRMED면 미확정 리마인더를 보내지 않는다")
     void checkUnconfirmedWorkLogs_confirmed_doesNotSendNotification() {
-        workLogMapper.insert(workLog(LocalDate.now(), "CONFIRMED", LocalTime.now().minusHours(2)));
+        workLogMapper.insert(workLogEndingAt(LocalDateTime.now().minusHours(2), "CONFIRMED"));
 
         service.checkUnconfirmedWorkLogs();
 
@@ -94,8 +147,8 @@ class WorkLogReminderServiceTest {
     @Test
     @DisplayName("종료 후 1시간이 지난 미확정 근무일지가 여러 건이면 각각 알림을 보낸다")
     void checkUnconfirmedWorkLogs_multiplePastDelay_sendsOnePerWorkLog() {
-        workLogMapper.insert(workLog(LocalDate.now(), "PLANNED", LocalTime.now().minusHours(2)));
-        workLogMapper.insert(workLog(LocalDate.now(), "PLANNED", LocalTime.now().minusHours(3)));
+        workLogMapper.insert(workLogEndingAt(LocalDateTime.now().minusHours(2), "PLANNED"));
+        workLogMapper.insert(workLogEndingAt(LocalDateTime.now().minusHours(3), "PLANNED"));
 
         service.checkUnconfirmedWorkLogs();
 
@@ -127,13 +180,14 @@ class WorkLogReminderServiceTest {
                 .build();
     }
 
-    private static WorkLog workLog(LocalDate workDate, String status, LocalTime endTime) {
+    /** endAt(날짜+시각)을 workDate/endTime으로 분리해 담는다 - 자정 경계에서도 날짜와 시각이 항상 같이 굴러가게 하기 위함. */
+    private static WorkLog workLogEndingAt(LocalDateTime endAt, String status) {
         return WorkLog.builder()
                 .userId(USER_ID)
                 .jobId(JOB_ID)
-                .workDate(workDate)
+                .workDate(endAt.toLocalDate())
                 .status(status)
-                .endTime(endTime)
+                .endTime(endAt.toLocalTime())
                 .build();
     }
 
