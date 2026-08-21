@@ -39,7 +39,7 @@ class LocalFinancialAccountCommandClientTest {
         );
 
         assertEquals("VIRTUAL", result.connectionType());
-        assertEquals(2, result.accountCount());
+        assertEquals(3, result.accountCount());
         assertEquals(42L, regenerationService.lastUserId);
         assertEquals(PersonalBank.SHINHAN_BANK, regenerationService.lastBank);
         assertTrue(collectionService.registerAndCollectCalls == 0, "VIRTUAL 요청은 CODEF 수집을 호출하면 안 된다");
@@ -269,7 +269,7 @@ class LocalFinancialAccountCommandClientTest {
         public GenerationSummary regenerateForUser(Long userId, PersonalBank bank) {
             lastUserId = userId;
             lastBank = bank;
-            return new GenerationSummary(1, 2, 2, 300, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
+            return new GenerationSummary(1, 3, 2, 306, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
         }
     }
 

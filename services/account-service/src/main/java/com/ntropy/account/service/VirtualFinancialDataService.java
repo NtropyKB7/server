@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.BiFunction;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +15,7 @@ import com.ntropy.account.domain.AccountBalanceConsistencyValidator;
 import com.ntropy.account.domain.AccountGroup;
 import com.ntropy.account.domain.AccountNoHash;
 import com.ntropy.account.domain.AccountNoMask;
+import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
@@ -35,11 +36,12 @@ import lombok.RequiredArgsConstructor;
 public class VirtualFinancialDataService {
 
     public static final int USER_COUNT = 50;
-    public static final int ACCOUNTS_PER_USER = 2;
-    public static final int EXPECTED_TRANSACTION_COUNT = 15_000;
+    public static final int ACCOUNTS_PER_USER = 3;
+    public static final int EXPECTED_TRANSACTION_COUNT = 15_300;
 
     private static final String DATASET_VERSION = "FIN-005-v1";
     private static final String CURRENCY_KRW = "KRW";
+    private static final String VIRTUAL_PROVIDER = ConnectionProvider.NTROPY.name();
     private static final int TRANSACTION_BATCH_SIZE = 500;
 
     private final VirtualConnectionService virtualConnectionService;
@@ -75,17 +77,17 @@ public class VirtualFinancialDataService {
             int userOrdinal = identity.ordinal();
             PersonalBank bank = bankFor(userOrdinal, context.randomSeed(), banks);
             UserGenerationResult result = generateAccountsAndTransactions(
-                    identity.userId(), bank, userOrdinal, totalUsers, referenceDate,
-                    (ordinaryAccount, secondaryAccount) -> transactionGenerator.generate(
+                    identity.userId(), bank, userOrdinal, referenceDate,
+                    (ordinaryAccount, installmentAccount, loanAccount) -> transactionGenerator.generate(
                             referenceDate, userOrdinal, context.randomSeed(), bank,
-                            ordinaryAccount, secondaryAccount
+                            ordinaryAccount, installmentAccount, loanAccount
                     )
             );
             generatedAccounts += result.accounts();
             generatedTransactions += result.transactions();
         }
 
-        // 지난 2개월은 사용자당 200건 고정이고, 현재 월은 기준일까지만 생성돼 사용자당 0~100건이다.
+        // 지난 2개월은 사용자당 204건 고정이고, 현재 월은 기준일까지만 생성돼 사용자당 0~102건이다.
         int minimumExpected = totalUsers * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 2;
         int maximumExpected = totalUsers * VirtualFinancialTransactionGenerator.TRANSACTIONS_PER_USER_PER_MONTH * 3;
         if (generatedTransactions < minimumExpected || generatedTransactions > maximumExpected) {
@@ -102,7 +104,7 @@ public class VirtualFinancialDataService {
         );
     }
 
-    /** 로그인 사용자 한 명에게 선택 은행의 가상계좌 2개와 목 거래를 멱등 생성한다. */
+    /** 로그인 사용자 한 명에게 선택 은행의 가상계좌 3개(수시입출금·적금·대출)와 목 거래를 멱등 생성한다. */
     @Transactional
     public GenerationSummary generateForUser(Long userId, PersonalBank bank) {
         if (userId == null || userId <= 0) {
@@ -114,9 +116,9 @@ public class VirtualFinancialDataService {
         LocalDate referenceDate = LocalDate.now(clock);
         int ordinal = stableUserOrdinal(userId);
         UserGenerationResult result = generateAccountsAndTransactions(
-                userId, bank, ordinal, USER_COUNT, referenceDate,
-                (ordinaryAccount, secondaryAccount) -> transactionGenerator.generateForUser(
-                        referenceDate, userId, bank, ordinaryAccount, secondaryAccount
+                userId, bank, ordinal, referenceDate,
+                (ordinaryAccount, installmentAccount, loanAccount) -> transactionGenerator.generateForUser(
+                        referenceDate, userId, bank, ordinaryAccount, installmentAccount, loanAccount
                 )
         );
         return new GenerationSummary(
@@ -127,30 +129,70 @@ public class VirtualFinancialDataService {
     }
 
     private UserGenerationResult generateAccountsAndTransactions(
-            Long userId, PersonalBank bank, int userOrdinal, int totalUsers, LocalDate referenceDate,
-            BiFunction<Account, Account, GeneratedTransactions> transactionsSupplier) {
+            Long userId, PersonalBank bank, int userOrdinal, LocalDate referenceDate,
+            TransactionsSupplier transactionsSupplier) {
         CodefConnection connection = virtualConnectionService.getOrCreateConnection(userId);
         virtualConnectionService.registerInstitution(connection, bank.getOrganizationCode());
 
-        Account ordinaryAccount = saveAccount(
-                buildOrdinaryAccount(userOrdinal, userId, connection, bank, referenceDate)
-        );
-        Account secondaryAccount = saveAccount(
-                buildSecondaryAccount(userOrdinal, totalUsers, userId, connection, bank, referenceDate)
-        );
-        GeneratedTransactions generated = transactionsSupplier.apply(ordinaryAccount, secondaryAccount);
+        Account ordinaryAccount = buildOrdinaryAccount(userOrdinal, userId, connection, bank, referenceDate);
+        Account installmentAccount = buildInstallmentAccount(userOrdinal, userId, connection, bank, referenceDate);
+        Account loanAccount = buildLoanAccount(userOrdinal, userId, connection, bank, referenceDate);
+        List<Account> expectedAccounts = List.of(ordinaryAccount, installmentAccount, loanAccount);
+        reconcileLegacyAccountLayout(userId, expectedAccounts);
+
+        ordinaryAccount = saveAccount(ordinaryAccount);
+        installmentAccount = saveAccount(installmentAccount);
+        loanAccount = saveAccount(loanAccount);
+        GeneratedTransactions generated = transactionsSupplier.apply(ordinaryAccount, installmentAccount, loanAccount);
 
         ordinaryAccount.setBalance(generated.finalBalances().get(ordinaryAccount.getId()));
-        secondaryAccount.setBalance(generated.finalBalances().get(secondaryAccount.getId()));
+        installmentAccount.setBalance(generated.finalBalances().get(installmentAccount.getId()));
+        loanAccount.setBalance(generated.finalBalances().get(loanAccount.getId()));
         ordinaryAccount.setLastTranDate(lastTransactionDate(ordinaryAccount.getId(), generated.transactions()));
-        secondaryAccount.setLastTranDate(lastTransactionDate(secondaryAccount.getId(), generated.transactions()));
+        installmentAccount.setLastTranDate(lastTransactionDate(installmentAccount.getId(), generated.transactions()));
+        loanAccount.setLastTranDate(lastTransactionDate(loanAccount.getId(), generated.transactions()));
         accountMapper.upsert(ordinaryAccount);
-        accountMapper.upsert(secondaryAccount);
+        accountMapper.upsert(installmentAccount);
+        accountMapper.upsert(loanAccount);
 
         insertInBatches(generated.transactions());
         validateStoredBalance(ordinaryAccount, referenceDate);
-        validateStoredBalance(secondaryAccount, referenceDate);
-        return new UserGenerationResult(2, generated.transactions().size(), generated.userIncomeCounterpartyCount());
+        validateStoredBalance(installmentAccount, referenceDate);
+        validateStoredBalance(loanAccount, referenceDate);
+        return new UserGenerationResult(3, generated.transactions().size(), generated.userIncomeCounterpartyCount());
+    }
+
+    /**
+     * 2계좌 시절의 accountOrdinal=2 계좌와 거래가 남아 있으면 새 거래의 잔액 흐름과 섞인다.
+     * 새 3계좌 레이아웃과 다른 경우에만 해당 사용자의 NTROPY 계좌·거래를 정리해 한 번만 마이그레이션한다.
+     */
+    private void reconcileLegacyAccountLayout(Long userId, List<Account> expectedAccounts) {
+        List<Account> existingAccounts = accountMapper.findByUserIdAndProvider(userId, VIRTUAL_PROVIDER);
+        if (existingAccounts == null || existingAccounts.isEmpty()) {
+            return;
+        }
+
+        boolean currentLayout = existingAccounts.size() == expectedAccounts.size()
+                && expectedAccounts.stream().allMatch(expected -> existingAccounts.stream()
+                .anyMatch(existing -> sameAccountLayout(existing, expected)));
+        if (currentLayout) {
+            return;
+        }
+
+        accountTransactionMapper.deleteByUserIdAndProvider(userId, VIRTUAL_PROVIDER);
+        accountMapper.deleteByUserIdAndProvider(userId, VIRTUAL_PROVIDER);
+    }
+
+    private static boolean sameAccountLayout(Account existing, Account expected) {
+        return Objects.equals(existing.getCodefConnectionId(), expected.getCodefConnectionId())
+                && Objects.equals(existing.getAccountNoHash(), expected.getAccountNoHash())
+                && existing.getAccountGroup() == expected.getAccountGroup()
+                && Objects.equals(existing.getDepositTypeCode(), expected.getDepositTypeCode());
+    }
+
+    @FunctionalInterface
+    private interface TransactionsSupplier {
+        GeneratedTransactions apply(Account ordinaryAccount, Account installmentAccount, Account loanAccount);
     }
 
     /** 은행 배정: 순번을 randomSeed만큼 순환시켜, 데이터셋 버전(랜덤시드)이 바뀌면 배정도 함께 바뀌도록 한다. */
@@ -191,25 +233,34 @@ public class VirtualFinancialDataService {
         return account;
     }
 
-    private static Account buildSecondaryAccount(int userOrdinal, int totalUsers, Long userId,
-                                                 CodefConnection connection, PersonalBank bank,
-                                                 LocalDate referenceDate) {
+    private static Account buildInstallmentAccount(int userOrdinal, Long userId,
+                                                    CodefConnection connection, PersonalBank bank,
+                                                    LocalDate referenceDate) {
         Account account = baseAccount(userOrdinal, userId, connection, bank, 2, referenceDate);
-        boolean installment = userOrdinal <= totalUsers / 2;
-        account.setAccountGroup(installment ? AccountGroup.DEPOSIT_TRUST : AccountGroup.LOAN);
-        account.setDepositTypeCode(installment ? "12" : "40");
-        account.setAccountName(bank.getDisplayName() + (installment ? " 가상 적금" : " 가상 대출"));
+        account.setAccountGroup(AccountGroup.DEPOSIT_TRUST);
+        account.setDepositTypeCode("12");
+        account.setAccountName(bank.getDisplayName() + " 가상 적금");
         account.setBalance(BigDecimal.ZERO);
         account.setOverdraftYn(null);
         account.setNextPaymentDate(DefaultPaymentSchedule.nextAfter(referenceDate));
-        if (installment) {
-            account.setInterestRate(installmentInterestRate(userOrdinal));
-            account.setMaturityDate(referenceDate.plusYears(2));
-        } else {
-            account.setLoanContractPrincipal(loanContractPrincipal(userOrdinal));
-            account.setInterestRate(loanInterestRate(userOrdinal));
-            account.setMaturityDate(referenceDate.plusYears(10));
-        }
+        account.setInterestRate(installmentInterestRate(userOrdinal));
+        account.setMaturityDate(referenceDate.plusYears(2));
+        return account;
+    }
+
+    private static Account buildLoanAccount(int userOrdinal, Long userId,
+                                            CodefConnection connection, PersonalBank bank,
+                                            LocalDate referenceDate) {
+        Account account = baseAccount(userOrdinal, userId, connection, bank, 3, referenceDate);
+        account.setAccountGroup(AccountGroup.LOAN);
+        account.setDepositTypeCode("40");
+        account.setAccountName(bank.getDisplayName() + " 가상 대출");
+        account.setBalance(BigDecimal.ZERO);
+        account.setOverdraftYn(null);
+        account.setNextPaymentDate(DefaultPaymentSchedule.nextAfter(referenceDate));
+        account.setLoanContractPrincipal(loanContractPrincipal(userOrdinal));
+        account.setInterestRate(loanInterestRate(userOrdinal));
+        account.setMaturityDate(referenceDate.plusYears(10));
         return account;
     }
 

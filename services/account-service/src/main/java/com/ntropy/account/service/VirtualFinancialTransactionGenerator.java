@@ -26,7 +26,8 @@ import com.ntropy.account.domain.entity.AccountTransaction;
 @Component
 public class VirtualFinancialTransactionGenerator {
 
-    public static final int TRANSACTIONS_PER_USER_PER_MONTH = 100;
+    /** 수시입출금(income+fixed+consumption+적금이체+대출상환) + 적금 1건 + 대출 1건. */
+    public static final int TRANSACTIONS_PER_USER_PER_MONTH = 102;
     private static final int CONSUMPTION_TRANSACTIONS_PER_MONTH = 74;
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
@@ -141,22 +142,24 @@ public class VirtualFinancialTransactionGenerator {
     private static final double[] DIFFICULTY_TARGET_PERCENTAGES = {24.3, 54.1, 16.2, 5.4};
 
     public GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, PersonalBank bank,
-                                          Account ordinaryAccount, Account secondaryAccount) {
-        return generate(referenceDate, userOrdinal, 0L, bank, ordinaryAccount, secondaryAccount);
+                                          Account ordinaryAccount, Account installmentAccount, Account loanAccount) {
+        return generate(referenceDate, userOrdinal, 0L, bank, ordinaryAccount, installmentAccount, loanAccount);
     }
 
     /** 공용 데이터셋 seed와 사용자 순번으로 소비 프로필을 결정해 거래를 생성한다. */
     public GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, long randomSeed,
-                                          PersonalBank bank, Account ordinaryAccount, Account secondaryAccount) {
+                                          PersonalBank bank, Account ordinaryAccount,
+                                          Account installmentAccount, Account loanAccount) {
         return generate(
                 referenceDate, userOrdinal, consumerProfileFor(userOrdinal, randomSeed),
-                bank, ordinaryAccount, secondaryAccount
+                bank, ordinaryAccount, installmentAccount, loanAccount
         );
     }
 
     /** 실제 로그인 사용자는 userId 해시로 네 소비 유형 중 하나에 안정적으로 배정한다. */
     public GeneratedTransactions generateForUser(LocalDate referenceDate, Long userId, PersonalBank bank,
-                                                  Account ordinaryAccount, Account secondaryAccount) {
+                                                  Account ordinaryAccount, Account installmentAccount,
+                                                  Account loanAccount) {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("사용자 ID는 양수여야 합니다");
         }
@@ -165,13 +168,17 @@ public class VirtualFinancialTransactionGenerator {
         ConsumerProfile[] profiles = ConsumerProfile.values();
         int variation = Math.floorMod(hash / profiles.length, 12);
         int stableUserOrdinal = 1 + profile.ordinal() + profiles.length * variation;
-        return generate(referenceDate, stableUserOrdinal, profile, bank, ordinaryAccount, secondaryAccount);
+        return generate(
+                referenceDate, stableUserOrdinal, profile, bank, ordinaryAccount, installmentAccount, loanAccount
+        );
     }
 
     private GeneratedTransactions generate(LocalDate referenceDate, int userOrdinal, ConsumerProfile consumerProfile,
-                                            PersonalBank bank, Account ordinaryAccount, Account secondaryAccount) {
+                                            PersonalBank bank, Account ordinaryAccount,
+                                            Account installmentAccount, Account loanAccount) {
         requireAccountId(ordinaryAccount);
-        requireAccountId(secondaryAccount);
+        requireAccountId(installmentAccount);
+        requireAccountId(loanAccount);
         if (referenceDate == null) {
             throw new IllegalArgumentException("기준일이 필요합니다");
         }
@@ -181,11 +188,10 @@ public class VirtualFinancialTransactionGenerator {
 
         int userIncomeCounterpartyCount = userIncomeCounterpartyCount(userOrdinal);
         List<String> incomeCounterparties = incomeCounterparties(userOrdinal, userIncomeCounterpartyCount);
-        boolean installment = secondaryAccount.getAccountGroup()
-                == com.ntropy.account.domain.AccountGroup.DEPOSIT_TRUST;
 
         List<PlannedTransaction> ordinaryPlans = new ArrayList<>();
-        List<PlannedTransaction> secondaryPlans = new ArrayList<>();
+        List<PlannedTransaction> installmentPlans = new ArrayList<>();
+        List<PlannedTransaction> loanPlans = new ArrayList<>();
 
         YearMonth currentMonth = YearMonth.from(referenceDate);
         for (int monthOffset = 0; monthOffset < 3; monthOffset++) {
@@ -193,42 +199,45 @@ public class VirtualFinancialTransactionGenerator {
             boolean isCurrentMonth = monthOffset == 2;
 
             List<PlannedTransaction> monthOrdinaryPlans = new ArrayList<>();
-            List<PlannedTransaction> monthSecondaryPlans = new ArrayList<>();
+            List<PlannedTransaction> monthInstallmentPlans = new ArrayList<>();
+            List<PlannedTransaction> monthLoanPlans = new ArrayList<>();
             addIncomePlans(monthOrdinaryPlans, userOrdinal, monthOffset, month, incomeCounterparties);
             addFixedExpensePlans(monthOrdinaryPlans, userOrdinal, monthOffset, month);
             addConsumptionPlans(monthOrdinaryPlans, userOrdinal, monthOffset, month, consumerProfile);
-            addSecondaryTransferPlans(
-                    monthOrdinaryPlans, monthSecondaryPlans, userOrdinal, monthOffset, month, installment
-            );
+            addInstallmentTransferPlans(monthOrdinaryPlans, monthInstallmentPlans, userOrdinal, month);
+            addLoanRepaymentPlans(monthOrdinaryPlans, monthLoanPlans, userOrdinal, month);
 
             if (isCurrentMonth) {
                 // 현재 월은 기준일 이후 거래를 만들지 않는다. 지난 2개월은 항상 완결된 달이라 필터가 필요 없다.
                 monthOrdinaryPlans.removeIf(plan -> plan.date().isAfter(referenceDate));
-                monthSecondaryPlans.removeIf(plan -> plan.date().isAfter(referenceDate));
+                monthInstallmentPlans.removeIf(plan -> plan.date().isAfter(referenceDate));
+                monthLoanPlans.removeIf(plan -> plan.date().isAfter(referenceDate));
             }
             ordinaryPlans.addAll(monthOrdinaryPlans);
-            secondaryPlans.addAll(monthSecondaryPlans);
+            installmentPlans.addAll(monthInstallmentPlans);
+            loanPlans.addAll(monthLoanPlans);
         }
 
         List<AccountTransaction> ordinaryTransactions = materialize(
                 ordinaryAccount.getId(), AccountTransactionCategory.ORDINARY,
                 BigDecimal.valueOf(3_000_000L + userOrdinal * 20_000L), bank, ordinaryPlans
         );
-        BigDecimal secondaryOpeningBalance = installment
-                ? ZERO
-                : BigDecimal.valueOf(15_000_000L + userOrdinal * 100_000L);
-        AccountTransactionCategory secondaryCategory = installment
-                ? AccountTransactionCategory.INSTALLMENT
-                : AccountTransactionCategory.LOAN;
-        List<AccountTransaction> secondaryTransactions = materialize(
-                secondaryAccount.getId(), secondaryCategory, secondaryOpeningBalance, bank, secondaryPlans
+        List<AccountTransaction> installmentTransactions = materialize(
+                installmentAccount.getId(), AccountTransactionCategory.INSTALLMENT, ZERO, bank, installmentPlans
+        );
+        List<AccountTransaction> loanTransactions = materialize(
+                loanAccount.getId(), AccountTransactionCategory.LOAN,
+                BigDecimal.valueOf(15_000_000L + userOrdinal * 100_000L), bank, loanPlans
         );
 
-        List<AccountTransaction> all = new ArrayList<>(ordinaryTransactions.size() + secondaryTransactions.size());
+        List<AccountTransaction> all = new ArrayList<>(
+                ordinaryTransactions.size() + installmentTransactions.size() + loanTransactions.size()
+        );
         all.addAll(ordinaryTransactions);
-        all.addAll(secondaryTransactions);
+        all.addAll(installmentTransactions);
+        all.addAll(loanTransactions);
 
-        // 지난 2개월은 완결된 달이라 항상 월 100건씩 200건이고, 현재 월은 기준일까지만 생성돼 0~100건이다.
+        // 지난 2개월은 완결된 달이라 항상 월 102건씩 204건이고, 현재 월은 기준일까지만 생성돼 0~102건이다.
         int minimumExpected = TRANSACTIONS_PER_USER_PER_MONTH * 2;
         int maximumExpected = TRANSACTIONS_PER_USER_PER_MONTH * 3;
         if (all.size() < minimumExpected || all.size() > maximumExpected) {
@@ -239,7 +248,8 @@ public class VirtualFinancialTransactionGenerator {
 
         Map<Long, BigDecimal> finalBalances = new LinkedHashMap<>();
         finalBalances.put(ordinaryAccount.getId(), lastBalance(ordinaryTransactions));
-        finalBalances.put(secondaryAccount.getId(), lastBalance(secondaryTransactions));
+        finalBalances.put(installmentAccount.getId(), lastBalance(installmentTransactions));
+        finalBalances.put(loanAccount.getId(), lastBalance(loanTransactions));
         return new GeneratedTransactions(
                 List.copyOf(all), Map.copyOf(finalBalances), userIncomeCounterpartyCount
         );
@@ -452,27 +462,35 @@ public class VirtualFinancialTransactionGenerator {
         return b == 0 ? a : gcd(b, a % b);
     }
 
-    private static void addSecondaryTransferPlans(List<PlannedTransaction> ordinaryPlans,
-                                                  List<PlannedTransaction> secondaryPlans,
-                                                  int userOrdinal, int monthOffset,
-                                                  YearMonth month, boolean installment) {
-        long amount = installment
-                ? 300_000L + (userOrdinal % 3) * 50_000L
-                : 450_000L + (userOrdinal % 4) * 50_000L;
+    private static void addInstallmentTransferPlans(List<PlannedTransaction> ordinaryPlans,
+                                                     List<PlannedTransaction> installmentPlans,
+                                                     int userOrdinal, YearMonth month) {
+        long amount = 300_000L + (userOrdinal % 3) * 50_000L;
         LocalDate date = DefaultPaymentSchedule.occurrenceIn(month);
-        String counterparty = installment ? "정기적금" : "대출상환";
 
         ordinaryPlans.add(new PlannedTransaction(
                 date, LocalTime.of(21, 0), BigDecimal.valueOf(amount), ZERO,
-                "출금", "계좌이체", counterparty, installment ? "적금 납입" : "원리금 상환", "동일은행"
+                "출금", "계좌이체", "정기적금", "적금 납입", "동일은행"
         ));
-        secondaryPlans.add(new PlannedTransaction(
-                date, LocalTime.of(21, 1),
-                installment ? ZERO : BigDecimal.valueOf(amount),
-                installment ? BigDecimal.valueOf(amount) : ZERO,
-                installment ? "입금" : "상환", "자동이체",
-                installment ? "수시입출금계좌" : "대출계좌",
-                installment ? "정기 납입" : "원리금 상환", "동일은행"
+        installmentPlans.add(new PlannedTransaction(
+                date, LocalTime.of(21, 1), ZERO, BigDecimal.valueOf(amount),
+                "입금", "자동이체", "수시입출금계좌", "정기 납입", "동일은행"
+        ));
+    }
+
+    private static void addLoanRepaymentPlans(List<PlannedTransaction> ordinaryPlans,
+                                              List<PlannedTransaction> loanPlans,
+                                              int userOrdinal, YearMonth month) {
+        long amount = 450_000L + (userOrdinal % 4) * 50_000L;
+        LocalDate date = DefaultPaymentSchedule.occurrenceIn(month);
+
+        ordinaryPlans.add(new PlannedTransaction(
+                date, LocalTime.of(21, 2), BigDecimal.valueOf(amount), ZERO,
+                "출금", "계좌이체", "대출상환", "원리금 상환", "동일은행"
+        ));
+        loanPlans.add(new PlannedTransaction(
+                date, LocalTime.of(21, 3), BigDecimal.valueOf(amount), ZERO,
+                "상환", "자동이체", "대출계좌", "원리금 상환", "동일은행"
         ));
     }
 
