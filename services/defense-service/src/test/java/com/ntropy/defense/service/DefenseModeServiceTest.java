@@ -17,12 +17,14 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -64,13 +66,42 @@ class DefenseModeServiceTest {
     }
 
     @Test
+    void recalculatesCurrentMonthDiagnosisBeforeImmediateActivation() {
+        MemoryMapper immediateMapper = new MemoryMapper();
+        AtomicReference<DiagnosisDefenseSnapshot> latestSnapshot = new AtomicReference<>(
+                new DiagnosisDefenseSnapshot(null, null, null));
+        AtomicReference<YearMonth> recalculatedMonth = new AtomicReference<>();
+        Clock clock = clockAt(LocalDate.of(2026, 8, 21));
+        DefenseModeService immediateService = new DefenseModeService(
+                immediateMapper,
+                userId -> latestSnapshot.get(),
+                (userId, yearMonth) -> {
+                    recalculatedMonth.set(yearMonth);
+                    latestSnapshot.set(new DiagnosisDefenseSnapshot(1_200_000L, 600_000L, 3_000_000L));
+                },
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                clock);
+
+        DefenseMode entered = immediateService.enter(new DefenseModeEnterCommand(
+                1L, "ILLNESS", LocalDate.of(2026, 8, 21), LocalDate.of(2026, 8, 31)));
+
+        assertEquals(YearMonth.of(2026, 8), recalculatedMonth.get());
+        assertEquals(DefenseModeStatus.ACTIVE, entered.getStatus());
+        assertEquals(1_800_000L, entered.getAvailableAssetsSnapshot());
+        assertEquals(18, entered.getDDay());
+    }
+
+    @Test
     void schedulesFutureDefenseModeAndCalculatesSnapshotWhenActivated() {
         MemoryMapper scheduledMapper = new MemoryMapper();
+        AtomicInteger recalculationCount = new AtomicInteger();
         AtomicReference<DiagnosisDefenseSnapshot> latestSnapshot = new AtomicReference<>(
                 new DiagnosisDefenseSnapshot(100_000L, 200_000L, 900_000L));
         DefenseModeService scheduledService = new DefenseModeService(
                 scheduledMapper,
                 userId -> latestSnapshot.get(),
+                (userId, yearMonth) -> recalculationCount.incrementAndGet(),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 clockAt(LocalDate.of(2026, 8, 3)));
@@ -81,16 +112,19 @@ class DefenseModeServiceTest {
         assertEquals(DefenseModeStatus.SCHEDULED, entered.getStatus());
         assertEquals(null, entered.getAvailableAssetsSnapshot());
         assertEquals(null, entered.getDDay());
+        assertEquals(0, recalculationCount.get());
 
         latestSnapshot.set(new DiagnosisDefenseSnapshot(1_200_000L, 600_000L, 3_000_000L));
         DefenseModeService activationService = new DefenseModeService(
                 scheduledMapper,
                 userId -> latestSnapshot.get(),
+                (userId, yearMonth) -> recalculationCount.incrementAndGet(),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 clockAt(LocalDate.of(2026, 8, 10)));
 
         assertEquals(1, activationService.activateScheduledModes());
+        assertEquals(1, recalculationCount.get());
         DefenseMode activated = scheduledMapper.findById(entered.getDefenseId());
         assertEquals(DefenseModeStatus.ACTIVE, activated.getStatus());
         assertEquals(1_800_000L, activated.getAvailableAssetsSnapshot());
