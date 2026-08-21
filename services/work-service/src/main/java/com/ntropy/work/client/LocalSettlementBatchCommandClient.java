@@ -17,10 +17,12 @@ public class LocalSettlementBatchCommandClient implements SettlementBatchCommand
 
     @Override
     public boolean runForDate(Long userId, LocalDate processDate) {
-        boolean created = settlementService.processSettlement(userId, processDate);
-        if (created) {
-            settlementService.notifySettlementCompleted(userId, processDate);
+        SettlementService.SettlementBatchOutcome outcome =
+                settlementService.processSettlementDetailed(userId, processDate);
+        if (outcome.createdCount() > 0) {
+            settlementService.notifySettlementCompleted(
+                    userId, processDate, outcome.createdCount(), outcome.totalAmount());
         }
-        return created;
+        return outcome.createdCount() > 0;
     }
 }

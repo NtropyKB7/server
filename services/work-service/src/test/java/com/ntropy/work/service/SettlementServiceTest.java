@@ -69,7 +69,7 @@ class SettlementServiceTest {
                 .settlementCycle("DAILY")
                 .settlementOffsetDay(1)
                 .build());
-        jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).build());
+        jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).isActive(true).build());
         incomingTransactionQueryClient = new StubIncomingTransactionQueryClient();
         service = new SettlementService(
                 incomingTransactionQueryClient, activeUserQueryClient,
@@ -356,7 +356,7 @@ class SettlementServiceTest {
     }
 
     @Test
-    @DisplayName("runDailyBatch에서 여러 날짜의 정산이 생성돼도 유저당 정산 완료 알림은 1건만 발송된다")
+    @DisplayName("runDailyBatch에서 여러 날짜의 정산이 생성돼도 유저당 정산 완료 알림은 1건만 발송되고, 건수/총액이 합산되어 본문에 담긴다")
     void runDailyBatch_settlementCreatedOnMultipleDays_sendsSingleNotificationPerUser() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
         activeUserQueryClient.userIds = List.of(USER_ID);
@@ -373,8 +373,40 @@ class SettlementServiceTest {
 
         assertEquals(2, settlementMapper.findAll().size());
         assertEquals(1, notificationCommandClient.created.size());
-        assertEquals(USER_ID, notificationCommandClient.created.get(0).userId());
-        assertEquals("settlement-completed-" + USER_ID + "-" + today, notificationCommandClient.created.get(0).eventId());
+        NotificationCreateCommand notification = notificationCommandClient.created.get(0);
+        assertEquals(USER_ID, notification.userId());
+        assertEquals("settlement-completed-" + USER_ID + "-" + today, notification.eventId());
+        assertEquals("오늘 정산 2건, 총 88,000원이 처리됐어요.", notification.body());
+    }
+
+    @Test
+    @DisplayName("processSettlementDetailed는 생성된 정산 건수와 실입금액 총합을 반환한다")
+    void processSettlementDetailed_returnsCreatedCountAndTotalAmount() {
+        jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
+        incomingTransactionQueryClient.transactions = List.of(
+                transaction(111L, 30_000L),
+                transaction(222L, 20_000L)
+        );
+
+        SettlementService.SettlementBatchOutcome outcome =
+                service.processSettlementDetailed(USER_ID, PROCESS_DATE);
+
+        assertEquals(2, outcome.createdCount());
+        assertEquals(50_000L, outcome.totalAmount());
+    }
+
+    @Test
+    @DisplayName("UNMATCHED 거래만 있으면 processSettlementDetailed의 건수/총액은 0이다")
+    void processSettlementDetailed_onlyUnmatched_returnsZero() {
+        incomingTransactionQueryClient.transactions = List.of(
+                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
+        );
+
+        SettlementService.SettlementBatchOutcome outcome =
+                service.processSettlementDetailed(USER_ID, PROCESS_DATE);
+
+        assertEquals(0, outcome.createdCount());
+        assertEquals(0L, outcome.totalAmount());
     }
 
     @Test
