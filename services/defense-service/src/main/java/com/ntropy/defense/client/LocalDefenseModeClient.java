@@ -49,6 +49,13 @@ public class LocalDefenseModeClient implements DefenseModeCommandClient, Defense
     @Override
     public DefenseModeSummary getCurrent(Long userId) {
         DefenseMode defenseMode = defenseModeService.getCurrent(userId);
+        if (defenseMode.getStatus() == DefenseModeStatus.SCHEDULED) {
+            GrowthModeSummary growthMode = new GrowthModeSummary(
+                    false,
+                    "DISPLAY_ONLY",
+                    "방어모드 시작 전까지 성장모드는 계속 유지됩니다.");
+            return toSummary(defenseMode, null, null, growthMode, null);
+        }
         FixedExpenseCheckSummary fixedExpenseCheck = defenseModeService.getFixedExpenseCheck(defenseMode);
         ExpectedIncomeLossSummary expectedIncomeLoss = defenseModeService.getExpectedIncomeLoss(defenseMode);
         GrowthModeSummary growthMode = new GrowthModeSummary(

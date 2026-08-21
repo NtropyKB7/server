@@ -1,5 +1,6 @@
 package com.ntropy.defense.service;
 
+import com.ntropy.common.client.DiagnosisCommandClient;
 import com.ntropy.common.client.DiagnosisQueryClient;
 import com.ntropy.common.client.FinancialCommitmentQueryClient;
 import com.ntropy.common.client.ExpectedIncomeLossQueryClient;
@@ -41,6 +42,7 @@ public class DefenseModeService {
 
     private final DefenseModeMapper defenseModeMapper;
     private final DiagnosisQueryClient diagnosisQueryClient;
+    private final DiagnosisCommandClient diagnosisCommandClient;
     private final FinancialCommitmentQueryClient financialCommitmentQueryClient;
     private final ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient;
     private final Clock clock;
@@ -49,11 +51,13 @@ public class DefenseModeService {
     public DefenseModeService(
             DefenseModeMapper defenseModeMapper,
             ObjectProvider<DiagnosisQueryClient> diagnosisQueryClientProvider,
+            ObjectProvider<DiagnosisCommandClient> diagnosisCommandClientProvider,
             ObjectProvider<FinancialCommitmentQueryClient> financialCommitmentQueryClientProvider,
             ObjectProvider<ExpectedIncomeLossQueryClient> expectedIncomeLossQueryClientProvider) {
         this(
                 defenseModeMapper,
                 diagnosisQueryClientProvider.getIfAvailable(() -> userId -> null),
+                diagnosisCommandClientProvider.getObject(),
                 financialCommitmentQueryClientProvider.getIfAvailable(
                         () -> (userId, fromDate, toDate) -> Collections.emptyList()),
                 expectedIncomeLossQueryClientProvider.getIfAvailable(
@@ -66,7 +70,7 @@ public class DefenseModeService {
             DiagnosisQueryClient diagnosisQueryClient,
             FinancialCommitmentQueryClient financialCommitmentQueryClient,
             ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient) {
-        this(defenseModeMapper, diagnosisQueryClient, financialCommitmentQueryClient,
+        this(defenseModeMapper, diagnosisQueryClient, (userId, yearMonth) -> { }, financialCommitmentQueryClient,
                 expectedIncomeLossQueryClient, Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
@@ -76,8 +80,20 @@ public class DefenseModeService {
             FinancialCommitmentQueryClient financialCommitmentQueryClient,
             ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient,
             Clock clock) {
+        this(defenseModeMapper, diagnosisQueryClient, (userId, yearMonth) -> { }, financialCommitmentQueryClient,
+                expectedIncomeLossQueryClient, clock);
+    }
+
+    public DefenseModeService(
+            DefenseModeMapper defenseModeMapper,
+            DiagnosisQueryClient diagnosisQueryClient,
+            DiagnosisCommandClient diagnosisCommandClient,
+            FinancialCommitmentQueryClient financialCommitmentQueryClient,
+            ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient,
+            Clock clock) {
         this.defenseModeMapper = defenseModeMapper;
         this.diagnosisQueryClient = diagnosisQueryClient;
+        this.diagnosisCommandClient = diagnosisCommandClient;
         this.financialCommitmentQueryClient = financialCommitmentQueryClient;
         this.expectedIncomeLossQueryClient = expectedIncomeLossQueryClient;
         this.clock = clock;
@@ -86,7 +102,7 @@ public class DefenseModeService {
     @Transactional
     public DefenseMode enter(DefenseModeEnterCommand command) {
         validateEnterCommand(command);
-        if (defenseModeMapper.findActiveByUserId(command.getUserId()) != null) {
+        if (defenseModeMapper.findCurrentByUserId(command.getUserId()) != null) {
             throw new ServiceException(DefenseErrorCode.ALREADY_ACTIVE);
         }
 
@@ -95,8 +111,13 @@ public class DefenseModeService {
         defenseMode.setCauseCode(parseCause(command.getCauseCode()));
         defenseMode.setUnavailableStartDate(command.getUnavailableStartDate());
         defenseMode.setExpectedReturnDate(command.getExpectedReturnDate());
-        applyDiagnosisSnapshot(defenseMode, diagnosisQueryClient.getDefenseSnapshot(command.getUserId()));
-        defenseMode.setStatus(DefenseModeStatus.ACTIVE);
+        LocalDate today = LocalDate.now(clock);
+        if (command.getUnavailableStartDate().isAfter(today)) {
+            defenseMode.setStatus(DefenseModeStatus.SCHEDULED);
+        } else {
+            recalculateAndApplyDiagnosisSnapshot(defenseMode, today);
+            defenseMode.setStatus(DefenseModeStatus.ACTIVE);
+        }
         defenseModeMapper.insert(defenseMode);
         return defenseModeMapper.findById(defenseMode.getDefenseId());
     }
@@ -105,11 +126,23 @@ public class DefenseModeService {
         if (userId == null) {
             throw new ServiceException(DefenseErrorCode.INVALID_REQUEST);
         }
-        DefenseMode defenseMode = defenseModeMapper.findActiveByUserId(userId);
+        DefenseMode defenseMode = defenseModeMapper.findCurrentByUserId(userId);
         if (defenseMode == null) {
             throw new ServiceException(DefenseErrorCode.NOT_FOUND);
         }
         return defenseMode;
+    }
+
+    @Transactional
+    public int activateScheduledModes() {
+        LocalDate today = LocalDate.now(clock);
+        int activatedCount = 0;
+        for (DefenseMode defenseMode : defenseModeMapper.findScheduledToActivate(today)) {
+            recalculateAndApplyDiagnosisSnapshot(defenseMode, today);
+            defenseMode.setStatus(DefenseModeStatus.ACTIVE);
+            activatedCount += defenseModeMapper.activate(defenseMode);
+        }
+        return activatedCount;
     }
 
     public Integer getCurrentDDay(DefenseMode defenseMode) {
@@ -255,6 +288,11 @@ public class DefenseModeService {
         defenseMode.setDailyExpense(dailyExpense);
         defenseMode.setDDay(calculatedDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculatedDays);
         defenseMode.setCalculationStatus(DefenseCalculationStatus.CALCULATED);
+    }
+
+    private void recalculateAndApplyDiagnosisSnapshot(DefenseMode defenseMode, LocalDate activationDate) {
+        diagnosisCommandClient.recalculate(defenseMode.getUserId(), YearMonth.from(activationDate));
+        applyDiagnosisSnapshot(defenseMode, diagnosisQueryClient.getDefenseSnapshot(defenseMode.getUserId()));
     }
 
     private Long sumNullable(Long first, Long second) {

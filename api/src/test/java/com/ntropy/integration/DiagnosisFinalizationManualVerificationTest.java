@@ -375,6 +375,23 @@ class DiagnosisFinalizationManualVerificationTest {
         }
 
         @Override
+        public DefenseMode findCurrentByUserId(Long userId) {
+            return data.values().stream()
+                    .filter(mode -> userId.equals(mode.getUserId()))
+                    .filter(mode -> mode.getStatus() == DefenseModeStatus.ACTIVE
+                            || mode.getStatus() == DefenseModeStatus.SCHEDULED)
+                    .findFirst().orElse(null);
+        }
+
+        @Override
+        public java.util.List<DefenseMode> findScheduledToActivate(java.time.LocalDate today) {
+            return data.values().stream()
+                    .filter(mode -> mode.getStatus() == DefenseModeStatus.SCHEDULED)
+                    .filter(mode -> !mode.getUnavailableStartDate().isAfter(today))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override
         public List<DefenseMode> findCalendarPeriods(Long userId, java.time.LocalDate from, java.time.LocalDate to) {
             return List.of();
         }
@@ -382,6 +399,12 @@ class DiagnosisFinalizationManualVerificationTest {
         @Override
         public int insert(DefenseMode defenseMode) {
             defenseMode.setDefenseId(++sequence);
+            data.put(defenseMode.getDefenseId(), defenseMode);
+            return 1;
+        }
+
+        @Override
+        public int activate(DefenseMode defenseMode) {
             data.put(defenseMode.getDefenseId(), defenseMode);
             return 1;
         }
