@@ -1,0 +1,9 @@
+-- 미래 시작일 방어모드를 SCHEDULED 상태로 저장하기 위한 변경이다.
+-- 예약 상태에서는 활성화 시점까지 진단 계산 결과가 없으므로 calculation_status를 NULL 허용한다.
+ALTER TABLE DEFENSE_MODE
+    MODIFY COLUMN calculation_status VARCHAR(30) NULL
+        COMMENT 'CALCULATED, DIAGNOSIS_REQUIRED, EXPENSE_DATA_REQUIRED (예약 상태는 NULL)';
+
+ALTER TABLE DEFENSE_MODE
+    MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
+        COMMENT 'SCHEDULED, ACTIVE, RELEASED';
