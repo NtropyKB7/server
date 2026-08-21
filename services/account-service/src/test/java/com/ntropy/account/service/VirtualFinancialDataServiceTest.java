@@ -345,6 +345,11 @@ class VirtualFinancialDataServiceTest {
         }
 
         @Override
+        public boolean existsAnyByUserIdAndProvider(Long userId, String provider) {
+            return store.values().stream().anyMatch(account -> userId.equals(account.getUserId()));
+        }
+
+        @Override
         public void deleteByUserIdAndProvider(Long userId, String provider) {
             store.values().removeIf(account -> userId.equals(account.getUserId()));
         }

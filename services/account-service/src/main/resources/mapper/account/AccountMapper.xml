@@ -141,6 +141,19 @@
         ORDER BY account_id
     </select>
 
+    <!-- 비활성 계좌도 이미 생성된 데이터셋으로 간주하므로 status 조건을 두지 않는다. -->
+    <select id="existsAnyByUserIdAndProvider" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM ACCOUNT account_row
+                     INNER JOIN CODEF_CONNECTION connection_row
+                                ON connection_row.codef_connection_id = account_row.codef_connection_id
+            WHERE account_row.user_id = #{userId}
+              AND connection_row.user_id = #{userId}
+              AND connection_row.provider = #{provider}
+        )
+    </select>
+
     <delete id="deleteByUserIdAndProvider">
         DELETE FROM ACCOUNT
         WHERE user_id = #{userId}

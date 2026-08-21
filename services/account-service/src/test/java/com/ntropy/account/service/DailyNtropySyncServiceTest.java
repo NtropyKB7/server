@@ -230,6 +230,11 @@ class DailyNtropySyncServiceTest {
         }
 
         @Override
+        public boolean existsAnyByUserIdAndProvider(Long userId, String provider) {
+            return !byUserId.getOrDefault(userId, List.of()).isEmpty();
+        }
+
+        @Override
         public void deleteByUserIdAndProvider(Long userId, String provider) {
         }
     }
