@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -60,6 +61,41 @@ class DefenseModeServiceTest {
                 1L, "ILLNESS", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10));
         service.enter(command);
         assertThrows(ServiceException.class, () -> service.enter(command));
+    }
+
+    @Test
+    void schedulesFutureDefenseModeAndCalculatesSnapshotWhenActivated() {
+        MemoryMapper scheduledMapper = new MemoryMapper();
+        AtomicReference<DiagnosisDefenseSnapshot> latestSnapshot = new AtomicReference<>(
+                new DiagnosisDefenseSnapshot(100_000L, 200_000L, 900_000L));
+        DefenseModeService scheduledService = new DefenseModeService(
+                scheduledMapper,
+                userId -> latestSnapshot.get(),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                clockAt(LocalDate.of(2026, 8, 3)));
+
+        DefenseMode entered = scheduledService.enter(new DefenseModeEnterCommand(
+                1L, "ILLNESS", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 20)));
+
+        assertEquals(DefenseModeStatus.SCHEDULED, entered.getStatus());
+        assertEquals(null, entered.getAvailableAssetsSnapshot());
+        assertEquals(null, entered.getDDay());
+
+        latestSnapshot.set(new DiagnosisDefenseSnapshot(1_200_000L, 600_000L, 3_000_000L));
+        DefenseModeService activationService = new DefenseModeService(
+                scheduledMapper,
+                userId -> latestSnapshot.get(),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                (userId, fromDate, toDate) -> Collections.emptyList(),
+                clockAt(LocalDate.of(2026, 8, 10)));
+
+        assertEquals(1, activationService.activateScheduledModes());
+        DefenseMode activated = scheduledMapper.findById(entered.getDefenseId());
+        assertEquals(DefenseModeStatus.ACTIVE, activated.getStatus());
+        assertEquals(1_800_000L, activated.getAvailableAssetsSnapshot());
+        assertEquals(100_000L, activated.getDailyExpense());
+        assertEquals(18, activated.getDDay());
     }
 
     @Test
@@ -211,6 +247,23 @@ class DefenseModeServiceTest {
         }
 
         @Override
+        public DefenseMode findCurrentByUserId(Long userId) {
+            return data.values().stream()
+                    .filter(mode -> userId.equals(mode.getUserId()))
+                    .filter(mode -> mode.getStatus() == DefenseModeStatus.ACTIVE
+                            || mode.getStatus() == DefenseModeStatus.SCHEDULED)
+                    .findFirst().orElse(null);
+        }
+
+        @Override
+        public List<DefenseMode> findScheduledToActivate(LocalDate today) {
+            return data.values().stream()
+                    .filter(mode -> mode.getStatus() == DefenseModeStatus.SCHEDULED)
+                    .filter(mode -> !mode.getUnavailableStartDate().isAfter(today))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override
         public List<DefenseMode> findCalendarPeriods(Long userId, LocalDate from, LocalDate to) {
             return data.values().stream()
                     .filter(mode -> userId.equals(mode.getUserId()))
@@ -228,6 +281,12 @@ class DefenseModeServiceTest {
         @Override
         public int insert(DefenseMode defenseMode) {
             defenseMode.setDefenseId(++sequence);
+            data.put(defenseMode.getDefenseId(), defenseMode);
+            return 1;
+        }
+
+        @Override
+        public int activate(DefenseMode defenseMode) {
             data.put(defenseMode.getDefenseId(), defenseMode);
             return 1;
         }

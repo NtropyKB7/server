@@ -86,7 +86,7 @@ public class DefenseModeService {
     @Transactional
     public DefenseMode enter(DefenseModeEnterCommand command) {
         validateEnterCommand(command);
-        if (defenseModeMapper.findActiveByUserId(command.getUserId()) != null) {
+        if (defenseModeMapper.findCurrentByUserId(command.getUserId()) != null) {
             throw new ServiceException(DefenseErrorCode.ALREADY_ACTIVE);
         }
 
@@ -95,8 +95,13 @@ public class DefenseModeService {
         defenseMode.setCauseCode(parseCause(command.getCauseCode()));
         defenseMode.setUnavailableStartDate(command.getUnavailableStartDate());
         defenseMode.setExpectedReturnDate(command.getExpectedReturnDate());
-        applyDiagnosisSnapshot(defenseMode, diagnosisQueryClient.getDefenseSnapshot(command.getUserId()));
-        defenseMode.setStatus(DefenseModeStatus.ACTIVE);
+        LocalDate today = LocalDate.now(clock);
+        if (command.getUnavailableStartDate().isAfter(today)) {
+            defenseMode.setStatus(DefenseModeStatus.SCHEDULED);
+        } else {
+            applyDiagnosisSnapshot(defenseMode, diagnosisQueryClient.getDefenseSnapshot(command.getUserId()));
+            defenseMode.setStatus(DefenseModeStatus.ACTIVE);
+        }
         defenseModeMapper.insert(defenseMode);
         return defenseModeMapper.findById(defenseMode.getDefenseId());
     }
@@ -105,11 +110,25 @@ public class DefenseModeService {
         if (userId == null) {
             throw new ServiceException(DefenseErrorCode.INVALID_REQUEST);
         }
-        DefenseMode defenseMode = defenseModeMapper.findActiveByUserId(userId);
+        DefenseMode defenseMode = defenseModeMapper.findCurrentByUserId(userId);
         if (defenseMode == null) {
             throw new ServiceException(DefenseErrorCode.NOT_FOUND);
         }
         return defenseMode;
+    }
+
+    @Transactional
+    public int activateScheduledModes() {
+        LocalDate today = LocalDate.now(clock);
+        int activatedCount = 0;
+        for (DefenseMode defenseMode : defenseModeMapper.findScheduledToActivate(today)) {
+            applyDiagnosisSnapshot(
+                    defenseMode,
+                    diagnosisQueryClient.getDefenseSnapshot(defenseMode.getUserId()));
+            defenseMode.setStatus(DefenseModeStatus.ACTIVE);
+            activatedCount += defenseModeMapper.activate(defenseMode);
+        }
+        return activatedCount;
     }
 
     public Integer getCurrentDDay(DefenseMode defenseMode) {
