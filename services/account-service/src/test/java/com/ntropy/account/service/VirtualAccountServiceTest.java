@@ -215,6 +215,11 @@ class VirtualAccountServiceTest {
         }
 
         @Override
+        public boolean existsAnyByUserIdAndProvider(Long userId, String provider) {
+            return store.values().stream().anyMatch(a -> userId.equals(a.getUserId()));
+        }
+
+        @Override
         public void deleteByUserIdAndProvider(Long userId, String provider) {
             store.values().removeIf(a -> userId.equals(a.getUserId()));
         }

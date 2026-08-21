@@ -12,9 +12,12 @@ import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
+import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.AccountCollectionService;
+import com.ntropy.account.service.PersonalBankAccountService;
 import com.ntropy.account.service.VirtualAccountRegenerationService;
+import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.client.FinancialAccountCommandClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
@@ -24,17 +27,22 @@ import com.ntropy.common.dto.account.MyDataConnectionSummary;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /** BFF에 노출할 금융계좌 명령과 연결 상태를 account-service 기능으로 조합한다. */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class LocalFinancialAccountCommandClient implements FinancialAccountCommandClient {
 
     private static final int DEFAULT_COLLECTION_DAYS = 90;
 
+    private final PersonalBankAccountService personalBankAccountService;
     private final AccountCollectionService accountCollectionService;
     private final VirtualAccountRegenerationService virtualAccountRegenerationService;
+    private final VirtualFinancialDataService virtualFinancialDataService;
     private final AccountLifecycleMapper accountLifecycleMapper;
+    private final AccountMapper accountMapper;
     private final CodefConnectionMapper codefConnectionMapper;
 
     @Override
@@ -80,10 +88,27 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         String birthDate = resolveBirthDate(bank, command.birthDate());
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(DEFAULT_COLLECTION_DAYS - 1L);
-        int accountCount = accountCollectionService.registerAndCollect(
-                userId, bank, command.bankLoginId(), command.bankLoginPassword(), birthDate, startDate, endDate
-        ).size();
+
+        personalBankAccountService.registerPersonalAccount(
+                userId, bank, command.bankLoginId(), command.bankLoginPassword(), birthDate
+        );
+        ensureVirtualDatasetSafely(userId, bank);
+        int accountCount = accountCollectionService.collect(userId, bank, birthDate, startDate, endDate).size();
         return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), accountCount);
+    }
+
+    private void ensureVirtualDatasetSafely(Long userId, PersonalBank bank) {
+        try {
+            if (accountMapper.existsAnyByUserIdAndProvider(userId, ConnectionProvider.NTROPY.name())) {
+                return;
+            }
+            virtualFinancialDataService.generateForUser(userId, bank);
+        } catch (RuntimeException e) {
+            log.warn(
+                    "CODEF 연동 후 가상 금융 데이터셋 생성 실패: userId={}, organizationCode={}",
+                    userId, bank.getOrganizationCode(), e
+            );
+        }
     }
 
     @Override
