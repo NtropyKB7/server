@@ -4,17 +4,25 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.domain.AccountGroup;
+import com.ntropy.account.domain.AccountNoHash;
+import com.ntropy.account.domain.AccountTransactionCategory;
+import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 import com.ntropy.account.domain.entity.CodefConnection;
@@ -46,7 +54,7 @@ class VirtualFinancialDataServiceTest {
     void generatesExpectedDatasetAndIsIdempotent() {
         InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
         InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
-        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper(accountMapper);
         ZoneId zone = ZoneId.of("Asia/Seoul");
         // 월말을 기준일로 고정해 "현재 월"이 항상 완결된 3개월 창이 되도록 하고, 기존 고정 건수 검증값을 그대로 유지한다.
         Clock clock = Clock.fixed(LocalDate.of(2020, 1, 1).atStartOfDay(zone).toInstant(), zone);
@@ -67,15 +75,20 @@ class VirtualFinancialDataServiceTest {
         GenerationSummary second = service.generateForUsers(users, context);
 
         assertEquals(50, first.users());
-        assertEquals(100, first.accounts());
+        assertEquals(150, first.accounts());
         assertEquals(15, first.incomeCounterparties());
-        assertEquals(15_000, first.transactions());
+        assertEquals(15_300, first.transactions());
         assertEquals(first, second);
         assertEquals(50, connectionMapper.store.size());
-        assertEquals(100, accountMapper.store.size());
-        assertEquals(15_000, transactionMapper.store.size());
+        assertEquals(150, accountMapper.store.size());
+        assertEquals(15_300, transactionMapper.store.size());
+        for (VirtualUserIdentity user : users) {
+            assertEquals(1, countAccounts(accountMapper, user.userId(), AccountGroup.DEPOSIT_TRUST, "11"));
+            assertEquals(1, countAccounts(accountMapper, user.userId(), AccountGroup.DEPOSIT_TRUST, "12"));
+            assertEquals(1, countAccounts(accountMapper, user.userId(), AccountGroup.LOAN, "40"));
+        }
 
-        // 사용자 순번 1은 적금(installment), 26은 대출(loan) 보조계좌를 받는다.
+        // 모든 사용자가 적금·대출 계좌를 동시에 갖는다.
         Account installmentAccount = accountMapper.store.values().stream()
                 .filter(account -> account.getUserId() == userIdFor(1)
                         && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.DEPOSIT_TRUST
@@ -88,10 +101,10 @@ class VirtualFinancialDataServiceTest {
         assertEquals(lastTransactionDate(transactionMapper, installmentAccount), installmentAccount.getLastTranDate());
 
         Account loanAccount = accountMapper.store.values().stream()
-                .filter(account -> account.getUserId() == userIdFor(26)
+                .filter(account -> account.getUserId() == userIdFor(1)
                         && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.LOAN)
                 .findFirst().orElseThrow();
-        assertEquals(java.math.BigDecimal.valueOf(80_000_000L), loanAccount.getLoanContractPrincipal());
+        assertEquals(java.math.BigDecimal.valueOf(55_000_000L), loanAccount.getLoanContractPrincipal());
         assertEquals(java.math.BigDecimal.valueOf(340, 2), loanAccount.getInterestRate());
         assertEquals(LocalDate.of(2036, 6, 30), loanAccount.getMaturityDate());
         assertEquals(LocalDate.of(2026, 7, 25), loanAccount.getNextPaymentDate());
@@ -102,7 +115,7 @@ class VirtualFinancialDataServiceTest {
     void generateDelegatesToVirtualUserQueryClientDatasetUsingContextReferenceDate() {
         InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
         InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
-        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper(accountMapper);
         ZoneId zone = ZoneId.of("Asia/Seoul");
         // Clock은 generate()/generateForUsers() 경로에서 쓰이지 않아야 하므로, context와 다른 날짜로 고정해 둔다.
         Clock clock = Clock.fixed(LocalDate.of(2099, 1, 1).atStartOfDay(zone).toInstant(), zone);
@@ -124,16 +137,16 @@ class VirtualFinancialDataServiceTest {
         GenerationSummary summary = service.generate();
 
         assertEquals(4, summary.users());
-        assertEquals(8, summary.accounts());
+        assertEquals(12, summary.accounts());
         assertEquals(context.referenceDate(), summary.endDate());
-        assertEquals(1_200, summary.transactions());
+        assertEquals(1_224, summary.transactions());
     }
 
     @Test
     void handlesLeapYearReferenceDateForProductConditionDatesWithoutError() {
         InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
         InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
-        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper(accountMapper);
         ZoneId zone = ZoneId.of("Asia/Seoul");
         // 2028-02-29(윤년)를 기준일로 삼아도 예외 없이 만기일·다음납입일이 계산돼야 한다.
         Clock clock = Clock.fixed(LocalDate.of(2028, 2, 29).atStartOfDay(zone).toInstant(), zone);
@@ -155,7 +168,7 @@ class VirtualFinancialDataServiceTest {
     void usesCurrentMonthTwentyFifthBeforeDefaultPaymentDay() {
         InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
         InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
-        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper();
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper(accountMapper);
         ZoneId zone = ZoneId.of("Asia/Seoul");
         Clock clock = Clock.fixed(LocalDate.of(2026, 6, 15).atStartOfDay(zone).toInstant(), zone);
         VirtualFinancialDataService service = new VirtualFinancialDataService(
@@ -170,6 +183,79 @@ class VirtualFinancialDataServiceTest {
                 .findFirst().orElseThrow();
         assertEquals(LocalDate.of(2026, 6, 25), secondaryAccount.getNextPaymentDate());
         assertEquals(lastTransactionDate(transactionMapper, secondaryAccount), secondaryAccount.getLastTranDate());
+    }
+
+    @Test
+    void migratesLegacyTwoAccountLayoutBeforeGeneratingThreeAccountLayout() {
+        InMemoryCodefConnectionMapper connectionMapper = new InMemoryCodefConnectionMapper();
+        InMemoryAccountMapper accountMapper = new InMemoryAccountMapper();
+        InMemoryAccountTransactionMapper transactionMapper = new InMemoryAccountTransactionMapper(accountMapper);
+        VirtualConnectionService connectionService = new VirtualConnectionService(connectionMapper);
+        VirtualFinancialDataService service = new VirtualFinancialDataService(
+                connectionService, accountMapper, transactionMapper,
+                new VirtualFinancialTransactionGenerator(), Clock.systemUTC(), null
+        );
+        long userId = userIdFor(26);
+        CodefConnection connection = connectionService.getOrCreateConnection(userId);
+        Account ordinary = legacyAccount(connection, userId, 26, 1, AccountGroup.DEPOSIT_TRUST, "11");
+        Account legacyLoan = legacyAccount(connection, userId, 26, 2, AccountGroup.LOAN, "40");
+        accountMapper.upsert(ordinary);
+        accountMapper.upsert(legacyLoan);
+
+        AccountTransaction legacyTransaction = new AccountTransaction();
+        legacyTransaction.setAccountId(legacyLoan.getId());
+        legacyTransaction.setFingerprint("legacy-loan-transaction");
+        legacyTransaction.setTransactionCategory(AccountTransactionCategory.LOAN);
+        legacyTransaction.setTranDate(LocalDate.of(2026, 4, 25));
+        legacyTransaction.setTranTime(LocalTime.of(21, 1));
+        legacyTransaction.setOutAmount(BigDecimal.valueOf(500_000L));
+        legacyTransaction.setInAmount(BigDecimal.ZERO);
+        legacyTransaction.setAfterBalance(BigDecimal.valueOf(15_000_000L));
+        transactionMapper.insertAll(List.of(legacyTransaction));
+
+        VirtualDatasetContext context = new VirtualDatasetContext(
+                "FIN-005-test-migration", LocalDate.of(2026, 6, 30), 1L
+        );
+        GenerationSummary first = service.generateForUsers(
+                List.of(new VirtualUserIdentity(userId, 26)), context
+        );
+        GenerationSummary second = service.generateForUsers(
+                List.of(new VirtualUserIdentity(userId, 26)), context
+        );
+
+        assertEquals(first, second);
+        assertEquals(3, accountMapper.store.size());
+        assertEquals(306, transactionMapper.store.size());
+        assertEquals(1, countAccounts(accountMapper, userId, AccountGroup.DEPOSIT_TRUST, "11"));
+        assertEquals(1, countAccounts(accountMapper, userId, AccountGroup.DEPOSIT_TRUST, "12"));
+        assertEquals(1, countAccounts(accountMapper, userId, AccountGroup.LOAN, "40"));
+        assertFalse(transactionMapper.store.values().stream()
+                .anyMatch(transaction -> "legacy-loan-transaction".equals(transaction.getFingerprint())));
+    }
+
+    private static Account legacyAccount(CodefConnection connection, long userId, int userOrdinal,
+                                         int accountOrdinal, AccountGroup accountGroup, String depositTypeCode) {
+        String rawAccountNo = String.format(Locale.ROOT, "46%03d%07d", userOrdinal, accountOrdinal);
+        Account account = new Account();
+        account.setCodefConnectionId(connection.getId());
+        account.setUserId(userId);
+        account.setOrganizationCode(PersonalBank.SHINHAN_BANK.getOrganizationCode());
+        account.setAccountGroup(accountGroup);
+        account.setDepositTypeCode(depositTypeCode);
+        account.setAccountNoMasked(rawAccountNo);
+        account.setAccountNoHash(AccountNoHash.hash(
+                PersonalBank.SHINHAN_BANK.getOrganizationCode(), "FIN-005-v1:" + rawAccountNo
+        ));
+        return account;
+    }
+
+    private static long countAccounts(InMemoryAccountMapper accountMapper, long userId,
+                                      AccountGroup accountGroup, String depositTypeCode) {
+        return accountMapper.store.values().stream()
+                .filter(account -> account.getUserId() == userId)
+                .filter(account -> account.getAccountGroup() == accountGroup)
+                .filter(account -> depositTypeCode.equals(account.getDepositTypeCode()))
+                .count();
     }
 
     private static LocalDate lastTransactionDate(InMemoryAccountTransactionMapper transactionMapper,
@@ -271,6 +357,12 @@ class VirtualFinancialDataServiceTest {
     private static class InMemoryAccountTransactionMapper implements AccountTransactionMapper {
 
         private final Map<String, AccountTransaction> store = new LinkedHashMap<>();
+        private final InMemoryAccountMapper accountMapper;
+
+        private InMemoryAccountTransactionMapper(InMemoryAccountMapper accountMapper) {
+            this.accountMapper = accountMapper;
+        }
+
         @Override
         public void insertAll(List<AccountTransaction> transactions) {
             for (AccountTransaction transaction : transactions) {
@@ -300,6 +392,11 @@ class VirtualFinancialDataServiceTest {
 
         @Override
         public void deleteByUserIdAndProvider(Long userId, String provider) {
+            Set<Long> accountIds = accountMapper.store.values().stream()
+                    .filter(account -> userId.equals(account.getUserId()))
+                    .map(Account::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+            store.values().removeIf(transaction -> accountIds.contains(transaction.getAccountId()));
         }
 
         @Override

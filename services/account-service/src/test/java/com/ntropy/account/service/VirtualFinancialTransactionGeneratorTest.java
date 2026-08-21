@@ -57,28 +57,33 @@ class VirtualFinancialTransactionGeneratorTest {
     private final VirtualFinancialTransactionGenerator generator = new VirtualFinancialTransactionGenerator();
 
     @Test
-    void generatesOneHundredTransactionsPerMonthWithAllFinancialPatterns() {
+    void generatesTransactionsPerMonthWithAllFinancialPatterns() {
         Account ordinary = account(10L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(11L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(12L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
-                1, PersonalBank.SHINHAN_BANK, ordinary, installment
+                1, PersonalBank.SHINHAN_BANK, ordinary, installment, loan
         );
 
-        assertEquals(300, generated.transactions().size());
+        assertEquals(306, generated.transactions().size());
         Map<YearMonth, Long> monthlyCounts = generated.transactions().stream()
                 .collect(Collectors.groupingBy(
                         transaction -> YearMonth.from(transaction.getTranDate()),
                         Collectors.counting()
                 ));
-        assertEquals(100L, monthlyCounts.get(YearMonth.of(2026, 4)));
-        assertEquals(100L, monthlyCounts.get(YearMonth.of(2026, 5)));
-        assertEquals(100L, monthlyCounts.get(YearMonth.of(2026, 6)));
+        assertEquals(102L, monthlyCounts.get(YearMonth.of(2026, 4)));
+        assertEquals(102L, monthlyCounts.get(YearMonth.of(2026, 5)));
+        assertEquals(102L, monthlyCounts.get(YearMonth.of(2026, 6)));
 
-        assertEquals(297, countCategory(generated.transactions(), AccountTransactionCategory.ORDINARY));
+        assertEquals(300, countCategory(generated.transactions(), AccountTransactionCategory.ORDINARY));
         assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.INSTALLMENT));
+        assertEquals(3, countCategory(generated.transactions(), AccountTransactionCategory.LOAN));
         assertTrue(generated.transactions().stream()
                 .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.INSTALLMENT)
+                .allMatch(transaction -> transaction.getTranDate().getDayOfMonth() == 25));
+        assertTrue(generated.transactions().stream()
+                .filter(transaction -> transaction.getTransactionCategory() == AccountTransactionCategory.LOAN)
                 .allMatch(transaction -> transaction.getTranDate().getDayOfMonth() == 25));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getInAmount().signum() > 0));
         assertTrue(generated.transactions().stream().anyMatch(transaction -> transaction.getOutAmount().signum() > 0));
@@ -94,9 +99,12 @@ class VirtualFinancialTransactionGeneratorTest {
     @Test
     void assignsThreeIncomeCounterpartiesToEverySecondUserAndGeneratesLoanRepayments() {
         Account ordinary = account(20L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(22L, AccountGroup.DEPOSIT_TRUST);
         Account loan = account(21L, AccountGroup.LOAN);
 
-        GeneratedTransactions generated = generator.generate(REFERENCE_DATE,26, PersonalBank.NH_BANK, ordinary, loan);
+        GeneratedTransactions generated = generator.generate(
+                REFERENCE_DATE, 26, PersonalBank.NH_BANK, ordinary, installment, loan
+        );
 
         assertEquals(3, generated.userIncomeCounterpartyCount());
         assertEquals(3, generated.transactions().stream()
@@ -115,33 +123,40 @@ class VirtualFinancialTransactionGeneratorTest {
     void generatesStableUniqueFingerprintsAndConsistentBalances() {
         Account ordinary = account(30L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(31L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(32L, AccountGroup.LOAN);
 
-        GeneratedTransactions first = generator.generate(REFERENCE_DATE,3, PersonalBank.KB_KOOKMIN_BANK, ordinary, installment);
-        GeneratedTransactions second = generator.generate(REFERENCE_DATE,3, PersonalBank.KB_KOOKMIN_BANK, ordinary, installment);
+        GeneratedTransactions first = generator.generate(
+                REFERENCE_DATE, 3, PersonalBank.KB_KOOKMIN_BANK, ordinary, installment, loan
+        );
+        GeneratedTransactions second = generator.generate(
+                REFERENCE_DATE, 3, PersonalBank.KB_KOOKMIN_BANK, ordinary, installment, loan
+        );
 
         List<String> firstFingerprints = first.transactions().stream()
                 .map(AccountTransaction::getFingerprint).toList();
         List<String> secondFingerprints = second.transactions().stream()
                 .map(AccountTransaction::getFingerprint).toList();
         assertEquals(firstFingerprints, secondFingerprints);
-        assertEquals(300, Set.copyOf(firstFingerprints).size());
+        assertEquals(306, Set.copyOf(firstFingerprints).size());
 
         verifyAccountBalance(ordinary, first);
         verifyAccountBalance(installment, first);
+        verifyAccountBalance(loan, first);
     }
 
     @Test
     void followsBankSpecificOptionalDescriptionFields() {
         Account ordinary = account(40L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(41L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(42L, AccountGroup.LOAN);
 
         GeneratedTransactions jeonbuk = generator.generate(REFERENCE_DATE,
-                5, PersonalBank.JEONBUK_BANK, ordinary, installment
+                5, PersonalBank.JEONBUK_BANK, ordinary, installment, loan
         );
         assertTrue(jeonbuk.transactions().stream().allMatch(transaction -> transaction.getDesc2() == null));
 
         GeneratedTransactions ibk = generator.generate(REFERENCE_DATE,
-                5, PersonalBank.IBK_INDUSTRIAL_BANK, ordinary, installment
+                5, PersonalBank.IBK_INDUSTRIAL_BANK, ordinary, installment, loan
         );
         assertTrue(ibk.transactions().stream().allMatch(transaction -> transaction.getDesc4() == null));
         assertTrue(ibk.transactions().stream()
@@ -155,19 +170,23 @@ class VirtualFinancialTransactionGeneratorTest {
     void appliesConsumerProfileToMerchantMixAndSpendingLevel() {
         GeneratedTransactions rational = generator.generate(REFERENCE_DATE,
                 1, PersonalBank.SHINHAN_BANK,
-                account(50L, AccountGroup.DEPOSIT_TRUST), account(51L, AccountGroup.DEPOSIT_TRUST)
+                account(50L, AccountGroup.DEPOSIT_TRUST), account(51L, AccountGroup.DEPOSIT_TRUST),
+                account(59L, AccountGroup.LOAN)
         );
         GeneratedTransactions trend = generator.generate(REFERENCE_DATE,
                 2, PersonalBank.SHINHAN_BANK,
-                account(52L, AccountGroup.DEPOSIT_TRUST), account(53L, AccountGroup.DEPOSIT_TRUST)
+                account(52L, AccountGroup.DEPOSIT_TRUST), account(53L, AccountGroup.DEPOSIT_TRUST),
+                account(60L, AccountGroup.LOAN)
         );
         GeneratedTransactions value = generator.generate(REFERENCE_DATE,
                 3, PersonalBank.SHINHAN_BANK,
-                account(54L, AccountGroup.DEPOSIT_TRUST), account(55L, AccountGroup.DEPOSIT_TRUST)
+                account(54L, AccountGroup.DEPOSIT_TRUST), account(55L, AccountGroup.DEPOSIT_TRUST),
+                account(61L, AccountGroup.LOAN)
         );
         GeneratedTransactions impulse = generator.generate(REFERENCE_DATE,
                 4, PersonalBank.SHINHAN_BANK,
-                account(56L, AccountGroup.DEPOSIT_TRUST), account(57L, AccountGroup.DEPOSIT_TRUST)
+                account(56L, AccountGroup.DEPOSIT_TRUST), account(57L, AccountGroup.DEPOSIT_TRUST),
+                account(62L, AccountGroup.LOAN)
         );
 
         assertEquals(VirtualFinancialTransactionGenerator.ConsumerProfile.RATIONAL_FRUGAL,
@@ -192,7 +211,8 @@ class VirtualFinancialTransactionGeneratorTest {
 
         GeneratedTransactions seeded = generator.generate(
                 REFERENCE_DATE, 1, 1L, PersonalBank.SHINHAN_BANK,
-                account(58L, AccountGroup.DEPOSIT_TRUST), account(59L, AccountGroup.DEPOSIT_TRUST)
+                account(58L, AccountGroup.DEPOSIT_TRUST), account(63L, AccountGroup.DEPOSIT_TRUST),
+                account(64L, AccountGroup.LOAN)
         );
         assertTrue(hasMerchant(seeded, "신세계백화점"));
     }
@@ -212,11 +232,13 @@ class VirtualFinancialTransactionGeneratorTest {
     void assignsOneOrTwoInsuranceProductsAndPreservesBankDescriptions() {
         GeneratedTransactions oddUser = generator.generate(REFERENCE_DATE,
                 1, PersonalBank.IBK_INDUSTRIAL_BANK,
-                account(60L, AccountGroup.DEPOSIT_TRUST), account(61L, AccountGroup.DEPOSIT_TRUST)
+                account(60L, AccountGroup.DEPOSIT_TRUST), account(61L, AccountGroup.DEPOSIT_TRUST),
+                account(65L, AccountGroup.LOAN)
         );
         GeneratedTransactions evenUser = generator.generate(REFERENCE_DATE,
                 2, PersonalBank.NH_BANK,
-                account(62L, AccountGroup.DEPOSIT_TRUST), account(63L, AccountGroup.DEPOSIT_TRUST)
+                account(62L, AccountGroup.DEPOSIT_TRUST), account(66L, AccountGroup.DEPOSIT_TRUST),
+                account(67L, AccountGroup.LOAN)
         );
 
         List<AccountTransaction> oddInsurance = insuranceTransactions(oddUser);
@@ -236,9 +258,10 @@ class VirtualFinancialTransactionGeneratorTest {
         LocalDate midMonthReference = LocalDate.of(2026, 6, 15);
         Account ordinary = account(70L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(71L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(74L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                midMonthReference, 1, PersonalBank.SHINHAN_BANK, ordinary, installment
+                midMonthReference, 1, PersonalBank.SHINHAN_BANK, ordinary, installment, loan
         );
 
         assertTrue(generated.transactions().stream()
@@ -249,11 +272,11 @@ class VirtualFinancialTransactionGeneratorTest {
                         transaction -> YearMonth.from(transaction.getTranDate()),
                         Collectors.counting()
                 ));
-        // 지난 2개월(4~5월)은 완결된 달이라 100건씩, 현재 월(6월 15일까지)은 100건보다 적어야 한다.
-        assertEquals(100L, monthlyCounts.get(YearMonth.of(2026, 4)));
-        assertEquals(100L, monthlyCounts.get(YearMonth.of(2026, 5)));
-        assertTrue(monthlyCounts.get(YearMonth.of(2026, 6)) < 100L);
-        assertTrue(generated.transactions().size() >= 200 && generated.transactions().size() < 300);
+        // 지난 2개월(4~5월)은 완결된 달이라 102건씩, 현재 월(6월 15일까지)은 102건보다 적어야 한다.
+        assertEquals(102L, monthlyCounts.get(YearMonth.of(2026, 4)));
+        assertEquals(102L, monthlyCounts.get(YearMonth.of(2026, 5)));
+        assertTrue(monthlyCounts.get(YearMonth.of(2026, 6)) < 102L);
+        assertTrue(generated.transactions().size() >= 204 && generated.transactions().size() < 306);
     }
 
     @Test
@@ -261,9 +284,10 @@ class VirtualFinancialTransactionGeneratorTest {
         LocalDate referenceDate = LocalDate.of(2026, 11, 30);
         Account ordinary = account(72L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(73L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(75L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                referenceDate, 1, PersonalBank.SHINHAN_BANK, ordinary, installment
+                referenceDate, 1, PersonalBank.SHINHAN_BANK, ordinary, installment, loan
         );
 
         Set<YearMonth> months = generated.transactions().stream()
@@ -275,10 +299,11 @@ class VirtualFinancialTransactionGeneratorTest {
     @Test
     void splitsLoanRepaymentIntoPrincipalAndInterest() {
         Account ordinary = account(80L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(82L, AccountGroup.DEPOSIT_TRUST);
         Account loan = account(81L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                REFERENCE_DATE, 26, PersonalBank.NH_BANK, ordinary, loan
+                REFERENCE_DATE, 26, PersonalBank.NH_BANK, ordinary, installment, loan
         );
 
         List<AccountTransaction> loanTransactions = generated.transactions().stream()
@@ -299,9 +324,10 @@ class VirtualFinancialTransactionGeneratorTest {
         LocalDate firstOfMonth = LocalDate.of(2026, 6, 1);
         Account ordinary = account(90L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(91L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(98L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                firstOfMonth, 1, PersonalBank.SHINHAN_BANK, ordinary, installment
+                firstOfMonth, 1, PersonalBank.SHINHAN_BANK, ordinary, installment, loan
         );
 
         assertTrue(generated.transactions().stream()
@@ -310,22 +336,23 @@ class VirtualFinancialTransactionGeneratorTest {
                 .filter(transaction -> YearMonth.from(transaction.getTranDate()).equals(YearMonth.of(2026, 6)))
                 .count();
         assertTrue(currentMonthCount > 0 && currentMonthCount < 10,
-                "월 1일에는 지난달 100건씩 + 이번 달 소수 건만 있어야 한다: " + currentMonthCount);
+                "월 1일에는 지난달 102건씩 + 이번 달 소수 건만 있어야 한다: " + currentMonthCount);
     }
 
     @Test
     void handlesLeapYearFebruary29AsReferenceDate() {
         LocalDate leapDay = LocalDate.of(2028, 2, 29);
         Account ordinary = account(92L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(99L, AccountGroup.DEPOSIT_TRUST);
         Account loan = account(93L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                leapDay, 26, PersonalBank.NH_BANK, ordinary, loan
+                leapDay, 26, PersonalBank.NH_BANK, ordinary, installment, loan
         );
 
         assertTrue(generated.transactions().stream()
                 .noneMatch(transaction -> transaction.getTranDate().isAfter(leapDay)));
-        assertTrue(generated.transactions().size() >= 200);
+        assertTrue(generated.transactions().size() >= 204);
     }
 
     @Test
@@ -333,35 +360,37 @@ class VirtualFinancialTransactionGeneratorTest {
         LocalDate lastFebDay = LocalDate.of(2027, 2, 28);
         Account ordinary = account(94L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(95L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(101L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                lastFebDay, 1, PersonalBank.SHINHAN_BANK, ordinary, installment
+                lastFebDay, 1, PersonalBank.SHINHAN_BANK, ordinary, installment, loan
         );
 
         assertTrue(generated.transactions().stream()
                 .noneMatch(transaction -> transaction.getTranDate().isAfter(lastFebDay)));
-        // 2월은 완결된 달이라도 100건이 아니라 28일치 패턴 그대로다.
+        // 2월은 완결된 달이라도 102건이 아니라 28일치 패턴 그대로다.
         Map<YearMonth, Long> monthlyCounts = generated.transactions().stream()
                 .collect(Collectors.groupingBy(
                         transaction -> YearMonth.from(transaction.getTranDate()),
                         Collectors.counting()
                 ));
-        assertEquals(100L, monthlyCounts.get(YearMonth.of(2027, 2)));
+        assertEquals(102L, monthlyCounts.get(YearMonth.of(2027, 2)));
     }
 
     @Test
     void handlesThirtyOneDayMonthEndAsReferenceDate() {
         LocalDate endOfJuly = LocalDate.of(2026, 7, 31);
         Account ordinary = account(96L, AccountGroup.DEPOSIT_TRUST);
+        Account installment = account(102L, AccountGroup.DEPOSIT_TRUST);
         Account loan = account(97L, AccountGroup.LOAN);
 
         GeneratedTransactions generated = generator.generate(
-                endOfJuly, 26, PersonalBank.NH_BANK, ordinary, loan
+                endOfJuly, 26, PersonalBank.NH_BANK, ordinary, installment, loan
         );
 
         assertTrue(generated.transactions().stream()
                 .noneMatch(transaction -> transaction.getTranDate().isAfter(endOfJuly)));
-        assertEquals(300, generated.transactions().size());
+        assertEquals(306, generated.transactions().size());
     }
 
     @Test
@@ -370,7 +399,8 @@ class VirtualFinancialTransactionGeneratorTest {
             GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
                     userOrdinal, PersonalBank.SHINHAN_BANK,
                     account(100L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
-                    account(110L + userOrdinal, AccountGroup.DEPOSIT_TRUST)
+                    account(110L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
+                    account(120L + userOrdinal, AccountGroup.LOAN)
             );
             assertTrue(generated.transactions().stream()
                     .noneMatch(transaction ->
@@ -388,7 +418,8 @@ class VirtualFinancialTransactionGeneratorTest {
             GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
                     userOrdinal, PersonalBank.SHINHAN_BANK,
                     account(200L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
-                    account(300L + userOrdinal, AccountGroup.DEPOSIT_TRUST)
+                    account(300L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
+                    account(400L + userOrdinal, AccountGroup.LOAN)
             );
             generated.transactions().stream()
                     .filter(transaction -> transaction.getInAmount().signum() > 0)
@@ -403,10 +434,11 @@ class VirtualFinancialTransactionGeneratorTest {
     void completedMonthsMeetDifficultyRatioRanges() {
         Account ordinary = account(120L, AccountGroup.DEPOSIT_TRUST);
         Account installment = account(121L, AccountGroup.DEPOSIT_TRUST);
+        Account loan = account(122L, AccountGroup.LOAN);
 
         // REFERENCE_DATE가 월말이라 세 달(4~6월) 모두 완결된 달로 취급된다.
         GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
-                1, PersonalBank.SHINHAN_BANK, ordinary, installment
+                1, PersonalBank.SHINHAN_BANK, ordinary, installment, loan
         );
 
         Map<YearMonth, Map<Difficulty, Long>> byMonth =
@@ -437,7 +469,8 @@ class VirtualFinancialTransactionGeneratorTest {
             GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
                     userOrdinal, PersonalBank.SHINHAN_BANK,
                     account(130L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
-                    account(140L + userOrdinal, AccountGroup.DEPOSIT_TRUST)
+                    account(140L + userOrdinal, AccountGroup.DEPOSIT_TRUST),
+                    account(150L + userOrdinal, AccountGroup.LOAN)
             );
             Set<Difficulty> difficulties =
                     generated.transactions().stream()
@@ -455,7 +488,8 @@ class VirtualFinancialTransactionGeneratorTest {
     void undecidableDifficultyDoesNotExposeCategorySpecificAmountOrPaymentMethod() {
         GeneratedTransactions generated = generator.generate(REFERENCE_DATE,
                 2, PersonalBank.KEB_HANA_BANK,
-                account(150L, AccountGroup.DEPOSIT_TRUST), account(151L, AccountGroup.DEPOSIT_TRUST)
+                account(160L, AccountGroup.DEPOSIT_TRUST), account(161L, AccountGroup.DEPOSIT_TRUST),
+                account(162L, AccountGroup.LOAN)
         );
 
         List<AccountTransaction> undecidable = generated.transactions().stream()

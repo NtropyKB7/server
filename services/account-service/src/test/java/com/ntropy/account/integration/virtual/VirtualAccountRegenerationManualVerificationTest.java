@@ -74,7 +74,7 @@ class VirtualAccountRegenerationManualVerificationTest {
             assertEquals(firstConnectionId, secondConnectionId, "NTROPY CODEF_CONNECTION 행은 재사용돼야 한다");
             assertEquals(firstAccounts, secondAccounts, "재등록 후에도 계좌 수가 중복 없이 동일해야 한다");
             assertEquals(firstTransactions, secondTransactions, "재등록 후에도 거래 수가 중복 없이 동일해야 한다");
-            assertEquals(2, secondAccounts);
+            assertEquals(3, secondAccounts);
             assertTrue(second.transactions() > 0);
 
             assertEquals(0, jdbc.queryForObject("""

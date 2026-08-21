@@ -94,12 +94,36 @@ class VirtualFinancialDataManualVerificationTest {
                     WHERE connection_row.provider = 'NTROPY'
                       AND seeded_user.provider = ?
                     """, VIRTUAL_TEST_PROVIDER));
-            assertEquals(userCount * 2, count(jdbc, """
+            assertEquals(userCount * 3, count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT account_row
+                    JOIN CODEF_CONNECTION connection_row
+                      ON connection_row.codef_connection_id = account_row.codef_connection_id
                     JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
-                    WHERE seeded_user.provider = ?
+                    WHERE connection_row.provider = 'NTROPY'
+                      AND seeded_user.provider = ?
                     """, VIRTUAL_TEST_PROVIDER));
+            assertEquals(0, count(jdbc, """
+                    SELECT COUNT(*) FROM (
+                        SELECT account_row.user_id
+                        FROM ACCOUNT account_row
+                        JOIN CODEF_CONNECTION connection_row
+                          ON connection_row.codef_connection_id = account_row.codef_connection_id
+                        JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
+                        WHERE connection_row.provider = 'NTROPY'
+                          AND seeded_user.provider = ?
+                        GROUP BY account_row.user_id
+                        HAVING COUNT(*) <> 3
+                           OR SUM(CASE WHEN account_row.account_group = 'DEPOSIT_TRUST'
+                                            AND account_row.deposit_type_code = '11' THEN 1 ELSE 0 END) <> 1
+                           OR SUM(CASE WHEN account_row.account_group = 'DEPOSIT_TRUST'
+                                            AND account_row.deposit_type_code = '12' THEN 1 ELSE 0 END) <> 1
+                           OR SUM(CASE WHEN account_row.account_group = 'LOAN'
+                                            AND account_row.deposit_type_code = '40'
+                                            THEN 1 ELSE 0 END) <> 1
+                    ) invalid_account_layout
+                    """, VIRTUAL_TEST_PROVIDER),
+                    "모든 가상회원은 수시입출금·적금·대출 계좌를 각각 하나씩 가져야 한다");
             assertEquals(first.transactions(), count(jdbc, """
                     SELECT COUNT(*)
                     FROM ACCOUNT_TRANSACTION transaction_row
