@@ -16,7 +16,7 @@ public class DefenseModeActivationScheduler {
     private final DefenseModeService defenseModeService;
 
     @Scheduled(
-            cron = "${defense.scheduler.activation-cron:0 */10 * * * ?}",
+            cron = "${defense.scheduler.activation-cron:0 5 0 * * ?}",
             zone = "Asia/Seoul"
     )
     public void activateScheduledModes() {
