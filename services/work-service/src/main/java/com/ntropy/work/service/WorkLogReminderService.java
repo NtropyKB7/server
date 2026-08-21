@@ -62,16 +62,21 @@ public class WorkLogReminderService {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         for (Long userId : activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope())) {
-            for (WorkLog workLog : workLogMapper.findByUserIdAndWorkDate(userId, today)) {
+            // 자정을 넘기는 근무는 work_date가 시작일 기준으로 저장되므로 어제 날짜도 함께 조회한다.
+            for (WorkLog workLog : workLogMapper.findByUserIdAndDateRange(userId, today.minusDays(1), today)) {
                 if (!STATUS_PLANNED.equals(workLog.getStatus())) {
                     continue;
                 }
+                LocalTime startTime = workLog.getStartTime();
                 LocalTime endTime = workLog.getEndTime();
                 if (endTime == null) {
                     continue;
                 }
-                LocalDateTime reminderAt = LocalDateTime.of(today, endTime)
-                        .plusMinutes(UNCONFIRMED_REMINDER_DELAY_MINUTES);
+                LocalDateTime endDateTime = LocalDateTime.of(workLog.getWorkDate(), endTime);
+                if (startTime != null && !endTime.isAfter(startTime)) {
+                    endDateTime = endDateTime.plusDays(1); // 자정을 넘기는 근무 보정 (WorkTimeUtils와 동일 규칙)
+                }
+                LocalDateTime reminderAt = endDateTime.plusMinutes(UNCONFIRMED_REMINDER_DELAY_MINUTES);
                 if (now.isBefore(reminderAt)) {
                     continue;
                 }

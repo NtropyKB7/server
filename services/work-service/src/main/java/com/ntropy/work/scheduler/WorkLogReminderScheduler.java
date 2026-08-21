@@ -27,7 +27,7 @@ public class WorkLogReminderScheduler {
         runSafely("근무일지 미작성 확인", workLogReminderService::checkNoWorkLogToday);
     }
 
-    @Scheduled(cron = "${worklog.reminder.unconfirmed-cron:0 */15 * * * ?}", zone = "Asia/Seoul")
+    @Scheduled(cron = "${worklog.reminder.unconfirmed-cron:0 */3 * * * ?}", zone = "Asia/Seoul")
     public void checkUnconfirmedWorkLogs() {
         runSafely("근무일지 미확정 확인", workLogReminderService::checkUnconfirmedWorkLogs);
     }
