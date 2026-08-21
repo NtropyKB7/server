@@ -11,9 +11,12 @@ import java.util.List;
 public interface DefenseModeMapper {
     DefenseMode findById(Long defenseId);
     DefenseMode findActiveByUserId(Long userId);
+    DefenseMode findCurrentByUserId(Long userId);
+    List<DefenseMode> findScheduledToActivate(@Param("today") LocalDate today);
     List<DefenseMode> findCalendarPeriods(@Param("userId") Long userId,
                                           @Param("from") LocalDate from,
                                           @Param("to") LocalDate to);
     int insert(DefenseMode defenseMode);
+    int activate(DefenseMode defenseMode);
     int release(DefenseMode defenseMode);
 }

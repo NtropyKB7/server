@@ -41,6 +41,22 @@
         LIMIT 1
     </select>
 
+    <select id="findCurrentByUserId" resultMap="defenseModeResultMap">
+        SELECT <include refid="columns"/>
+        FROM DEFENSE_MODE
+        WHERE user_id = #{userId} AND status IN ('ACTIVE', 'SCHEDULED')
+        ORDER BY CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END, defense_id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findScheduledToActivate" resultMap="defenseModeResultMap">
+        SELECT <include refid="columns"/>
+        FROM DEFENSE_MODE
+        WHERE status = 'SCHEDULED'
+          AND unavailable_start_date &lt;= #{today}
+        ORDER BY unavailable_start_date ASC, defense_id ASC
+    </select>
+
     <select id="findCalendarPeriods" resultMap="defenseModeResultMap">
         SELECT <include refid="columns"/>
         FROM DEFENSE_MODE
@@ -67,6 +83,19 @@
             #{calculationStatus}, #{status}
         )
     </insert>
+
+    <update id="activate" parameterType="com.ntropy.defense.domain.DefenseMode">
+        UPDATE DEFENSE_MODE
+        SET reserve_amount_snapshot = #{reserveAmountSnapshot},
+            safe_asset_amount_snapshot = #{safeAssetAmountSnapshot},
+            available_assets_snapshot = #{availableAssetsSnapshot},
+            average_monthly_expense = #{averageMonthlyExpense},
+            daily_expense = #{dailyExpense},
+            d_day = #{dDay},
+            calculation_status = #{calculationStatus},
+            status = 'ACTIVE'
+        WHERE defense_id = #{defenseId} AND status = 'SCHEDULED'
+    </update>
 
     <update id="release" parameterType="com.ntropy.defense.domain.DefenseMode">
         UPDATE DEFENSE_MODE
