@@ -275,8 +275,9 @@ public class SettlementService {
     }
 
     /** 유저당 배치 실행(runDailyBatch 1회) 기준 1건만 보낸다. eventId를 (userId, today) 기준으로 잡아
-     *  배치가 같은 날 재실행돼도 중복 발송되지 않게 한다. */
-    private void notifySettlementCompleted(Long userId, LocalDate today) {
+     *  배치가 같은 날 재실행돼도 중복 발송되지 않게 한다. 테스트 컨트롤러(LocalSettlementBatchCommandClient)도
+     *  processSettlement 성공 시 이 메서드를 호출하므로 public으로 열어둔다. */
+    public void notifySettlementCompleted(Long userId, LocalDate today) {
         notificationCommandClient.create(new NotificationCreateCommand(
                 userId,
                 "settlement-completed-" + userId + "-" + today,
