@@ -42,18 +42,21 @@ public class DefenseModeController {
         return ApiResponse.success(new DefenseCausesResponse(defenseModeQueryClient.getCauses()));
     }
 
-    @ApiOperation("방어모드 진입")
+    @ApiOperation("방어모드 진입 또는 예약")
     @PostMapping
     public ResponseEntity<ApiResponse<DefenseModeResponse>> enter(
             @ApiParam(hidden = true) Authentication authentication,
             @RequestBody DefenseModeEnterRequest request) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
         DefenseModeResponse response = DefenseModeResponse.from(defenseModeCommandClient.enter(request.toCommand(userId)));
+        String message = "SCHEDULED".equals(response.getStatus())
+                ? "방어모드가 예약되었습니다."
+                : "방어모드가 시작되었습니다.";
         return ResponseEntity.status(HttpStatus.CREATED).body(
-                ApiResponse.success(HttpStatus.CREATED.value(), "방어모드가 시작되었습니다.", response));
+                ApiResponse.success(HttpStatus.CREATED.value(), message, response));
     }
 
-    @ApiOperation("현재 방어모드 조회")
+    @ApiOperation("현재 또는 예약된 방어모드 조회")
     @GetMapping("/active")
     public ApiResponse<DefenseModeResponse> getCurrent(@ApiParam(hidden = true) Authentication authentication) {
         Long userId = authenticatedUserIdResolver.resolve(authentication);
