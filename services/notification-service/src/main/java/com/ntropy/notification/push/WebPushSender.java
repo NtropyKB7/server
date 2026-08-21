@@ -35,6 +35,7 @@ public class WebPushSender {
     public void sendToUser(Long userId, Map<String, Object> payload) {
         List<PushSubscription> subscriptions = pushSubscriptionMapper.findByUserId(userId);
         if (subscriptions.isEmpty()) {
+            log.info("웹푸시 구독이 없어 발송을 건너뜁니다: userId={}", userId);
             return;
         }
 
@@ -46,6 +47,7 @@ public class WebPushSender {
             return;
         }
 
+        log.info("웹푸시 발송 시작: userId={}, 구독수={}", userId, subscriptions.size());
         for (PushSubscription subscription : subscriptions) {
             sendOne(subscription, payloadJson);
         }
@@ -55,6 +57,8 @@ public class WebPushSender {
         try {
             int statusCode = webPushClient.send(
                     subscription.getEndpoint(), subscription.getP256dh(), subscription.getAuth(), payloadJson);
+            log.info("웹푸시 발송 완료: userId={}, endpoint={}, statusCode={}",
+                    subscription.getUserId(), subscription.getEndpoint(), statusCode);
             if (statusCode == STATUS_NOT_FOUND || statusCode == STATUS_GONE) {
                 log.info("만료된 웹푸시 구독을 삭제합니다: endpoint={}", subscription.getEndpoint());
                 pushSubscriptionMapper.deleteByEndpoint(subscription.getEndpoint());
