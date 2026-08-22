@@ -2,7 +2,7 @@ package com.ntropy.ai.client.fastapi;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -12,20 +12,26 @@ import org.springframework.web.client.RestTemplate;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationRequest;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResponse;
 import com.ntropy.ai.dto.fastapi.TransactionForClassification;
-
-import lombok.RequiredArgsConstructor;
+import com.ntropy.ai.config.FastApiProperties;
 
 /**
  * FastAPI 소비 분류 API 호출 Client입니다.
  */
 @Component
-@RequiredArgsConstructor
 public class FastApiTransactionClassificationClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${fastapi.base-url:http://localhost:8000}")
-    private String fastApiBaseUrl;
+    private final String fastApiBaseUrl;
+
+    @Autowired
+    public FastApiTransactionClassificationClient(FastApiProperties properties) {
+        this.fastApiBaseUrl = properties.getBaseUrl();
+    }
+
+    protected FastApiTransactionClassificationClient() {
+        this.fastApiBaseUrl = null;
+    }
 
     public TransactionClassificationResponse classifyTransactions(
             List<TransactionForClassification> transactions

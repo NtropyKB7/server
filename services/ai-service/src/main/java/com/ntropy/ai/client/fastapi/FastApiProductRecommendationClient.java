@@ -1,6 +1,6 @@
 package com.ntropy.ai.client.fastapi;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -9,6 +9,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.ntropy.ai.dto.fastapi.ProductRecommendationRequest;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
+import com.ntropy.ai.config.FastApiProperties;
 
 /**
  * FastAPI 금융상품 추천 API Client입니다.
@@ -19,10 +20,14 @@ public class FastApiProductRecommendationClient {
     private final RestTemplate restTemplate;
     private final String fastApiBaseUrl;
 
+    @Autowired
     public FastApiProductRecommendationClient(
-            @Value("${fastapi.base-url:http://localhost:8000}")
-            String fastApiBaseUrl
+            FastApiProperties properties
     ) {
+        this(properties.getBaseUrl());
+    }
+
+    protected FastApiProductRecommendationClient(String fastApiBaseUrl) {
         this.restTemplate = new RestTemplate();
         this.fastApiBaseUrl = fastApiBaseUrl;
     }

@@ -21,6 +21,7 @@ holiday-local.properties
 user-local.properties
 webpush-local.properties
 birth-date-local.properties
+fastapi.properties
 
 ### 개인 문서/도구 ###
 docs/
@@ -70,4 +71,3 @@ bin/
 
 ### Mac OS ###
 .DS_Store
-
