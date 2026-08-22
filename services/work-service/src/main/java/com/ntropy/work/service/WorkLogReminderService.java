@@ -3,7 +3,9 @@ package com.ntropy.work.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
@@ -12,7 +14,9 @@ import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
 import com.ntropy.work.domain.WorkLogStatus;
+import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
+import com.ntropy.work.mapper.JobMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -30,10 +34,13 @@ public class WorkLogReminderService {
 
     private static final String STATUS_PLANNED = WorkLogStatus.PLANNED;
     private static final int UNCONFIRMED_REMINDER_DELAY_MINUTES = 60;
+    private static final DateTimeFormatter UNCONFIRMED_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yy.M.d", Locale.KOREA);
 
     private final ActiveUserQueryClient activeUserQueryClient;
     private final WorkReminderBatchUserScopeProperties userScopeProperties;
     private final WorkLogMapper workLogMapper;
+    private final JobMapper jobMapper;
     private final NotificationCommandClient notificationCommandClient;
 
     /** 매일 지정된 시각에 실행. 오늘 근무 기록이 없는 유저에게 리마인더를 보낸다. */
@@ -85,9 +92,19 @@ public class WorkLogReminderService {
                         "worklog-unconfirmed-" + workLog.getLogId(),
                         "WORK",
                         "확정되지 않은 근무가 있어요",
-                        "종료되었는데 확정되지 않은 근무가 있어요. 확정해 주세요."
+                        buildUnconfirmedBody(workLog)
                 ));
             }
         }
+    }
+
+    /** "종료되었는데 확정되지 않은 근무가 있어요. (26.8.12 <근무 이름>)" 형태로 날짜/근무명을 붙인다.
+     *  근무(Job)가 삭제되는 등으로 조회가 안 되면 근무명 없이 날짜만 표기한다. */
+    private String buildUnconfirmedBody(WorkLog workLog) {
+        String dateText = workLog.getWorkDate().format(UNCONFIRMED_DATE_FORMATTER);
+        Job job = jobMapper.findById(workLog.getJobId());
+        String jobName = job != null ? job.getJobName() : null;
+        String suffix = jobName != null ? dateText + " " + jobName : dateText;
+        return "종료되었는데 확정되지 않은 근무가 있어요. (" + suffix + ")";
     }
 }
