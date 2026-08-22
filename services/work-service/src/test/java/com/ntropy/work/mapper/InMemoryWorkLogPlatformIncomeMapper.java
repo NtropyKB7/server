@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
+import com.ntropy.work.mapper.projection.VirtualSettlementIncome;
 
 /**
  * 테스트용 인메모리 WorkLogPlatformIncomeMapper 구현체.
@@ -109,6 +110,32 @@ public class InMemoryWorkLogPlatformIncomeMapper implements WorkLogPlatformIncom
                 continue;
             }
             result.add(income);
+        }
+        return result;
+    }
+
+    @Override
+    public List<VirtualSettlementIncome> findConfirmedByUserIdUpToDateForVirtualSettlement(
+            Long userId, LocalDate endDate) {
+        List<VirtualSettlementIncome> result = new ArrayList<>();
+        for (WorkLogPlatformIncome income : store.values()) {
+            WorkLog workLog = workLogMapper.findById(income.getLogId());
+            if (workLog == null || !userId.equals(workLog.getUserId())) {
+                continue;
+            }
+            if (!"CONFIRMED".equals(workLog.getStatus())
+                    || workLog.getWorkDate() == null
+                    || workLog.getWorkDate().isAfter(endDate)) {
+                continue;
+            }
+            VirtualSettlementIncome projection = new VirtualSettlementIncome();
+            projection.setIncomeId(income.getIncomeId());
+            projection.setUserId(workLog.getUserId());
+            projection.setPlatformId(income.getPlatformId());
+            projection.setWorkDate(workLog.getWorkDate());
+            projection.setExpectedAmount(income.getExpectedAmount());
+            projection.setSettlementStatus(income.getSettlementStatus());
+            result.add(projection);
         }
         return result;
     }

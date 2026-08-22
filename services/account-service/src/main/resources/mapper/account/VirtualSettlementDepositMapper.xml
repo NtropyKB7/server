@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ntropy.account.mapper.VirtualSettlementDepositMapper">
+
+    <select id="findBalanceForUpdate" resultType="java.math.BigDecimal">
+        SELECT balance
+        FROM ACCOUNT
+        WHERE account_id = #{accountId}
+        FOR UPDATE
+    </select>
+
+    <select id="sumGeneratedAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(in_amount), 0)
+        FROM ACCOUNT_TRANSACTION
+        WHERE account_id = #{accountId}
+          AND transaction_category = 'ORDINARY'
+          AND desc4 = #{settlementKey}
+    </select>
+
+    <insert id="insertIfAbsent" parameterType="com.ntropy.account.domain.entity.AccountTransaction">
+        INSERT IGNORE INTO ACCOUNT_TRANSACTION (
+            account_id, fingerprint, transaction_category,
+            tran_date, tran_time, out_amount, in_amount, after_balance,
+            desc1, desc2, desc3, desc4
+        ) VALUES (
+            #{accountId}, #{fingerprint}, #{transactionCategory},
+            #{tranDate}, #{tranTime}, #{outAmount}, #{inAmount}, #{afterBalance},
+            #{desc1}, #{desc2}, #{desc3}, #{desc4}
+        )
+    </insert>
+
+    <update id="incrementBalanceAndAdvanceLastTranDate">
+        UPDATE ACCOUNT
+        SET balance = COALESCE(balance, 0) + #{amount},
+            last_tran_date = CASE
+                WHEN last_tran_date IS NULL OR last_tran_date &lt; #{tranDate} THEN #{tranDate}
+                ELSE last_tran_date
+            END
+        WHERE account_id = #{accountId}
+    </update>
+
+</mapper>

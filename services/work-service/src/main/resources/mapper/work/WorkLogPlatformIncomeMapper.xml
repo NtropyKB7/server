@@ -68,4 +68,21 @@
         AND wl.work_date BETWEEN #{startDate} AND #{endDate}
     </select>
 
+    <select id="findConfirmedByUserIdUpToDateForVirtualSettlement"
+            resultType="com.ntropy.work.mapper.projection.VirtualSettlementIncome">
+        SELECT wpi.income_id      AS incomeId,
+               wl.user_id         AS userId,
+               wpi.platform_id    AS platformId,
+               wl.work_date       AS workDate,
+               wpi.expected_amount AS expectedAmount,
+               wpi.settlement_status AS settlementStatus
+        FROM WORK_LOG_PLATFORM_INCOME wpi
+        JOIN WORK_LOG wl ON wpi.log_id = wl.log_id
+        WHERE wl.user_id = #{userId}
+          AND wl.status = 'CONFIRMED'
+          AND wl.work_date IS NOT NULL
+          AND wl.work_date &lt;= #{endDate}
+        ORDER BY wl.work_date, wpi.platform_id, wpi.income_id
+    </select>
+
 </mapper>

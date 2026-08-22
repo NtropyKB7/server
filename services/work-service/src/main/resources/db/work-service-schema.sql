@@ -128,7 +128,7 @@ CREATE TABLE `SETTLEMENT` (
 	`period_start`	DATE	NOT NULL,
 	`period_end`	DATE	NOT NULL,
 	`deposit_date`	DATE	NOT NULL	COMMENT '실제 입금일 (ACCOUNT_TRANSACTION.tran_date)',
-	`expected_amount`	BIGINT	NOT NULL	COMMENT '해당 기간 WORK_LOG_PLATFORM_INCOME 합계 스냅샷 (UNMATCHED는 0)',
+	`expected_amount`	BIGINT	NOT NULL	COMMENT '이 거래가 새로 정산 완료한 WORK_LOG_PLATFORM_INCOME 예상액 합계 스냅샷 (동일 기간 top-up은 신규 PENDING분만, UNMATCHED는 0)',
 	`actual_amount`	BIGINT	NOT NULL	COMMENT '매칭된 실제 입금액 합계',
 	`transaction_count`	INT	NOT NULL	COMMENT '이 SETTLEMENT 행에 합산된 거래 건수',
 	`account_transaction_id`	BIGINT	NULL	COMMENT 'account-service ACCOUNT_TRANSACTION 참조 (크로스 도메인 FK 없음). UNMATCHED는 NULL',
