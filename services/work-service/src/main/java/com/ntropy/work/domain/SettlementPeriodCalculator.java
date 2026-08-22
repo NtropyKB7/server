@@ -17,10 +17,11 @@ import com.ntropy.work.domain.entity.Platform;
  * MONTHLY 기준일의 정확한 정산 규칙도 마찬가지로 검증되지 않은 추정값이다:
  * - MONTHLY: 입금일이 속한 달의 직전 달 전체
  *
- * <p>settlement_offset_unit이 BUSINESS_DAY인 경우(현재 배민커넥트/쿠팡이츠 배달파트너)
- * offset일만큼 역산할 때 주말·공휴일을 건너뛴다. 주말 판정은 외부 데이터 없이 계산하고,
- * 공휴일은 holidays 파라미터로 주입받는다 - 이 클래스는 순수 함수로 유지하고, 실제 공휴일
- * 조회(홀리데이 API/캐시)는 호출부(SettlementService)의 책임으로 둔다.</p>
+ * <p>settlement_offset_unit이 BUSINESS_DAY인 경우 offset일만큼 역산할 때 주말·공휴일을
+ * 건너뛴다. 다만 정산 요일이 고정된 WEEKLY 플랫폼은 실제 입금이 밀려도 정산기간 자체는
+ * 유지해야 하므로 고정 요일과 기간 종료일의 달력상 간격을 사용한다. 주말 판정은 외부 데이터
+ * 없이 계산하고, 공휴일은 holidays 파라미터로 주입받는다 - 이 클래스는 순수 함수로 유지하고,
+ * 실제 공휴일 조회(홀리데이 API/캐시)는 호출부(SettlementService)의 책임으로 둔다.</p>
  *
  * <p>DAILY + BUSINESS_DAY 조합에서는 역산된 workDate 하루가 아니라, workDate부터 그 다음
  * 영업일 직전까지를 기간으로 잡는다. 주말/공휴일은 오프셋 카운트에 안 들어가므로, 그 구간
@@ -64,12 +65,19 @@ public final class SettlementPeriodCalculator {
         int offset = platform.getSettlementOffsetDay() == null
                 ? DEFAULT_WEEKLY_OFFSET_DAY
                 : platform.getSettlementOffsetDay();
-        LocalDate periodEndAnchor = subtractDays(scheduledPaymentDate, offset, platform.getSettlementOffsetUnit(), holidays);
+        // 정산 요일이 고정된 플랫폼은 공휴일 때문에 실제 입금만 밀릴 뿐 정산기간 자체는
+        // 흔들리지 않는다(쿠팡이츠: 항상 수~화 근무분). 따라서 고정 요일과 기간 종료일의
+        // 간격은 달력일로 유지한다. 요일이 없는 추정 규칙만 기존 단위 기반 역산을 사용한다.
+        LocalDate periodEndAnchor = platform.getSettlementDayOfWeek() == null
+                ? subtractDays(scheduledPaymentDate, offset, platform.getSettlementOffsetUnit(), holidays)
+                : scheduledPaymentDate.minusDays(offset);
         // periodEnd 경계일 자체가 공휴일이면 subtractDays가 그 전 영업일로 밀어버려서, 정작
         // 그 경계일(공휴일)에 일한 근무일지가 7일 범위 밖으로 빠진다 - DAILY와 같은 이유로
         // 같은 헬퍼로 경계일을 다시 확장해준다.
-        LocalDate periodEnd = extendThroughTrailingNonBusinessDays(
-                periodEndAnchor, platform.getSettlementOffsetUnit(), holidays);
+        LocalDate periodEnd = platform.getSettlementDayOfWeek() == null
+                ? extendThroughTrailingNonBusinessDays(
+                        periodEndAnchor, platform.getSettlementOffsetUnit(), holidays)
+                : periodEndAnchor;
         LocalDate periodStart = periodEnd.minusDays(6);
         return new SettlementPeriod(periodStart, periodEnd);
     }
@@ -86,25 +94,12 @@ public final class SettlementPeriodCalculator {
         if (settlementDayOfWeek == null) {
             return actualPaymentDate;
         }
-        DayOfWeek scheduled = parseDayOfWeek(settlementDayOfWeek);
+        DayOfWeek scheduled = SettlementDayOfWeekParser.parse(settlementDayOfWeek);
         LocalDate date = actualPaymentDate;
         while (date.getDayOfWeek() != scheduled) {
             date = date.minusDays(1);
         }
         return date;
-    }
-
-    private static DayOfWeek parseDayOfWeek(String abbreviation) {
-        return switch (abbreviation.toUpperCase(java.util.Locale.ROOT)) {
-            case "MON" -> DayOfWeek.MONDAY;
-            case "TUE" -> DayOfWeek.TUESDAY;
-            case "WED" -> DayOfWeek.WEDNESDAY;
-            case "THU" -> DayOfWeek.THURSDAY;
-            case "FRI" -> DayOfWeek.FRIDAY;
-            case "SAT" -> DayOfWeek.SATURDAY;
-            case "SUN" -> DayOfWeek.SUNDAY;
-            default -> throw new IllegalArgumentException("알 수 없는 settlement_day_of_week 값입니다: " + abbreviation);
-        };
     }
 
     private static SettlementPeriod monthlyPeriod(LocalDate paymentDate) {

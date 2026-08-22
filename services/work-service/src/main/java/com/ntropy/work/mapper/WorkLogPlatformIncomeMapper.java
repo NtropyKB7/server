@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.ntropy.work.domain.entity.WorkLogPlatformIncome;
+import com.ntropy.work.mapper.projection.VirtualSettlementIncome;
 
 @Mapper
 public interface WorkLogPlatformIncomeMapper {
@@ -47,5 +48,10 @@ public interface WorkLogPlatformIncomeMapper {
     List<WorkLogPlatformIncome> findConfirmedByUserIdInAndDateRange(
             @Param("userIds") List<Long> userIds,
             @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /** 가상 정산 입금용: 기준일까지 확정된 플랫폼 소득의 누적 목표액과 PENDING 여부를 조회한다. */
+    List<VirtualSettlementIncome> findConfirmedByUserIdUpToDateForVirtualSettlement(
+            @Param("userId") Long userId,
             @Param("endDate") LocalDate endDate);
 }
