@@ -196,6 +196,44 @@ class SettlementServiceTest {
     }
 
     @Test
+    @DisplayName("같은 정산기간의 늦은 소득을 top-up하면 신규 소득만 expectedAmount에 반영된다")
+    void processSettlement_topUpSamePeriod_doesNotDuplicateCompletedExpectedAmount() {
+        jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
+        WorkLog first = workLog(PERIOD_DATE, "CONFIRMED", 40_000L);
+        WorkLog second = workLog(PERIOD_DATE, "CONFIRMED", 10_000L);
+        workLogMapper.insert(first);
+        workLogMapper.insert(second);
+        insertIncome(first, PLATFORM_ID, 40_000L, SettlementStatus.PENDING);
+        insertIncome(second, PLATFORM_ID, 10_000L, SettlementStatus.PENDING);
+
+        incomingTransactionQueryClient.transactions = List.of(transaction(111L, 50_000L));
+        service.processSettlement(USER_ID, PROCESS_DATE);
+
+        WorkLog late = workLog(PERIOD_DATE, "CONFIRMED", 20_000L);
+        workLogMapper.insert(late);
+        insertIncome(late, PLATFORM_ID, 20_000L, SettlementStatus.PENDING);
+        incomingTransactionQueryClient.transactions = List.of(transaction(222L, 20_000L));
+        service.processSettlement(USER_ID, PROCESS_DATE);
+
+        List<Settlement> settlements = settlementMapper.findAll();
+        assertEquals(2, settlements.size());
+        Settlement initial = settlements.stream()
+                .filter(settlement -> settlement.getAccountTransactionId().equals(111L))
+                .findFirst()
+                .orElseThrow();
+        Settlement topUp = settlements.stream()
+                .filter(settlement -> settlement.getAccountTransactionId().equals(222L))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(50_000L, initial.getExpectedAmount());
+        assertEquals(20_000L, topUp.getExpectedAmount());
+        assertEquals(70_000L, settlements.stream().mapToLong(Settlement::getExpectedAmount).sum());
+        assertEquals(70_000L, settlements.stream().mapToLong(Settlement::getActualAmount).sum());
+        assertEquals(SettlementStatus.COMPLETED,
+                workLogPlatformIncomeMapper.findByLogId(late.getLogId()).get(0).getSettlementStatus());
+    }
+
+    @Test
     @DisplayName("이미 같은 날짜의 UNMATCHED SETTLEMENT가 있으면 중복 생성하지 않는다")
     void processSettlement_alreadyUnmatchedSettled_skipsDuplicate() {
         settlementMapper.insert(Settlement.builder()

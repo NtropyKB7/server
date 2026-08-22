@@ -42,6 +42,8 @@ import lombok.extern.slf4j.Slf4j;
  * 호출하는 것을 전제로 한다. 이미 같은 accountTransactionId로 처리된 거래는 재처리하지
  * 않는다 - 배치가 중복 실행돼도 안전하고, 같은 잡·같은 정산기간에 서로 다른 거래가 여러 건
  * 들어와도(거래 ID가 다르므로) 각각 정상적으로 반영된다.
+ * 각 SETTLEMENT의 expectedAmount는 기간 전체 누계가 아니라 해당 거래가 새로 COMPLETED로
+ * 전환한 PENDING 소득의 합계다. 따라서 같은 기간의 top-up 거래도 기존 완료 소득을 중복 집계하지 않는다.
  *
  * <p>매칭되지 않은(UNMATCHED) 거래도 버리지 않고, 같은 날짜에 들어온 것들을 합산해
  * status=UNMATCHED(job_id=null) 행 하나로 저장한다. 한 플랫폼에 회원 잡이 여러 개
@@ -200,7 +202,10 @@ public class SettlementService {
         List<WorkLogPlatformIncome> incomesInPeriod = workLogPlatformIncomeMapper
                 .findConfirmedByJobIdAndPlatformIdAndDateRange(
                         jobId, platform.getPlatformId(), period.start(), period.end());
-        long expectedAmount = incomesInPeriod.stream()
+        List<WorkLogPlatformIncome> newlyCoveredIncomes = incomesInPeriod.stream()
+                .filter(income -> income.getSettlementStatus() == SettlementStatus.PENDING)
+                .toList();
+        long expectedAmount = newlyCoveredIncomes.stream()
                 .mapToLong(income -> income.getExpectedAmount() == null ? 0L : income.getExpectedAmount())
                 .sum();
 
@@ -220,7 +225,7 @@ public class SettlementService {
         settlementMapper.insert(settlement);
 
         Set<Long> affectedLogIds = new LinkedHashSet<>();
-        for (WorkLogPlatformIncome income : incomesInPeriod) {
+        for (WorkLogPlatformIncome income : newlyCoveredIncomes) {
             income.setSettlementStatus(SettlementStatus.COMPLETED);
             workLogPlatformIncomeMapper.update(income);
             affectedLogIds.add(income.getLogId());
