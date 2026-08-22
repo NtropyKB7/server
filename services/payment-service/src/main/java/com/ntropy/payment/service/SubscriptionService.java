@@ -238,7 +238,7 @@ public class SubscriptionService {
     }
 
     private void scheduleUpcomingPayment(Subscription subscription, LocalDateTime timeToPay) {
-        String paymentId = "sub-recurring-" + subscription.getSubscriptionId() + "-" + UUID.randomUUID();
+        String paymentId = "SR" + UUID.randomUUID().toString().replace("-", "");
 
         Payment pendingPayment = new Payment();
         pendingPayment.setSubscriptionId(subscription.getSubscriptionId());
