@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ntropy.bff.converter.ai.AiReportRecommendationConverter;
 import com.ntropy.common.dto.ai.AiReportDetailSummary;
 import com.ntropy.common.dto.ai.AiReportSummary;
 
@@ -37,10 +38,8 @@ public class AiReportResponse {
      */
     private JsonNode financialSummary;
 
-    /**
-     * 추천 상품과 추천 사유가 담긴 JSON입니다.
-     */
-    private JsonNode recommendation;
+    /** 추천 상품과 추천 사유를 프론트 표준 계약으로 변환한 응답입니다. */
+    private AiReportRecommendationResponse recommendation;
 
     /**
      * AI 리포트 생성 시각입니다.
@@ -61,7 +60,10 @@ public class AiReportResponse {
     public static AiReportResponse from(
             AiReportSummary summary
     ) {
-        return from(AiReportDetailSummary.from(summary));
+        AiReportResponse response = from(AiReportDetailSummary.from(summary));
+        // 별칭 우선순위를 보존하기 위해 camelCase 변환 전 원본 JSON을 사용합니다.
+        response.recommendation = AiReportRecommendationConverter.convert(summary.recommendation());
+        return response;
     }
 
     public static AiReportResponse from(
@@ -82,11 +84,7 @@ public class AiReportResponse {
          */
         response.financialSummary = summary.financialSummary();
 
-        /*
-         * FastAPI 추천 응답은 snake_case이므로
-         * 프론트엔드 응답 전에 camelCase로 변환합니다.
-         */
-        response.recommendation = summary.recommendation();
+        response.recommendation = AiReportRecommendationConverter.convert(summary.recommendation());
 
         response.createdAt =
                 summary.createdAt();

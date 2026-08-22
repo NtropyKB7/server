@@ -3,12 +3,14 @@ package com.ntropy.bff.controller.ai;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -35,15 +37,17 @@ import com.ntropy.common.dto.ai.AiReportSummary;
 class AiReportControllerContractTest {
 
     private StubDeliveryClient deliveryClient;
+    private StubAiReportQueryClient queryClient;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         deliveryClient = new StubDeliveryClient();
+        queryClient = new StubAiReportQueryClient();
         objectMapper = new ObjectMapper();
         AiReportController controller = new AiReportController(
-                new EmptyAiReportQueryClient(), deliveryClient, new AuthenticatedUserIdResolver()
+                queryClient, deliveryClient, new AuthenticatedUserIdResolver()
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -89,6 +93,64 @@ class AiReportControllerContractTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void returnsStandardizedDetailWhileKeepingFinancialSummaryCamelCase() throws Exception {
+        queryClient.detail = new AiReportSummary(
+                7L,
+                42L,
+                "2026-07",
+                objectMapper.readTree("{\"total_income\":2300000,\"total_expense\":1200000}"),
+                objectMapper.readTree("{\"financial_type\":\"가용자금 관리형\","
+                        + "\"recommended_product\":{\"product_name\":\"안심 적금\","
+                        + "\"details\":{\"interest_rate\":\"3.5\",\"term_months\":\"12.0\"}}}"),
+                LocalDateTime.of(2026, 8, 1, 3, 0)
+        );
+
+        MvcResult result = mockMvc.perform(get("/api/ai-reports/2026-07").principal(authentication()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode data = responseData(result);
+        assertEquals(42L, queryClient.userId);
+        assertEquals("2026-07", queryClient.yearMonth);
+        assertEquals(2300000L, data.path("financialSummary").path("totalIncome").asLong());
+        assertEquals("BALANCED", data.path("recommendation").path("financialType").asText());
+        assertEquals("안심 적금",
+                data.path("recommendation").path("recommendedProduct").path("productName").asText());
+        assertEquals(12,
+                data.path("recommendation").path("recommendedProduct").path("details")
+                        .path("savingPeriod").asInt());
+    }
+
+    @Test
+    void keepsListApiContractUnchanged() throws Exception {
+        queryClient.list = List.of(new AiReportSummary(
+                8L,
+                42L,
+                "2026-06",
+                objectMapper.readTree("{\"totalIncome\":2000000,\"totalExpense\":900000}"),
+                objectMapper.createObjectNode(),
+                LocalDateTime.of(2026, 7, 1, 3, 0)
+        ));
+
+        MvcResult result = mockMvc.perform(get("/api/ai-reports").principal(authentication()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode data = responseData(result);
+        assertEquals(42L, queryClient.userId);
+        assertEquals(1, data.path("totalCount").asInt());
+        assertEquals("2026년 6월 리포트", data.path("reports").get(0).path("reportTitle").asText());
+        assertEquals(2000000L, data.path("reports").get(0).path("totalIncome").asLong());
+        assertEquals(900000L, data.path("reports").get(0).path("totalExpense").asLong());
+    }
+
+    private JsonNode responseData(MvcResult result) throws Exception {
+        return objectMapper.readTree(
+                new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8)
+        ).path("data");
+    }
+
     private Authentication authentication() {
         return new UsernamePasswordAuthenticationToken(42L, "unused", Collections.emptyList());
     }
@@ -105,15 +167,23 @@ class AiReportControllerContractTest {
         }
     }
 
-    private static final class EmptyAiReportQueryClient implements AiReportQueryClient {
+    private static final class StubAiReportQueryClient implements AiReportQueryClient {
+        private Long userId;
+        private String yearMonth;
+        private AiReportSummary detail;
+        private List<AiReportSummary> list = List.of();
+
         @Override
         public AiReportSummary findByUserIdAndYearMonth(Long userId, String yearMonth) {
-            return null;
+            this.userId = userId;
+            this.yearMonth = yearMonth;
+            return detail;
         }
 
         @Override
         public List<AiReportSummary> findAllByUserId(Long userId) {
-            return List.of();
+            this.userId = userId;
+            return list;
         }
     }
 }
