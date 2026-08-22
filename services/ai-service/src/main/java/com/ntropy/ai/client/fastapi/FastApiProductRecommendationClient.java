@@ -20,7 +20,7 @@ public class FastApiProductRecommendationClient {
     private final String fastApiBaseUrl;
 
     public FastApiProductRecommendationClient(
-            @Value("${fastapi.base-url:http://localhost:8000}")
+            @Value("${fastapi.base-url:${FASTAPI_BASE_URL}}")
             String fastApiBaseUrl
     ) {
         this.restTemplate = new RestTemplate();

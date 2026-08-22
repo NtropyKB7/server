@@ -24,7 +24,7 @@ public class FastApiTransactionClassificationClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${fastapi.base-url:http://localhost:8000}")
+    @Value("${fastapi.base-url:${FASTAPI_BASE_URL}}")
     private String fastApiBaseUrl;
 
     public TransactionClassificationResponse classifyTransactions(
