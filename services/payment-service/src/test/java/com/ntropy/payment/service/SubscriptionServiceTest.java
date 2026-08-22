@@ -175,6 +175,8 @@ class SubscriptionServiceTest {
         assertEquals(PaymentStatus.SUCCESS, initialPayment.getPaymentStatus());
         assertEquals(PaymentStatus.PENDING, scheduledPayment.getPaymentStatus());
         assertEquals(10L, scheduledPayment.getSubscriptionId());
+        assertEquals(34, scheduledPayment.getMerchantUid().length());
+        assertTrue(scheduledPayment.getMerchantUid().matches("SR[0-9a-f]{32}"));
         verify(paymentClient).schedulePayment(
                 eq(scheduledPayment.getMerchantUid()), eq(BILLING_KEY), eq(4_900L), anyString(), eq(result.getEndDate()));
     }
