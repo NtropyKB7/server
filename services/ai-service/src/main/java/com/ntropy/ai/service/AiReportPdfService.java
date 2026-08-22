@@ -56,42 +56,38 @@ public class AiReportPdfService {
     }
 
     private void writeReport(PdfWriter writer, AiReportDetailSummary report) throws IOException {
-        writer.title("Ntropy AI 월간 재무 리포트");
-        writer.keyValue("대상 연월", report.yearMonth());
-        writer.keyValue("리포트 ID", text(report.reportId()));
-        writer.keyValue("생성 시각", report.createdAt() == null ? "-" : CREATED_AT.format(report.createdAt()));
-
         JsonNode financial = objectOrEmpty(report.financialSummary());
-        writer.section("월간 재무 요약");
-        writer.table(
-                List.of("총소득", "총소비", "가용자금"),
-                List.of(List.of(
-                        won(financial.path("totalIncome")),
-                        won(financial.path("totalExpense")),
-                        won(financial.path("availableFunds"))
-                )),
-                new float[] {1, 1, 1}
-        );
-        writer.keyValue("전월 대비 소득 변화율", percent(financial.path("incomeChangeRate")));
-        writer.keyValue("전월 대비 소비 변화율", percent(financial.path("expenseChangeRate")));
-
-        writeCategories(writer, financial.path("topCategories"));
-        writeJobs(writer, financial.path("jobSummaries"));
-        writeRemainingFields(writer, financial,
-                Set.of("totalIncome", "totalExpense", "availableFunds", "incomeChangeRate",
-                        "expenseChangeRate", "topCategories", "jobSummaries"));
-
         JsonNode recommendation = objectOrEmpty(report.recommendation());
-        writer.section("AI 재무 분석");
-        writer.keyValue("재무 유형", scalar(recommendation.path("financialType")));
-        writer.paragraph("재무활동 인사이트", scalar(recommendation.path("financialActivityInsight")));
-        writer.paragraph("잡별 소득 인사이트", scalar(recommendation.path("jobInsight")));
-        writer.paragraph("향후 소득 전망", scalar(recommendation.path("futureIncomeTrend")));
 
-        writeRecommendedProduct(writer, recommendation.path("recommendedProduct"));
+        writer.reportHeader(report.yearMonth(), report.createdAt() == null ? "-" : CREATED_AT.format(report.createdAt()));
+        writer.metricCards(
+                won(financial.path("totalIncome")),
+                won(financial.path("totalExpense")),
+                won(financial.path("availableFunds"))
+        );
+        writer.insightCard(
+                scalar(recommendation.path("financialActivityInsight")),
+                "전월 대비 소득 " + percent(financial.path("incomeChangeRate"))
+                        + " · 소비 " + percent(financial.path("expenseChangeRate"))
+        );
+        writer.cashFlowChart(financial.path("totalIncome"), financial.path("totalExpense"));
+        writer.categoryChart(financial.path("topCategories"));
+
+        writer.pageBreak();
+        writer.pageTitle("잡별 근무 성과와 맞춤 추천");
+        writer.jobChart(financial.path("jobSummaries"));
+        writer.insightCard("잡별 소득 인사이트", scalar(recommendation.path("jobInsight")));
+        writer.productCard(recommendation.path("recommendedProduct"));
         writer.paragraph("추천 이유", scalar(recommendation.path("reasoning")));
         String benefitLabel = benefitLabel(recommendation.path("recommendedProduct").path("productType"));
         writer.keyValue(benefitLabel, won(recommendation.path("simulatedExtraIncome")));
+        writer.paragraph("향후 소득 전망", scalar(recommendation.path("futureIncomeTrend")));
+        writer.keyValue("재무 유형", scalar(recommendation.path("financialType")));
+        writeRecommendedProductDetails(writer, recommendation.path("recommendedProduct"));
+
+        writeRemainingFields(writer, financial,
+                Set.of("totalIncome", "totalExpense", "availableFunds", "incomeChangeRate",
+                        "expenseChangeRate", "fixedExpense", "topCategories", "jobSummaries"));
         writeRemainingFields(writer, recommendation,
                 Set.of("financialType", "financialActivityInsight", "jobInsight", "futureIncomeTrend",
                         "recommendedProduct", "reasoning", "simulatedExtraIncome"));
@@ -149,16 +145,11 @@ public class AiReportPdfService {
         }
     }
 
-    private void writeRecommendedProduct(PdfWriter writer, JsonNode product) throws IOException {
-        writer.section("추천 금융상품");
-        writer.keyValue("상품 ID", scalar(product.path("productId")));
-        writer.keyValue("상품명", scalar(product.path("productName")));
-        writer.keyValue("금융사", scalar(product.path("provider")));
-        writer.keyValue("상품 유형", productTypeName(product.path("productType").asText("")));
-        writer.paragraph("상품 요약", scalar(product.path("summary")));
-        writer.paragraph("추천 대상", scalar(product.path("targetGroup")));
-        writer.paragraph("N잡 인사이트", scalar(product.path("njobTrendTip")));
-        writer.subsection("상품 상세 조건");
+    private void writeRecommendedProductDetails(PdfWriter writer, JsonNode product) throws IOException {
+        if (product == null || !product.isObject() || product.size() == 0) {
+            return;
+        }
+        writer.subsection("상품 상세 정보");
         writeDynamicNode(writer, product.path("details"), "상세");
         writeRemainingFields(writer, product,
                 Set.of("productId", "productName", "provider", "productType", "summary", "targetGroup",
@@ -235,6 +226,13 @@ public class AiReportPdfService {
         return String.format(Locale.KOREA, "%+.1f%%", value);
     }
 
+    private static String unsignedPercent(JsonNode node) {
+        if (node == null || !node.isNumber()) {
+            return "-";
+        }
+        return String.format(Locale.KOREA, "%.1f%%", Math.max(0, node.asDouble()) * 100);
+    }
+
     private static String workTime(JsonNode node) {
         if (node == null || !node.isNumber()) {
             return "-";
@@ -273,6 +271,16 @@ public class AiReportPdfService {
 
     private static String humanize(String key) {
         if (key == null || key.isBlank()) return "상세";
+        String translated = switch (key) {
+            case "interestRate" -> "금리";
+            case "savingPeriod" -> "저축 기간";
+            case "maxMonthlyAmount" -> "월 최대 납입액";
+            case "minimumSpend" -> "최소 이용 금액";
+            case "benefits" -> "혜택";
+            case "rate" -> "비율";
+            default -> null;
+        };
+        if (translated != null) return translated;
         String spaced = key.replace('_', ' ').replaceAll("([a-z0-9])([A-Z])", "$1 $2");
         return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
@@ -283,8 +291,17 @@ public class AiReportPdfService {
         private static final float BOTTOM = 48;
         private static final float BODY_SIZE = 10;
         private static final float LINE_HEIGHT = 15;
-        private static final PDColor BRAND = new PDColor(new float[] {0.16f, 0.35f, 0.72f}, PDDeviceRGB.INSTANCE);
-        private static final PDColor LIGHT = new PDColor(new float[] {0.92f, 0.95f, 1f}, PDDeviceRGB.INSTANCE);
+        private static final PDColor BRAND = rgb(0.02f, 0.47f, 0.35f);
+        private static final PDColor BRAND_DARK = rgb(0.02f, 0.30f, 0.24f);
+        private static final PDColor MINT = rgb(0.88f, 0.98f, 0.94f);
+        private static final PDColor LIGHT = rgb(0.95f, 0.97f, 0.96f);
+        private static final PDColor MUTED = rgb(0.42f, 0.47f, 0.45f);
+        private static final PDColor[] CHART_COLORS = {
+                rgb(0.02f, 0.47f, 0.35f),
+                rgb(0.25f, 0.68f, 0.53f),
+                rgb(0.52f, 0.82f, 0.69f),
+                rgb(0.78f, 0.90f, 0.84f)
+        };
 
         private final PDDocument document;
         private final PDType0Font font;
@@ -296,6 +313,174 @@ public class AiReportPdfService {
         PdfWriter(PDDocument document, PDType0Font font) throws IOException {
             this.document = document;
             this.font = font;
+            newPage();
+        }
+
+        void reportHeader(String yearMonth, String createdAt) throws IOException {
+            ensure(70);
+            text("Ntropy", MARGIN, y, 12, BRAND);
+            text(monthTitle(yearMonth), MARGIN, y - 26, 22, BRAND_DARK);
+            text("AI 월간 재무 리포트 · 생성 " + createdAt, MARGIN, y - 46, 8, MUTED);
+            y -= 66;
+        }
+
+        void pageTitle(String value) throws IOException {
+            ensure(52);
+            text("Ntropy AI 월간 재무 리포트", MARGIN, y, 9, BRAND);
+            text(value, MARGIN, y - 25, 18, BRAND_DARK);
+            y -= 48;
+        }
+
+        void metricCards(String income, String expense, String available) throws IOException {
+            ensure(76);
+            float gap = 10;
+            float width = (contentWidth() - gap * 2) / 3;
+            metricCard(MARGIN, y, width, "총소득", income, LIGHT, BRAND_DARK);
+            metricCard(MARGIN + width + gap, y, width, "총소비", expense, LIGHT, BRAND_DARK);
+            metricCard(MARGIN + (width + gap) * 2, y, width, "가용자금", available, MINT, BRAND);
+            y -= 82;
+        }
+
+        void insightCard(String headline, String detail) throws IOException {
+            List<String> headlineLines = wrap(headline, contentWidth() - 28, 11);
+            List<String> detailLines = wrap(detail, contentWidth() - 28, 8);
+            float height = 48 + headlineLines.size() * 15 + detailLines.size() * 12;
+            if (height > 180) {
+                paragraph("AI 맞춤 제안", headline);
+                paragraph("상세", detail);
+                return;
+            }
+            ensure(height + 8);
+            fillRect(MARGIN, y - height, contentWidth(), height, MINT);
+            text("AI 맞춤 제안", MARGIN + 14, y - 18, 8, BRAND);
+            float lineY = y - 38;
+            for (String line : headlineLines) {
+                text(line, MARGIN + 14, lineY, 11, BRAND_DARK);
+                lineY -= 15;
+            }
+            for (String line : detailLines) {
+                text(line, MARGIN + 14, lineY - 2, 8, MUTED);
+                lineY -= 12;
+            }
+            y -= height + 18;
+        }
+
+        void cashFlowChart(JsonNode incomeNode, JsonNode expenseNode) throws IOException {
+            ensure(160);
+            text("이번 달 자금 흐름", MARGIN, y, 13, BRAND_DARK);
+            long income = nonNegativeLong(incomeNode);
+            long expense = nonNegativeLong(expenseNode);
+            double ratio = income == 0 ? 0 : Math.min(1d, (double) expense / income);
+
+            float centerX = MARGIN + 72;
+            float centerY = y - 82;
+            drawRing(centerX, centerY, 42, 11, rgb(0.86f, 0.91f, 0.89f), 1d);
+            drawRing(centerX, centerY, 42, 11, BRAND, ratio);
+            String ratioText = Math.round(ratio * 100) + "%";
+            textCentered(ratioText, centerX, centerY + 3, 14, BRAND_DARK);
+            textCentered("소비율", centerX, centerY - 13, 8, MUTED);
+
+            float labelX = MARGIN + 155;
+            text("총소득", labelX, y - 57, 9, MUTED);
+            text(won(incomeNode), labelX + 78, y - 57, 10, BRAND_DARK);
+            text("총소비", labelX, y - 89, 9, MUTED);
+            text(won(expenseNode), labelX + 78, y - 89, 10, BRAND_DARK);
+            text("남은 가용자금", labelX, y - 121, 9, MUTED);
+            text(java.text.NumberFormat.getIntegerInstance(Locale.KOREA)
+                    .format(income - expense) + "원", labelX + 78, y - 121, 10, BRAND);
+            y -= 155;
+        }
+
+        void categoryChart(JsonNode categories) throws IOException {
+            text("주요 소비 카테고리", MARGIN, y, 13, BRAND_DARK);
+            List<JsonNode> items = firstItems(categories, 4);
+            if (items.isEmpty()) {
+                y -= 20;
+                paragraph("카테고리", "데이터 없음");
+                return;
+            }
+            ensure(52 + items.size() * 24);
+            double totalRatio = items.stream().mapToDouble(PdfWriter::ratio).sum();
+            float barY = y - 28;
+            float barX = MARGIN;
+            float barWidth = contentWidth();
+            for (int index = 0; index < items.size(); index++) {
+                double normalized = totalRatio <= 0 ? 1d / items.size() : ratio(items.get(index)) / totalRatio;
+                float segmentWidth = (float) (barWidth * normalized);
+                fillRect(barX, barY, segmentWidth, 12, CHART_COLORS[index]);
+                barX += segmentWidth;
+            }
+            float rowY = barY - 19;
+            for (int index = 0; index < items.size(); index++) {
+                JsonNode item = items.get(index);
+                String name = categoryName(item);
+                fillRect(MARGIN, rowY - 6, 7, 7, CHART_COLORS[index]);
+                text(abbreviate(name, 30), MARGIN + 14, rowY, 9, null);
+                text(won(item.path("amount")), MARGIN + 250, rowY, 9, BRAND_DARK);
+                text(unsignedPercent(item.path("ratio")), MARGIN + 390, rowY, 9, MUTED);
+                rowY -= 22;
+                if (!abbreviate(name, 30).equals(name)) {
+                    paragraph("전체 카테고리명", name);
+                    rowY = y;
+                }
+            }
+            y = Math.min(y, rowY - 5);
+        }
+
+        void jobChart(JsonNode jobs) throws IOException {
+            text("잡별 근무 분석", MARGIN, y, 13, BRAND_DARK);
+            y -= 24;
+            List<JsonNode> items = firstItems(jobs, 6);
+            if (items.isEmpty()) {
+                y -= 20;
+                paragraph("잡별 성과", "데이터 없음");
+                return;
+            }
+            long maxIncome = items.stream().mapToLong(item -> nonNegativeLong(item.path("incomeAmount"))).max().orElse(0);
+            for (JsonNode item : items) {
+                ensure(48);
+                String name = scalar(item.path("jobName"));
+                String shortName = abbreviate(name, 26);
+                text(shortName, MARGIN, y - 8, 10, BRAND_DARK);
+                text(workTime(item.path("totalWorkMinutes")) + " · " + won(item.path("incomeAmount")),
+                        MARGIN + 250, y - 8, 9, MUTED);
+                fillRect(MARGIN, y - 29, contentWidth(), 9, LIGHT);
+                float width = maxIncome == 0 ? 0 : contentWidth() * nonNegativeLong(item.path("incomeAmount")) / maxIncome;
+                fillRect(MARGIN, y - 29, width, 9, BRAND);
+                y -= 43;
+                if (!shortName.equals(name)) paragraph("전체 잡 이름", name);
+            }
+            y -= 5;
+        }
+
+        void productCard(JsonNode product) throws IOException {
+            if (product == null || !product.isObject() || product.size() == 0) {
+                insightCard("추천 상품이 아직 없어요.", "재무 데이터가 쌓이면 맞춤 상품을 안내해 드릴게요.");
+                return;
+            }
+            String provider = scalar(product.path("provider"));
+            String productName = scalar(product.path("productName"));
+            String summary = scalar(product.path("summary"));
+            List<String> nameLines = wrap(productName, contentWidth() - 145, 13);
+            List<String> summaryLines = wrap(summary, contentWidth() - 28, 9);
+            float height = 68 + nameLines.size() * 17 + summaryLines.size() * 13;
+            ensure(height + 8);
+            fillRect(MARGIN, y - height, contentWidth(), height, LIGHT);
+            text(provider, MARGIN + 14, y - 20, 9, BRAND);
+            badge("맞춤 추천", MARGIN + contentWidth() - 82, y - 25, 68);
+            float lineY = y - 45;
+            for (String line : nameLines) {
+                text(line, MARGIN + 14, lineY, 13, BRAND_DARK);
+                lineY -= 17;
+            }
+            for (String line : summaryLines) {
+                text(line, MARGIN + 14, lineY - 3, 9, MUTED);
+                lineY -= 13;
+            }
+            y -= height + 18;
+        }
+
+        void pageBreak() throws IOException {
             newPage();
         }
 
@@ -432,6 +617,53 @@ public class AiReportPdfService {
             stream.endText();
         }
 
+        private void metricCard(float x, float top, float width, String label, String value,
+                                PDColor background, PDColor valueColor) throws IOException {
+            fillRect(x, top - 66, width, 66, background);
+            text(label, x + 12, top - 20, 9, MUTED);
+            text(abbreviate(value, 18), x + 12, top - 45, 13, valueColor);
+        }
+
+        private void badge(String value, float x, float baseline, float width) throws IOException {
+            fillRect(x, baseline - 4, width, 19, MINT);
+            float textX = x + (width - stringWidth(value, 8)) / 2;
+            text(value, textX, baseline + 2, 8, BRAND);
+        }
+
+        private void fillRect(float x, float bottom, float width, float height, PDColor color) throws IOException {
+            stream.setNonStrokingColor(color);
+            stream.addRect(x, bottom, Math.max(0, width), Math.max(0, height));
+            stream.fill();
+        }
+
+        private void drawRing(float centerX, float centerY, float radius, float lineWidth,
+                              PDColor color, double portion) throws IOException {
+            double clamped = Math.max(0, Math.min(1, portion));
+            if (clamped == 0) return;
+            int segments = Math.max(2, (int) Math.ceil(120 * clamped));
+            stream.setStrokingColor(color);
+            stream.setLineWidth(lineWidth);
+            stream.setLineCapStyle(1);
+            for (int index = 0; index <= segments; index++) {
+                double angle = -Math.PI / 2 + Math.PI * 2 * clamped * index / segments;
+                float x = centerX + (float) Math.cos(angle) * radius;
+                float pointY = centerY + (float) Math.sin(angle) * radius;
+                if (index == 0) stream.moveTo(x, pointY);
+                else stream.lineTo(x, pointY);
+            }
+            stream.stroke();
+            stream.setLineCapStyle(0);
+        }
+
+        private void textCentered(String value, float centerX, float baseline, float size, PDColor color)
+                throws IOException {
+            text(value, centerX - stringWidth(value, size) / 2, baseline, size, color);
+        }
+
+        private float contentWidth() {
+            return page.getMediaBox().getWidth() - MARGIN * 2;
+        }
+
         private void ensure(float required) throws IOException {
             if (y - required < BOTTOM) newPage();
         }
@@ -458,6 +690,50 @@ public class AiReportPdfService {
             addPageNumber();
             stream.close();
             stream = null;
+        }
+
+        private static String monthTitle(String yearMonth) {
+            if (yearMonth == null || !yearMonth.matches("\\d{4}-\\d{2}")) {
+                return "AI 월간 리포트";
+            }
+            return yearMonth.substring(0, 4) + "년 "
+                    + Integer.parseInt(yearMonth.substring(5, 7)) + "월";
+        }
+
+        private static long nonNegativeLong(JsonNode node) {
+            return node != null && node.isNumber() ? Math.max(0, node.asLong()) : 0;
+        }
+
+        private static double ratio(JsonNode item) {
+            JsonNode node = item.path("ratio");
+            if (!node.isNumber()) return 0;
+            return Math.max(0, node.asDouble());
+        }
+
+        private static List<JsonNode> firstItems(JsonNode array, int limit) {
+            List<JsonNode> result = new ArrayList<>();
+            if (array == null || !array.isArray()) return result;
+            for (JsonNode item : array) {
+                if (result.size() == limit) break;
+                result.add(item);
+            }
+            return result;
+        }
+
+        private static String categoryName(JsonNode category) {
+            String displayName = scalar(category.path("displayName"));
+            if ("-".equals(displayName)) displayName = scalar(category.path("category"));
+            return "AGGREGATED_OTHER".equals(displayName) ? "기타" : displayName;
+        }
+
+        private static String abbreviate(String value, int maxCodePoints) {
+            if (value == null || value.codePointCount(0, value.length()) <= maxCodePoints) return value;
+            int end = value.offsetByCodePoints(0, maxCodePoints);
+            return value.substring(0, end) + "…";
+        }
+
+        private static PDColor rgb(float red, float green, float blue) {
+            return new PDColor(new float[] {red, green, blue}, PDDeviceRGB.INSTANCE);
         }
     }
 }

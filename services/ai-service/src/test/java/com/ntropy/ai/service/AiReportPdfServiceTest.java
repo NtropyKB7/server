@@ -23,6 +23,51 @@ import com.ntropy.common.dto.ai.AiReportDetailSummary;
 class AiReportPdfServiceTest {
 
     @Test
+    void rendersTwoPageVisualReportWithChartsAndRecommendationCard() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        AiReportDetailSummary report = new AiReportDetailSummary(
+                217L,
+                "2026-07",
+                mapper.readTree("{"
+                        + "\"totalIncome\":3960000,\"totalExpense\":2540000,\"availableFunds\":1420000,"
+                        + "\"incomeChangeRate\":0.05,\"expenseChangeRate\":-0.08,"
+                        + "\"topCategories\":["
+                        + "{\"displayName\":\"식비\",\"amount\":812800,\"ratio\":0.32},"
+                        + "{\"displayName\":\"교통비\",\"amount\":609600,\"ratio\":0.24},"
+                        + "{\"displayName\":\"여가·구독\",\"amount\":279400,\"ratio\":0.11},"
+                        + "{\"category\":\"AGGREGATED_OTHER\",\"amount\":838200,\"ratio\":0.33}],"
+                        + "\"jobSummaries\":["
+                        + "{\"jobName\":\"배달\",\"incomeAmount\":990000,\"totalWorkMinutes\":2160},"
+                        + "{\"jobName\":\"청소\",\"incomeAmount\":1720000,\"totalWorkMinutes\":1680}]}"),
+                mapper.readTree("{"
+                        + "\"financialType\":\"BALANCED\","
+                        + "\"financialActivityInsight\":\"식비가 줄어 가용자금이 늘었어요.\","
+                        + "\"jobInsight\":\"청소 업무의 시간당 성과가 가장 높아요.\","
+                        + "\"futureIncomeTrend\":\"현재 흐름을 유지하면 가용자금이 안정적으로 늘어날 수 있어요.\","
+                        + "\"reasoning\":\"남은 가용자금을 유연하게 저축할 수 있어요.\","
+                        + "\"simulatedExtraIncome\":35000,"
+                        + "\"recommendedProduct\":{\"productName\":\"N잡러 자유적금\","
+                        + "\"provider\":\"가상은행\",\"productType\":\"SAVINGS\","
+                        + "\"summary\":\"가용자금에 맞춰 자유롭게 납입하는 상품\","
+                        + "\"details\":{\"interestRate\":3.5,\"savingPeriod\":12}}}"),
+                LocalDateTime.of(2026, 8, 1, 3, 0)
+        );
+
+        byte[] pdf = new AiReportPdfService().generate(report);
+
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertTrue(document.getNumberOfPages() == 2);
+            assertTrue(text.contains("2026년 7월"));
+            assertTrue(text.contains("소비율"));
+            assertTrue(text.contains("주요 소비 카테고리"));
+            assertTrue(text.contains("잡별 근무 분석"));
+            assertTrue(text.contains("맞춤 추천"));
+            assertTrue(text.contains("N잡러 자유적금"));
+        }
+    }
+
+    @Test
     void includesFinancialJobsCategoriesRecommendationAndDynamicDetails() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         AiReportDetailSummary report = new AiReportDetailSummary(
@@ -54,7 +99,7 @@ class AiReportPdfServiceTest {
             assertTrue(text.contains("27시간 30분"));
             assertTrue(text.contains("기타"));
             assertTrue(text.contains("생활 카드"));
-            assertTrue(text.contains("Minimum Spend"));
+            assertTrue(text.contains("최소 이용 금액"));
             assertTrue(text.contains("교통"));
             assertTrue(text.contains("월 예상 절감액"));
             assertTrue(text.contains("단순 추정값"));
