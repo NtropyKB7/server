@@ -20,14 +20,14 @@ import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.common.client.CalendarQueryClient;
 import com.ntropy.common.client.IncomeAnalysisQueryClient;
 import com.ntropy.common.client.RecommendedWorkHoursQueryClient;
-import com.ntropy.common.client.UserQueryClient;
-import com.ntropy.common.dto.user.UserSummary;
 import com.ntropy.common.dto.work.summary.CalendarDailySummary;
 import com.ntropy.common.dto.work.summary.CalendarMonthlyHours;
 import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
 import com.ntropy.common.dto.work.summary.JobFatigueSummary;
 import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.user.api.client.UserQueryClient;
+import com.ntropy.user.api.dto.UserSummary;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

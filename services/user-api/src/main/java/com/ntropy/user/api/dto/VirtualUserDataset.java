@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.user;
+package com.ntropy.user.api.dto;
 
 import java.util.List;
 

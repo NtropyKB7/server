@@ -6,11 +6,11 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.client.VirtualUserQueryClient;
-import com.ntropy.common.dto.user.VirtualDatasetContext;
-import com.ntropy.common.dto.user.VirtualUserDataset;
-import com.ntropy.common.dto.user.VirtualUserIdentity;
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.user.api.client.VirtualUserQueryClient;
+import com.ntropy.user.api.dto.VirtualDatasetContext;
+import com.ntropy.user.api.dto.VirtualUserDataset;
+import com.ntropy.user.api.dto.VirtualUserIdentity;
 import com.ntropy.user.config.VirtualTestProperties;
 import com.ntropy.user.domain.entity.User;
 import com.ntropy.user.exception.UserErrorCode;

@@ -4,8 +4,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.common.domain.UserScope;
+import com.ntropy.user.api.client.ActiveUserQueryClient;
 import com.ntropy.work.port.user.UserPort;
 
 import lombok.RequiredArgsConstructor;

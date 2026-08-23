@@ -6,10 +6,10 @@ import org.springframework.stereotype.Component;
 
 import com.ntropy.ai.port.user.AiUser;
 import com.ntropy.ai.port.user.UserPort;
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.UserQueryClient;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.user.UserSummary;
+import com.ntropy.user.api.client.ActiveUserQueryClient;
+import com.ntropy.user.api.client.UserQueryClient;
+import com.ntropy.user.api.dto.UserSummary;
 
 import lombok.RequiredArgsConstructor;
 

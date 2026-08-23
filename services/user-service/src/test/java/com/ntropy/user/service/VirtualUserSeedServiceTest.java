@@ -14,8 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.ntropy.common.dto.user.VirtualUserDataset;
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.user.api.dto.VirtualUserDataset;
 import com.ntropy.user.config.VirtualTestProperties;
 import com.ntropy.user.domain.entity.User;
 import com.ntropy.user.mapper.UserMapper;

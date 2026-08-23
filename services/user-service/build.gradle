@@ -1,5 +1,6 @@
 dependencies {
     implementation project(':common')
+    implementation project(':services:user-api')
     implementation "org.springframework:spring-webmvc:${springVersion}"
     implementation "org.springframework:spring-tx:${springVersion}"
     implementation 'org.mybatis:mybatis-spring:2.1.2'

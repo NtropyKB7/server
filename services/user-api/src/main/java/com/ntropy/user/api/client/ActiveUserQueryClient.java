@@ -1,4 +1,4 @@
-package com.ntropy.common.client;
+package com.ntropy.user.api.client;
 
 import java.util.List;
 

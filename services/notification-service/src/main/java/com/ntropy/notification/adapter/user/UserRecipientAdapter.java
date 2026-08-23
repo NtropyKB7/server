@@ -2,10 +2,10 @@ package com.ntropy.notification.adapter.user;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.UserQueryClient;
-import com.ntropy.common.dto.user.UserSummary;
 import com.ntropy.notification.port.user.NotificationRecipient;
 import com.ntropy.notification.port.user.UserPort;
+import com.ntropy.user.api.client.UserQueryClient;
+import com.ntropy.user.api.dto.UserSummary;
 
 import lombok.RequiredArgsConstructor;
 

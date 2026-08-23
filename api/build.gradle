@@ -4,6 +4,14 @@ plugins {
 
 dependencies {
     implementation project(':common')
+    implementation project(':services:user-api')
+    implementation project(':services:account-api')
+    implementation project(':services:work-api')
+    implementation project(':services:diagnosis-api')
+    implementation project(':services:defense-api')
+    implementation project(':services:payment-api')
+    implementation project(':services:notification-api')
+    implementation project(':services:ai-api')
     implementation project(':services:user-service')
     implementation project(':services:account-service')
     implementation project(':services:work-service')

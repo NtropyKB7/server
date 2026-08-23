@@ -8,12 +8,12 @@ import com.ntropy.account.port.user.SeededVirtualUser;
 import com.ntropy.account.port.user.SeededVirtualUserBatch;
 import com.ntropy.account.port.user.UserPort;
 import com.ntropy.account.port.user.VirtualDatasetExecutionContext;
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.VirtualUserQueryClient;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.user.VirtualDatasetContext;
-import com.ntropy.common.dto.user.VirtualUserDataset;
-import com.ntropy.common.dto.user.VirtualUserIdentity;
+import com.ntropy.user.api.client.ActiveUserQueryClient;
+import com.ntropy.user.api.client.VirtualUserQueryClient;
+import com.ntropy.user.api.dto.VirtualDatasetContext;
+import com.ntropy.user.api.dto.VirtualUserDataset;
+import com.ntropy.user.api.dto.VirtualUserIdentity;
 
 import lombok.RequiredArgsConstructor;
 

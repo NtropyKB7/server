@@ -5,6 +5,11 @@
 dependencies {
     // 공통 모듈(common) 참조 (공통 유틸리티, DTO 등 사용)
     implementation project(':common')
+    implementation project(':services:ai-api')
+    implementation project(':services:user-api')
+    implementation project(':services:work-api')
+    implementation project(':services:account-api')
+    implementation project(':services:payment-api')
 
     // Spring Web MVC 의존성 (Spring 어노테이션 및 Web 기능 사용)
     implementation "org.springframework:spring-webmvc:${springVersion}"

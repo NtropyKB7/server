@@ -25,7 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import com.ntropy.common.dto.user.VirtualUserDataset;
+import com.ntropy.user.api.dto.VirtualUserDataset;
 import com.ntropy.user.config.VirtualTestProperties;
 import com.ntropy.user.mapper.UserMapper;
 import com.ntropy.user.service.VirtualUserSeedService;

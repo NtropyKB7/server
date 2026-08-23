@@ -3,3 +3,6 @@ include 'common', 'api'
 include 'services:user-service', 'services:account-service', 'services:work-service',
         'services:diagnosis-service', 'services:defense-service', 'services:payment-service',
         'services:notification-service', 'services:bff-service', 'services:ai-service'
+include 'services:user-api', 'services:account-api', 'services:work-api',
+        'services:diagnosis-api', 'services:defense-api', 'services:payment-api',
+        'services:notification-api', 'services:ai-api'
