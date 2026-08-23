@@ -9,9 +9,6 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.client.VirtualSettlementDepositCommandClient;
-import com.ntropy.common.dto.account.VirtualSettlementDepositCommand;
-import com.ntropy.common.dto.account.VirtualSettlementDepositResult;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.VirtualSettlementDepositBatchResult;
 import com.ntropy.work.domain.entity.Platform;
@@ -20,19 +17,22 @@ import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.PlatformMapper;
 import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.mapper.projection.VirtualSettlementIncome;
+import com.ntropy.work.port.account.SettlementDepositOutcome;
+import com.ntropy.work.port.account.SettlementDepositPort;
+import com.ntropy.work.port.account.SettlementDepositRequest;
 
 class VirtualSettlementDepositServiceTest {
 
     private final StubIncomeMapper incomeMapper = new StubIncomeMapper();
     private final StubPlatformMapper platformMapper = new StubPlatformMapper();
-    private final RecordingDepositClient depositClient = new RecordingDepositClient();
+    private final RecordingDepositPort depositPort = new RecordingDepositPort();
     private final VirtualSettlementDepositService service = new VirtualSettlementDepositService(
             scope -> List.of(1L),
             new SettlementBatchUserScopeProperties("ALL"),
             incomeMapper,
             platformMapper,
             new StubHolidayService(Set.of()),
-            depositClient
+            depositPort
     );
 
     @Test
@@ -51,11 +51,11 @@ class VirtualSettlementDepositServiceTest {
 
         assertEquals(2, result.createdCount());
         assertEquals(2, result.matchTargets().size());
-        assertEquals(2, depositClient.commands.size());
-        VirtualSettlementDepositCommand baemin = depositClient.commands.get(0);
+        assertEquals(2, depositPort.requests.size());
+        SettlementDepositRequest baemin = depositPort.requests.get(0);
         assertEquals(LocalDate.of(2026, 7, 21), baemin.depositDate());
         assertEquals(40_000L, baemin.amount());
-        VirtualSettlementDepositCommand coupang = depositClient.commands.get(1);
+        SettlementDepositRequest coupang = depositPort.requests.get(1);
         assertEquals(LocalDate.of(2026, 7, 24), coupang.depositDate());
         assertEquals(LocalDate.of(2026, 7, 15), coupang.periodStart());
         assertEquals(LocalDate.of(2026, 7, 21), coupang.periodEnd());
@@ -76,7 +76,7 @@ class VirtualSettlementDepositServiceTest {
         VirtualSettlementDepositBatchResult result = service.processUser(1L, LocalDate.of(2026, 7, 20));
 
         assertEquals(0, result.createdCount());
-        assertEquals(0, depositClient.commands.size());
+        assertEquals(0, depositPort.requests.size());
     }
 
     @Test
@@ -92,7 +92,7 @@ class VirtualSettlementDepositServiceTest {
         VirtualSettlementDepositBatchResult result = service.processUser(1L, LocalDate.of(2026, 7, 30));
 
         assertEquals(1, result.createdCount());
-        assertEquals(70_000L, depositClient.commands.get(0).amount());
+        assertEquals(70_000L, depositPort.requests.get(0).amount());
         assertEquals(LocalDate.of(2026, 7, 24), result.matchTargets().get(0).depositDate());
     }
 
@@ -110,8 +110,8 @@ class VirtualSettlementDepositServiceTest {
         VirtualSettlementDepositBatchResult result = service.processUser(1L, LocalDate.of(2026, 7, 24));
 
         assertEquals(1, result.createdCount());
-        assertEquals(1, depositClient.commands.size());
-        assertEquals(1L, depositClient.commands.get(0).platformId());
+        assertEquals(1, depositPort.requests.size());
+        assertEquals(1L, depositPort.requests.get(0).platformId());
     }
 
     @Test
@@ -122,7 +122,7 @@ class VirtualSettlementDepositServiceTest {
         incomeMapper.pending = List.of(
                 income(1L, LocalDate.of(2026, 6, 1), 40_000L, SettlementStatus.PENDING)
         );
-        depositClient.nextResult = VirtualSettlementDepositResult.alreadyAvailable();
+        depositPort.nextResult = new SettlementDepositOutcome(true, false);
 
         VirtualSettlementDepositBatchResult result = service.processUser(1L, LocalDate.of(2026, 7, 24));
 
@@ -201,13 +201,13 @@ class VirtualSettlementDepositServiceTest {
         }
     }
 
-    private static final class RecordingDepositClient implements VirtualSettlementDepositCommandClient {
-        private final List<VirtualSettlementDepositCommand> commands = new ArrayList<>();
-        private VirtualSettlementDepositResult nextResult = VirtualSettlementDepositResult.created();
+    private static final class RecordingDepositPort implements SettlementDepositPort {
+        private final List<SettlementDepositRequest> requests = new ArrayList<>();
+        private SettlementDepositOutcome nextResult = new SettlementDepositOutcome(true, true);
 
         @Override
-        public VirtualSettlementDepositResult createOrAdjust(VirtualSettlementDepositCommand command) {
-            commands.add(command);
+        public SettlementDepositOutcome createOrAdjust(SettlementDepositRequest request) {
+            requests.add(request);
             return nextResult;
         }
     }

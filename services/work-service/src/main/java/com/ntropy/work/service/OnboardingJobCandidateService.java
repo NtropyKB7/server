@@ -10,8 +10,6 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.client.IncomingTransactionQueryClient;
-import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.work.domain.JobCandidate;
 import com.ntropy.work.domain.PlatformMatch;
 import com.ntropy.work.domain.PlatformMatchResult;
@@ -20,6 +18,8 @@ import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.domain.entity.Platform;
 import com.ntropy.work.mapper.CategoryMapper;
 import com.ntropy.work.mapper.PlatformMapper;
+import com.ntropy.work.port.account.IncomingTransaction;
+import com.ntropy.work.port.account.IncomingTransactionPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,7 +38,7 @@ public class OnboardingJobCandidateService {
     /** work-service-seed.sql 기준 '배달' 카테고리 ID. */
     private static final Long DELIVERY_CATEGORY_ID = 1L;
 
-    private final IncomingTransactionQueryClient incomingTransactionQueryClient;
+    private final IncomingTransactionPort incomingTransactionPort;
     private final PlatformMapper platformMapper;
     private final CategoryMapper categoryMapper;
 
@@ -46,12 +46,12 @@ public class OnboardingJobCandidateService {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusMonths(ONBOARDING_LOOKBACK_MONTHS);
 
-        List<NormalizedIncomingTransaction> transactions =
-                incomingTransactionQueryClient.findIncomingTransactions(userId, startDate, endDate);
+        List<IncomingTransaction> transactions =
+                incomingTransactionPort.findIncomingTransactions(userId, startDate, endDate);
         List<Platform> platforms = platformMapper.findAll();
 
         Map<Long, Aggregate> aggregatesByPlatform = new LinkedHashMap<>();
-        for (NormalizedIncomingTransaction transaction : transactions) {
+        for (IncomingTransaction transaction : transactions) {
             PlatformMatchResult result = PlatformMatcher.match(transaction.counterpartyName(), platforms);
             if (!(result instanceof PlatformMatchResult.Matched matched)) {
                 continue;

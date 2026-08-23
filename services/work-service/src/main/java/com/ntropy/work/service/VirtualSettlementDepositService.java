@@ -13,9 +13,6 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.VirtualSettlementDepositCommandClient;
-import com.ntropy.common.dto.account.VirtualSettlementDepositCommand;
-import com.ntropy.common.dto.account.VirtualSettlementDepositResult;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.ExpectedSettlementDateCalculator;
 import com.ntropy.work.domain.SettlementPeriod;
@@ -27,6 +24,9 @@ import com.ntropy.work.domain.enums.SettlementStatus;
 import com.ntropy.work.mapper.PlatformMapper;
 import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.mapper.projection.VirtualSettlementIncome;
+import com.ntropy.work.port.account.SettlementDepositOutcome;
+import com.ntropy.work.port.account.SettlementDepositPort;
+import com.ntropy.work.port.account.SettlementDepositRequest;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +46,7 @@ public class VirtualSettlementDepositService {
     private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private final PlatformMapper platformMapper;
     private final HolidayService holidayService;
-    private final VirtualSettlementDepositCommandClient depositCommandClient;
+    private final SettlementDepositPort settlementDepositPort;
 
     /** 전체 활성 사용자의 오늘까지 도래한 가상 정산 입금을 생성한다. */
     public VirtualSettlementDepositBatchResult runDailyBatch(LocalDate processDate) {
@@ -114,8 +114,8 @@ public class VirtualSettlementDepositService {
             DepositGroupKey key = entry.getKey();
             Platform platform = platforms.get(key.platformId());
             try {
-                VirtualSettlementDepositResult result = depositCommandClient.createOrAdjust(
-                        new VirtualSettlementDepositCommand(
+                SettlementDepositOutcome result = settlementDepositPort.createOrAdjust(
+                        new SettlementDepositRequest(
                                 userId,
                                 key.platformId(),
                                 key.periodStart(),

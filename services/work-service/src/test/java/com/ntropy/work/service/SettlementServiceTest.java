@@ -13,10 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.work.client.holiday.HolidayApiClient;
@@ -37,6 +35,8 @@ import com.ntropy.work.mapper.InMemoryPlatformMapper;
 import com.ntropy.work.mapper.InMemorySettlementMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
+import com.ntropy.work.port.account.IncomingTransaction;
+import com.ntropy.work.port.account.IncomingTransactionPort;
 
 class SettlementServiceTest {
 
@@ -58,7 +58,7 @@ class SettlementServiceTest {
             new HolidayService(new HolidayApiClient(null, null), holidayMapperForTest);
     private final StubActiveUserQueryClient activeUserQueryClient = new StubActiveUserQueryClient();
     private final StubNotificationCommandClient notificationCommandClient = new StubNotificationCommandClient();
-    private StubIncomingTransactionQueryClient incomingTransactionQueryClient;
+    private StubIncomingTransactionPort incomingTransactionPort;
     private SettlementService service;
 
     @BeforeEach
@@ -70,9 +70,9 @@ class SettlementServiceTest {
                 .settlementOffsetDay(1)
                 .build());
         jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).isActive(true).build());
-        incomingTransactionQueryClient = new StubIncomingTransactionQueryClient();
+        incomingTransactionPort = new StubIncomingTransactionPort();
         service = new SettlementService(
-                incomingTransactionQueryClient, activeUserQueryClient,
+                incomingTransactionPort, activeUserQueryClient,
                 new SettlementBatchUserScopeProperties("REAL_ONLY"), platformMapper, jobMapper,
                 jobPlatformMappingMapper, workLogMapper, workLogPlatformIncomeMapper, settlementMapper, holidayService,
                 notificationCommandClient);
@@ -89,7 +89,7 @@ class SettlementServiceTest {
         workLogMapper.insert(outOfPeriodConfirmed);
         workLogMapper.insert(inPeriodPlanned);
         insertIncome(inPeriodConfirmed, PLATFORM_ID, 50_000L, SettlementStatus.PENDING);
-        incomingTransactionQueryClient.transactions = List.of(transaction(999L, 48_000L));
+        incomingTransactionPort.transactions = List.of(transaction(999L, 48_000L));
 
         service.processSettlement(USER_ID, PROCESS_DATE);
 
@@ -115,8 +115,8 @@ class SettlementServiceTest {
     @Test
     @DisplayName("PLATFORM과 매칭되지 않는 거래는 job_id=null인 UNMATCHED SETTLEMENT로 합산 저장된다")
     void processSettlement_unmatchedTransaction_savesUnmatchedSettlement() {
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
         );
 
         service.processSettlement(USER_ID, PROCESS_DATE);
@@ -135,9 +135,9 @@ class SettlementServiceTest {
     @Test
     @DisplayName("같은 날짜의 UNMATCHED 거래 여러 건은 하나의 SETTLEMENT 행으로 합산된다")
     void processSettlement_multipleUnmatchedTransactionsSameDay_aggregatesIntoOneRow() {
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처1", BigDecimal.valueOf(10_000L)),
-                new NormalizedIncomingTransaction(2L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처2", BigDecimal.valueOf(5_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처1", BigDecimal.valueOf(10_000L)),
+                new IncomingTransaction(2L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처2", BigDecimal.valueOf(5_000L))
         );
 
         service.processSettlement(USER_ID, PROCESS_DATE);
@@ -151,7 +151,7 @@ class SettlementServiceTest {
     @Test
     @DisplayName("매칭되는 PLATFORM이지만 사용자가 JOB으로 등록하지 않았으면 UNMATCHED로 저장된다")
     void processSettlement_platformNotRegisteredAsJob_savesUnmatchedSettlement() {
-        incomingTransactionQueryClient.transactions = List.of(transaction(1L, 10_000L));
+        incomingTransactionPort.transactions = List.of(transaction(1L, 10_000L));
 
         service.processSettlement(USER_ID, PROCESS_DATE);
 
@@ -171,7 +171,7 @@ class SettlementServiceTest {
                 .expectedAmount(0L).actualAmount(48_000L).transactionCount(1).accountTransactionId(999L)
                 .matchedAt(java.time.LocalDateTime.now())
                 .build());
-        incomingTransactionQueryClient.transactions = List.of(transaction(999L, 48_000L));
+        incomingTransactionPort.transactions = List.of(transaction(999L, 48_000L));
 
         service.processSettlement(USER_ID, PROCESS_DATE);
 
@@ -182,7 +182,7 @@ class SettlementServiceTest {
     @DisplayName("같은 잡·같은 정산기간에 서로 다른 거래 2건이 들어오면 각각 SETTLEMENT로 반영된다")
     void processSettlement_twoDistinctTransactionsSamePeriod_bothCreateSettlements() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
-        incomingTransactionQueryClient.transactions = List.of(
+        incomingTransactionPort.transactions = List.of(
                 transaction(111L, 30_000L),
                 transaction(222L, 20_000L)
         );
@@ -206,13 +206,13 @@ class SettlementServiceTest {
         insertIncome(first, PLATFORM_ID, 40_000L, SettlementStatus.PENDING);
         insertIncome(second, PLATFORM_ID, 10_000L, SettlementStatus.PENDING);
 
-        incomingTransactionQueryClient.transactions = List.of(transaction(111L, 50_000L));
+        incomingTransactionPort.transactions = List.of(transaction(111L, 50_000L));
         service.processSettlement(USER_ID, PROCESS_DATE);
 
         WorkLog late = workLog(PERIOD_DATE, "CONFIRMED", 20_000L);
         workLogMapper.insert(late);
         insertIncome(late, PLATFORM_ID, 20_000L, SettlementStatus.PENDING);
-        incomingTransactionQueryClient.transactions = List.of(transaction(222L, 20_000L));
+        incomingTransactionPort.transactions = List.of(transaction(222L, 20_000L));
         service.processSettlement(USER_ID, PROCESS_DATE);
 
         List<Settlement> settlements = settlementMapper.findAll();
@@ -243,8 +243,8 @@ class SettlementServiceTest {
                 .expectedAmount(0L).actualAmount(5_000L).transactionCount(1).accountTransactionId(null)
                 .matchedAt(java.time.LocalDateTime.now())
                 .build());
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
         );
 
         service.processSettlement(USER_ID, PROCESS_DATE);
@@ -269,8 +269,8 @@ class SettlementServiceTest {
         WorkLog alreadyCompletedLog = workLog(PERIOD_DATE, "CONFIRMED", 50_000L);
         alreadyCompletedLog.setSettlementStatus(SettlementStatus.COMPLETED);
         workLogMapper.insert(alreadyCompletedLog);
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "카카오모빌리티", BigDecimal.valueOf(120_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "카카오모빌리티", BigDecimal.valueOf(120_000L))
         );
 
         service.processSettlement(USER_ID, PROCESS_DATE);
@@ -316,8 +316,8 @@ class SettlementServiceTest {
         workLogMapper.insert(holidayWorkLog);
         insertIncome(thursdayLog, businessDayPlatformId, 40_000L, SettlementStatus.PENDING);
         insertIncome(holidayWorkLog, businessDayPlatformId, 25_000L, SettlementStatus.PENDING);
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, paymentDate, LocalTime.NOON, "배민커넥트테스트", BigDecimal.valueOf(65_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, paymentDate, LocalTime.NOON, "배민커넥트테스트", BigDecimal.valueOf(65_000L))
         );
 
         service.processSettlement(USER_ID, paymentDate);
@@ -349,7 +349,7 @@ class SettlementServiceTest {
         insertIncome(multiPlatformLog, platformBId, 15_000L, SettlementStatus.PENDING);
 
         // PLATFORM_ID 몫만 입금됨 - platformBId 몫은 아직
-        incomingTransactionQueryClient.transactions = List.of(transaction(999L, 25_000L));
+        incomingTransactionPort.transactions = List.of(transaction(999L, 25_000L));
 
         service.processSettlement(USER_ID, PROCESS_DATE);
 
@@ -364,8 +364,8 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now();
         WorkLog logForYesterday = workLog(today.minusDays(2), "CONFIRMED", 48_000L); // offset=1이라 today-1 입금 시 today-2가 근무일
         workLogMapper.insert(logForYesterday);
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(555L, today.minusDays(1), LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(48_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(555L, today.minusDays(1), LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(48_000L))
         );
 
         service.runDailyBatch();
@@ -402,9 +402,9 @@ class SettlementServiceTest {
         // offset=1이라 today, today-1 각각 입금되면 today-1, today-2가 근무일
         workLogMapper.insert(workLog(today.minusDays(1), "CONFIRMED", 40_000L));
         workLogMapper.insert(workLog(today.minusDays(2), "CONFIRMED", 48_000L));
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(111L, today, LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(40_000L)),
-                new NormalizedIncomingTransaction(555L, today.minusDays(1), LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(48_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(111L, today, LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(40_000L)),
+                new IncomingTransaction(555L, today.minusDays(1), LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(48_000L))
         );
 
         service.runDailyBatch();
@@ -421,7 +421,7 @@ class SettlementServiceTest {
     @DisplayName("processSettlementDetailed는 생성된 정산 건수와 실입금액 총합을 반환한다")
     void processSettlementDetailed_returnsCreatedCountAndTotalAmount() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
-        incomingTransactionQueryClient.transactions = List.of(
+        incomingTransactionPort.transactions = List.of(
                 transaction(111L, 30_000L),
                 transaction(222L, 20_000L)
         );
@@ -436,8 +436,8 @@ class SettlementServiceTest {
     @Test
     @DisplayName("UNMATCHED 거래만 있으면 processSettlementDetailed의 건수/총액은 0이다")
     void processSettlementDetailed_onlyUnmatched_returnsZero() {
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, PROCESS_DATE, LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
         );
 
         SettlementService.SettlementBatchOutcome outcome =
@@ -451,8 +451,8 @@ class SettlementServiceTest {
     @DisplayName("UNMATCHED 거래만 있으면 정산 완료 알림을 보내지 않는다")
     void runDailyBatch_onlyUnmatchedTransactions_doesNotSendNotification() {
         activeUserQueryClient.userIds = List.of(USER_ID);
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(1L, LocalDate.now(), LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(1L, LocalDate.now(), LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
         );
 
         service.runDailyBatch();
@@ -473,8 +473,8 @@ class SettlementServiceTest {
                 .expectedAmount(0L).actualAmount(40_000L).transactionCount(1).accountTransactionId(999L)
                 .matchedAt(java.time.LocalDateTime.now())
                 .build());
-        incomingTransactionQueryClient.transactions = List.of(
-                new NormalizedIncomingTransaction(999L, today, LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(40_000L))
+        incomingTransactionPort.transactions = List.of(
+                new IncomingTransaction(999L, today, LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(40_000L))
         );
 
         service.runDailyBatch();
@@ -504,16 +504,16 @@ class SettlementServiceTest {
                 .build());
     }
 
-    private static NormalizedIncomingTransaction transaction(long transactionId, long amount) {
-        return new NormalizedIncomingTransaction(
+    private static IncomingTransaction transaction(long transactionId, long amount) {
+        return new IncomingTransaction(
                 transactionId, PROCESS_DATE, LocalTime.NOON, "테스트플랫폼", BigDecimal.valueOf(amount));
     }
 
-    private static final class StubIncomingTransactionQueryClient implements IncomingTransactionQueryClient {
-        private List<NormalizedIncomingTransaction> transactions = List.of();
+    private static final class StubIncomingTransactionPort implements IncomingTransactionPort {
+        private List<IncomingTransaction> transactions = List.of();
 
         @Override
-        public List<NormalizedIncomingTransaction> findIncomingTransactions(
+        public List<IncomingTransaction> findIncomingTransactions(
                 Long userId, LocalDate startDate, LocalDate endDate) {
             return transactions;
         }

@@ -9,9 +9,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.IncomingTransactionQueryClient;
 import com.ntropy.common.client.NotificationCommandClient;
-import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.PlatformMatchResult;
@@ -32,6 +30,8 @@ import com.ntropy.work.mapper.PlatformMapper;
 import com.ntropy.work.mapper.SettlementMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
+import com.ntropy.work.port.account.IncomingTransaction;
+import com.ntropy.work.port.account.IncomingTransactionPort;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,7 +75,7 @@ public class SettlementService {
      *  이미 있어 같은 날짜를 여러 번 재처리해도 안전하다. */
     private static final int BACKFILL_DAYS = 3;
 
-    private final IncomingTransactionQueryClient incomingTransactionQueryClient;
+    private final IncomingTransactionPort incomingTransactionPort;
     private final ActiveUserQueryClient activeUserQueryClient;
     private final SettlementBatchUserScopeProperties userScopeProperties;
     private final PlatformMapper platformMapper;
@@ -130,8 +130,8 @@ public class SettlementService {
     }
 
     public SettlementBatchOutcome processSettlementDetailed(Long userId, LocalDate processDate) {
-        List<NormalizedIncomingTransaction> transactions =
-                incomingTransactionQueryClient.findIncomingTransactions(userId, processDate, processDate);
+        List<IncomingTransaction> transactions =
+                incomingTransactionPort.findIncomingTransactions(userId, processDate, processDate);
         if (transactions.isEmpty()) {
             return SettlementBatchOutcome.EMPTY;
         }
@@ -145,7 +145,7 @@ public class SettlementService {
         long createdAmount = 0L;
         long unmatchedAmount = 0;
         int unmatchedCount = 0;
-        for (NormalizedIncomingTransaction transaction : transactions) {
+        for (IncomingTransaction transaction : transactions) {
             TransactionResult result = processMatchedTransaction(userId, transaction, platforms, jobs);
             if (result.outcome() == MatchOutcome.UNMATCHED) {
                 unmatchedAmount += transaction.amount().longValueExact();
@@ -170,7 +170,7 @@ public class SettlementService {
     private record TransactionResult(MatchOutcome outcome, long amount) {
     }
 
-    private TransactionResult processMatchedTransaction(Long userId, NormalizedIncomingTransaction transaction,
+    private TransactionResult processMatchedTransaction(Long userId, IncomingTransaction transaction,
                                                      List<Platform> platforms, List<Job> jobs) {
         PlatformMatchResult result = PlatformMatcher.match(transaction.counterpartyName(), platforms);
         if (!(result instanceof PlatformMatchResult.Matched matched)) {
@@ -253,7 +253,7 @@ public class SettlementService {
      * WorkLog.settlementStatus는 이미 확정(CONFIRMED) 시점에 WorkLogService가 즉시
      * COMPLETED로 처리해뒀다 (이 메서드와 독립적).
      */
-    private void saveOnDemandSettlement(Long userId, Long jobId, NormalizedIncomingTransaction transaction) {
+    private void saveOnDemandSettlement(Long userId, Long jobId, IncomingTransaction transaction) {
         Settlement settlement = Settlement.builder()
                 .userId(userId)
                 .status(SettlementMatchStatus.MATCHED)
