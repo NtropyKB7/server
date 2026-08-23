@@ -27,9 +27,9 @@ public class MailProperties {
     ) {
         this.host = host;
         this.port = port;
-        this.username = username;
-        this.password = password;
-        this.from = from;
+        this.username = orEnv(username, "MAIL_USERNAME");
+        this.password = orEnv(password, "MAIL_PASSWORD");
+        this.from = orEnv(from, "MAIL_FROM");
         this.fromName = fromName;
     }
 
@@ -39,5 +39,10 @@ public class MailProperties {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    /** Spring 플레이스홀더 해석이 빈 값을 반환한 경우 OS 환경변수를 직접 한 번 더 확인한다. */
+    private static String orEnv(String value, String envKey) {
+        return hasText(value) ? value : System.getenv(envKey);
     }
 }
