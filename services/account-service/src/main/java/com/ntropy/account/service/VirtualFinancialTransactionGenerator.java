@@ -33,15 +33,14 @@ public class VirtualFinancialTransactionGenerator {
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     /**
-     * 가상 소득 입금 거래에 사용할 정산 주체명.
+     * 가상 소득 입금 거래에 사용할 정산 주체명. 시연용으로 메인 직업(배달: 우아한청년들·쿠팡이츠정산·위대한상상)과
+     * 서브 직업(대리: 카카오모빌리티, 펫시터: 펫피플)의 정산처만 고정한다(#225).
      * work-service의 PLATFORM.deposit_name 확정 시드 데이터(services/work-service/src/main/resources/db/work-service-seed.sql,
-     * docs/financial-diagnosis-mvp-spec.md §3.6)와 동일한 값을 써야 한다. 두 서비스는 별도 모듈이라 자동 동기화되지 않으니,
-     * 시드 데이터가 바뀌면 이 배열도 함께 수정할 것.
+     * docs/financial-diagnosis-mvp-spec.md §3.6)에 실재하는 값의 부분집합이어야 한다. 두 서비스는 별도 모듈이라
+     * 자동 동기화되지 않으니, 시드 데이터에서 해당 값이 바뀌거나 제거되면 이 배열도 함께 수정할 것.
      */
     private static final String[] INCOME_COUNTERPARTY_NAMES = {
-            "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "GOOGLE",
-            "쿠팡-용역비", "티맵모빌리티", "CJ대한통운", "로젠택배", "생활연구소",
-            "유한회사미소", "케어닥", "펫피플", "PAYPAL", "네이버"
+            "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "펫피플"
     };
     public static final int INCOME_COUNTERPARTY_COUNT = INCOME_COUNTERPARTY_NAMES.length;
 
@@ -57,13 +56,10 @@ public class VirtualFinancialTransactionGenerator {
             fixedExpense("네이버클라우드", 5_000L, 5_000L)
     };
 
+    /** 시연용으로 보험 상품 2종만 고정한다(#225). */
     private static final InsuranceProduct[] INSURANCE_PRODUCTS = {
             insurance("삼성생명", "삼성생명 실손보험", 45_000L, 80_000L),
-            insurance("현대해상", "현대해상 건강보험", 60_000L, 120_000L),
-            insurance("DB손해보험", "DB손해보험 운전자보험", 20_000L, 40_000L),
-            insurance("KB손해보험", "KB손해보험 암보험", 40_000L, 90_000L),
-            insurance("교보생명", "교보생명 종신보험", 120_000L, 250_000L),
-            insurance("한화생명", "한화생명 연금보험", 100_000L, 300_000L)
+            insurance("KB손해보험", "KB 이륜차 운전자보험", 20_000L, 40_000L)
     };
 
     private static final String[] BRANCHES = {

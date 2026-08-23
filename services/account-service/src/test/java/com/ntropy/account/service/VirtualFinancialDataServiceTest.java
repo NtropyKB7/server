@@ -76,7 +76,7 @@ class VirtualFinancialDataServiceTest {
 
         assertEquals(50, first.users());
         assertEquals(150, first.accounts());
-        assertEquals(15, first.incomeCounterparties());
+        assertEquals(5, first.incomeCounterparties());
         assertEquals(15_300, first.transactions());
         assertEquals(first, second);
         assertEquals(50, connectionMapper.store.size());
@@ -95,6 +95,7 @@ class VirtualFinancialDataServiceTest {
                         && "12".equals(account.getDepositTypeCode()))
                 .findFirst().orElseThrow();
         assertEquals(null, installmentAccount.getLoanContractPrincipal());
+        assertEquals("청년희망적금", installmentAccount.getAccountName());
         assertEquals(java.math.BigDecimal.valueOf(230, 2), installmentAccount.getInterestRate());
         assertEquals(LocalDate.of(2028, 6, 30), installmentAccount.getMaturityDate());
         assertEquals(LocalDate.of(2026, 7, 25), installmentAccount.getNextPaymentDate());
@@ -104,6 +105,7 @@ class VirtualFinancialDataServiceTest {
                 .filter(account -> account.getUserId() == userIdFor(1)
                         && account.getAccountGroup() == com.ntropy.account.domain.AccountGroup.LOAN)
                 .findFirst().orElseThrow();
+        assertEquals("주택담보대출", loanAccount.getAccountName());
         assertEquals(java.math.BigDecimal.valueOf(55_000_000L), loanAccount.getLoanContractPrincipal());
         assertEquals(java.math.BigDecimal.valueOf(340, 2), loanAccount.getInterestRate());
         assertEquals(LocalDate.of(2036, 6, 30), loanAccount.getMaturityDate());
@@ -178,11 +180,17 @@ class VirtualFinancialDataServiceTest {
 
         service.generateForUser(9_000_046_001L, com.ntropy.account.domain.PersonalBank.NH_BANK);
 
-        Account secondaryAccount = accountMapper.store.values().stream()
-                .filter(account -> account.getNextPaymentDate() != null)
+        Account installmentAccount = accountMapper.store.values().stream()
+                .filter(account -> "12".equals(account.getDepositTypeCode()))
                 .findFirst().orElseThrow();
-        assertEquals(LocalDate.of(2026, 6, 25), secondaryAccount.getNextPaymentDate());
-        assertEquals(lastTransactionDate(transactionMapper, secondaryAccount), secondaryAccount.getLastTranDate());
+        assertEquals("청년희망적금", installmentAccount.getAccountName());
+        assertEquals(LocalDate.of(2026, 6, 25), installmentAccount.getNextPaymentDate());
+        assertEquals(lastTransactionDate(transactionMapper, installmentAccount), installmentAccount.getLastTranDate());
+
+        Account loanAccount = accountMapper.store.values().stream()
+                .filter(account -> account.getAccountGroup() == AccountGroup.LOAN)
+                .findFirst().orElseThrow();
+        assertEquals("주택담보대출", loanAccount.getAccountName());
     }
 
     @Test

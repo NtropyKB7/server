@@ -1,7 +1,6 @@
 package com.ntropy.account.integration.virtual;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.time.Clock;
@@ -157,13 +156,11 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
                     WHERE seeded_user.provider = ?
                       AND REPLACE(transaction_row.desc3, '홈)', '') IN (
-                          '우아한청년들', '쿠팡이츠정산', '위대한상상', '카카오모빌리티', 'GOOGLE',
-                          '쿠팡-용역비', '티맵모빌리티', 'CJ대한통운', '로젠택배', '생활연구소',
-                          '유한회사미소', '케어닥', '펫피플', 'PAYPAL', '네이버'
+                          '우아한청년들', '쿠팡이츠정산', '위대한상상', '카카오모빌리티', '펫피플'
                       )
                     """, VIRTUAL_TEST_PROVIDER);
-            // 소득 정산처 15종 전체가 등장하려면 사용자 수가 충분해야 한다(기본 50명 기준).
-            assertTrue(distinctIncomeCounterparties > 0 && distinctIncomeCounterparties <= 15);
+            // 소득 정산처 5종 전체가 등장하려면 사용자 수가 충분해야 한다(기본 50명 기준).
+            assertEquals(5, distinctIncomeCounterparties);
             int distinctInsuranceProducts = count(jdbc, """
                     SELECT COUNT(DISTINCT REPLACE(transaction_row.desc3, '홈)', ''))
                     FROM ACCOUNT_TRANSACTION transaction_row
@@ -171,11 +168,10 @@ class VirtualFinancialDataManualVerificationTest {
                     JOIN USERS seeded_user ON seeded_user.user_id = account_row.user_id
                     WHERE seeded_user.provider = ?
                       AND REPLACE(transaction_row.desc3, '홈)', '') IN (
-                          '삼성생명 실손보험', '현대해상 건강보험', 'DB손해보험 운전자보험',
-                          'KB손해보험 암보험', '교보생명 종신보험', '한화생명 연금보험'
+                          '삼성생명 실손보험', 'KB 이륜차 운전자보험'
                       )
                     """, VIRTUAL_TEST_PROVIDER);
-            assertTrue(distinctInsuranceProducts > 0 && distinctInsuranceProducts <= 6);
+            assertEquals(2, distinctInsuranceProducts);
 
             System.out.println("VIRTUAL_FINANCIAL_USERS=" + first.users());
             System.out.println("VIRTUAL_FINANCIAL_ACCOUNTS=" + first.accounts());
