@@ -2,17 +2,17 @@ package com.ntropy.defense.service;
 
 import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
-import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
-import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
-import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseCalculationStatus;
 import com.ntropy.defense.domain.DefenseModeStatus;
 import com.ntropy.defense.mapper.DefenseModeMapper;
+import com.ntropy.defense.port.account.FinancialCommitment;
+import com.ntropy.defense.port.diagnosis.DefenseDiagnosisSnapshot;
+import com.ntropy.defense.port.work.JobExpectedIncomeLoss;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -34,7 +34,7 @@ class DefenseModeServiceTest {
     private final MemoryMapper mapper = new MemoryMapper();
     private final DefenseModeService service = new DefenseModeService(
             mapper,
-            userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
+            userId -> new DefenseDiagnosisSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
             (userId, fromDate, toDate) -> Collections.emptyList(),
             (userId, fromDate, toDate) -> Collections.emptyList());
 
@@ -68,8 +68,8 @@ class DefenseModeServiceTest {
     @Test
     void recalculatesCurrentMonthDiagnosisBeforeImmediateActivation() {
         MemoryMapper immediateMapper = new MemoryMapper();
-        AtomicReference<DiagnosisDefenseSnapshot> latestSnapshot = new AtomicReference<>(
-                new DiagnosisDefenseSnapshot(null, null, null));
+        AtomicReference<DefenseDiagnosisSnapshot> latestSnapshot = new AtomicReference<>(
+                new DefenseDiagnosisSnapshot(null, null, null));
         AtomicReference<YearMonth> recalculatedMonth = new AtomicReference<>();
         Clock clock = clockAt(LocalDate.of(2026, 8, 21));
         DefenseModeService immediateService = new DefenseModeService(
@@ -77,7 +77,7 @@ class DefenseModeServiceTest {
                 userId -> latestSnapshot.get(),
                 (userId, yearMonth) -> {
                     recalculatedMonth.set(yearMonth);
-                    latestSnapshot.set(new DiagnosisDefenseSnapshot(1_200_000L, 600_000L, 3_000_000L));
+                    latestSnapshot.set(new DefenseDiagnosisSnapshot(1_200_000L, 600_000L, 3_000_000L));
                 },
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
@@ -96,8 +96,8 @@ class DefenseModeServiceTest {
     void schedulesFutureDefenseModeAndCalculatesSnapshotWhenActivated() {
         MemoryMapper scheduledMapper = new MemoryMapper();
         AtomicInteger recalculationCount = new AtomicInteger();
-        AtomicReference<DiagnosisDefenseSnapshot> latestSnapshot = new AtomicReference<>(
-                new DiagnosisDefenseSnapshot(100_000L, 200_000L, 900_000L));
+        AtomicReference<DefenseDiagnosisSnapshot> latestSnapshot = new AtomicReference<>(
+                new DefenseDiagnosisSnapshot(100_000L, 200_000L, 900_000L));
         DefenseModeService scheduledService = new DefenseModeService(
                 scheduledMapper,
                 userId -> latestSnapshot.get(),
@@ -114,7 +114,7 @@ class DefenseModeServiceTest {
         assertEquals(null, entered.getDDay());
         assertEquals(0, recalculationCount.get());
 
-        latestSnapshot.set(new DiagnosisDefenseSnapshot(1_200_000L, 600_000L, 3_000_000L));
+        latestSnapshot.set(new DefenseDiagnosisSnapshot(1_200_000L, 600_000L, 3_000_000L));
         DefenseModeService activationService = new DefenseModeService(
                 scheduledMapper,
                 userId -> latestSnapshot.get(),
@@ -142,7 +142,7 @@ class DefenseModeServiceTest {
     void allowsEntryWithoutDiagnosisAndMarksCalculationUnavailable() {
         DefenseModeService serviceWithoutDiagnosis = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(null, null, null),
+                userId -> new DefenseDiagnosisSnapshot(null, null, null),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Collections.emptyList());
 
@@ -157,17 +157,17 @@ class DefenseModeServiceTest {
     void calculatesFixedExpenseImpactAndKeepsUnknownLoanAmountUncalculated() {
         DefenseModeService fixedExpenseService = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
+                userId -> new DefenseDiagnosisSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
                 (userId, fromDate, toDate) -> Arrays.asList(
-                        new FinancialCommitmentSummary(
+                        new FinancialCommitment(
                                 1L, 10L, "SAVING_PAYMENT", "청년희망적금", null,
-                                500_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "ESTIMATED"),
-                        new FinancialCommitmentSummary(
+                                500_000L, null, null, LocalDate.of(2026, 8, 5), "CONFIRMED", "ESTIMATED"),
+                        new FinancialCommitment(
                                 2L, 20L, "LOAN_REPAYMENT", "신한 직장인 대출", 12_500_000L,
-                                null, null, "INSUFFICIENT", "INSUFFICIENT"),
-                        new FinancialCommitmentSummary(
+                                null, null, null, null, "INSUFFICIENT", "INSUFFICIENT"),
+                        new FinancialCommitment(
                                 3L, 30L, "INSURANCE_PREMIUM", "실비 보험", null,
-                                100_000L, LocalDate.of(2026, 8, 7), "CONFIRMED", "CONFIRMED")),
+                                100_000L, null, null, LocalDate.of(2026, 8, 7), "CONFIRMED", "CONFIRMED")),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 clockAt(LocalDate.of(2026, 8, 3)));
         DefenseMode entered = fixedExpenseService.enter(new DefenseModeEnterCommand(
@@ -193,14 +193,14 @@ class DefenseModeServiceTest {
     void calculatesMaintainStatusFromAssetsAndPaymentImpactInsteadOfExpenseType() {
         DefenseModeService fixedExpenseService = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(9_000_000L, 0L, 3_000_000L),
+                userId -> new DefenseDiagnosisSnapshot(9_000_000L, 0L, 3_000_000L),
                 (userId, fromDate, toDate) -> Arrays.asList(
-                        new FinancialCommitmentSummary(
+                        new FinancialCommitment(
                                 1L, 10L, "SAVING_PAYMENT", "소액 적금", null,
-                                100_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED"),
-                        new FinancialCommitmentSummary(
+                                100_000L, null, null, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED"),
+                        new FinancialCommitment(
                                 2L, 20L, "SAVING_PAYMENT", "고액 적금", null,
-                                8_000_000L, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED")),
+                                8_000_000L, null, null, LocalDate.of(2026, 8, 5), "CONFIRMED", "CONFIRMED")),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 clockAt(LocalDate.of(2026, 8, 3)));
         DefenseMode entered = fixedExpenseService.enter(new DefenseModeEnterCommand(
@@ -219,11 +219,11 @@ class DefenseModeServiceTest {
         MemoryMapper currentMapper = new MemoryMapper();
         DefenseModeService currentService = new DefenseModeService(
                 currentMapper,
-                userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
+                userId -> new DefenseDiagnosisSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
                 (userId, fromDate, toDate) -> Collections.singletonList(
-                        new FinancialCommitmentSummary(
+                        new FinancialCommitment(
                                 1L, 10L, "SAVING_PAYMENT", "청년희망적금", null,
-                                500_000L, LocalDate.of(2026, 8, 15), "CONFIRMED", "CONFIRMED")),
+                                500_000L, null, null, LocalDate.of(2026, 8, 15), "CONFIRMED", "CONFIRMED")),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 clockAt(LocalDate.of(2026, 8, 13)));
         DefenseMode entered = currentService.enter(new DefenseModeEnterCommand(
@@ -246,11 +246,11 @@ class DefenseModeServiceTest {
         LocalDate endDate = today.withDayOfMonth(today.lengthOfMonth());
         DefenseModeService incomeLossService = new DefenseModeService(
                 new MemoryMapper(),
-                userId -> new DiagnosisDefenseSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
+                userId -> new DefenseDiagnosisSnapshot(1_280_000L, 3_400_000L, 3_300_000L),
                 (userId, fromDate, toDate) -> Collections.emptyList(),
                 (userId, fromDate, toDate) -> Arrays.asList(
-                        new JobExpectedIncomeLossSummary(101L, "대리운전", 150_000L),
-                        new JobExpectedIncomeLossSummary(102L, "배달라이더", 180_000L)));
+                        new JobExpectedIncomeLoss(101L, "대리운전", 150_000L),
+                        new JobExpectedIncomeLoss(102L, "배달라이더", 180_000L)));
         DefenseMode entered = incomeLossService.enter(new DefenseModeEnterCommand(
                 1L, "ILLNESS", startDate, endDate));
 

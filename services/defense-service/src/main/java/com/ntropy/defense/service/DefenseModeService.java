@@ -1,10 +1,5 @@
 package com.ntropy.defense.service;
 
-import com.ntropy.common.client.DiagnosisCommandClient;
-import com.ntropy.common.client.DiagnosisQueryClient;
-import com.ntropy.common.client.FinancialCommitmentQueryClient;
-import com.ntropy.common.client.ExpectedIncomeLossQueryClient;
-import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
 import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
@@ -12,7 +7,6 @@ import com.ntropy.common.dto.defense.summary.FixedExpenseSummary;
 import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
 import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
 import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
-import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.defense.domain.DefenseCause;
 import com.ntropy.defense.domain.DefenseCalculationStatus;
@@ -20,6 +14,13 @@ import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseModeStatus;
 import com.ntropy.defense.exception.DefenseErrorCode;
 import com.ntropy.defense.mapper.DefenseModeMapper;
+import com.ntropy.defense.port.account.FinancialCommitment;
+import com.ntropy.defense.port.account.FinancialCommitmentPort;
+import com.ntropy.defense.port.diagnosis.DefenseDiagnosisSnapshot;
+import com.ntropy.defense.port.diagnosis.DiagnosisRecalculationPort;
+import com.ntropy.defense.port.diagnosis.DiagnosisSnapshotPort;
+import com.ntropy.defense.port.work.ExpectedIncomeLossPort;
+import com.ntropy.defense.port.work.JobExpectedIncomeLoss;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,61 +42,61 @@ public class DefenseModeService {
     private static final int WARNING_REDUCTION_PERCENT = 20;
 
     private final DefenseModeMapper defenseModeMapper;
-    private final DiagnosisQueryClient diagnosisQueryClient;
-    private final DiagnosisCommandClient diagnosisCommandClient;
-    private final FinancialCommitmentQueryClient financialCommitmentQueryClient;
-    private final ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient;
+    private final DiagnosisSnapshotPort diagnosisSnapshotPort;
+    private final DiagnosisRecalculationPort diagnosisRecalculationPort;
+    private final FinancialCommitmentPort financialCommitmentPort;
+    private final ExpectedIncomeLossPort expectedIncomeLossPort;
     private final Clock clock;
 
     @Autowired
     public DefenseModeService(
             DefenseModeMapper defenseModeMapper,
-            ObjectProvider<DiagnosisQueryClient> diagnosisQueryClientProvider,
-            ObjectProvider<DiagnosisCommandClient> diagnosisCommandClientProvider,
-            ObjectProvider<FinancialCommitmentQueryClient> financialCommitmentQueryClientProvider,
-            ObjectProvider<ExpectedIncomeLossQueryClient> expectedIncomeLossQueryClientProvider) {
+            ObjectProvider<DiagnosisSnapshotPort> diagnosisSnapshotPortProvider,
+            ObjectProvider<DiagnosisRecalculationPort> diagnosisRecalculationPortProvider,
+            ObjectProvider<FinancialCommitmentPort> financialCommitmentPortProvider,
+            ObjectProvider<ExpectedIncomeLossPort> expectedIncomeLossPortProvider) {
         this(
                 defenseModeMapper,
-                diagnosisQueryClientProvider.getIfAvailable(() -> userId -> null),
-                diagnosisCommandClientProvider.getObject(),
-                financialCommitmentQueryClientProvider.getIfAvailable(
+                diagnosisSnapshotPortProvider.getIfAvailable(() -> userId -> null),
+                diagnosisRecalculationPortProvider.getObject(),
+                financialCommitmentPortProvider.getIfAvailable(
                         () -> (userId, fromDate, toDate) -> Collections.emptyList()),
-                expectedIncomeLossQueryClientProvider.getIfAvailable(
+                expectedIncomeLossPortProvider.getIfAvailable(
                         () -> (userId, fromDate, toDate) -> Collections.emptyList()),
                 Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
     public DefenseModeService(
             DefenseModeMapper defenseModeMapper,
-            DiagnosisQueryClient diagnosisQueryClient,
-            FinancialCommitmentQueryClient financialCommitmentQueryClient,
-            ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient) {
-        this(defenseModeMapper, diagnosisQueryClient, (userId, yearMonth) -> { }, financialCommitmentQueryClient,
-                expectedIncomeLossQueryClient, Clock.system(ZoneId.of("Asia/Seoul")));
+            DiagnosisSnapshotPort diagnosisSnapshotPort,
+            FinancialCommitmentPort financialCommitmentPort,
+            ExpectedIncomeLossPort expectedIncomeLossPort) {
+        this(defenseModeMapper, diagnosisSnapshotPort, (userId, yearMonth) -> { }, financialCommitmentPort,
+                expectedIncomeLossPort, Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
     public DefenseModeService(
             DefenseModeMapper defenseModeMapper,
-            DiagnosisQueryClient diagnosisQueryClient,
-            FinancialCommitmentQueryClient financialCommitmentQueryClient,
-            ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient,
+            DiagnosisSnapshotPort diagnosisSnapshotPort,
+            FinancialCommitmentPort financialCommitmentPort,
+            ExpectedIncomeLossPort expectedIncomeLossPort,
             Clock clock) {
-        this(defenseModeMapper, diagnosisQueryClient, (userId, yearMonth) -> { }, financialCommitmentQueryClient,
-                expectedIncomeLossQueryClient, clock);
+        this(defenseModeMapper, diagnosisSnapshotPort, (userId, yearMonth) -> { }, financialCommitmentPort,
+                expectedIncomeLossPort, clock);
     }
 
     public DefenseModeService(
             DefenseModeMapper defenseModeMapper,
-            DiagnosisQueryClient diagnosisQueryClient,
-            DiagnosisCommandClient diagnosisCommandClient,
-            FinancialCommitmentQueryClient financialCommitmentQueryClient,
-            ExpectedIncomeLossQueryClient expectedIncomeLossQueryClient,
+            DiagnosisSnapshotPort diagnosisSnapshotPort,
+            DiagnosisRecalculationPort diagnosisRecalculationPort,
+            FinancialCommitmentPort financialCommitmentPort,
+            ExpectedIncomeLossPort expectedIncomeLossPort,
             Clock clock) {
         this.defenseModeMapper = defenseModeMapper;
-        this.diagnosisQueryClient = diagnosisQueryClient;
-        this.diagnosisCommandClient = diagnosisCommandClient;
-        this.financialCommitmentQueryClient = financialCommitmentQueryClient;
-        this.expectedIncomeLossQueryClient = expectedIncomeLossQueryClient;
+        this.diagnosisSnapshotPort = diagnosisSnapshotPort;
+        this.diagnosisRecalculationPort = diagnosisRecalculationPort;
+        this.financialCommitmentPort = financialCommitmentPort;
+        this.expectedIncomeLossPort = expectedIncomeLossPort;
         this.clock = clock;
     }
 
@@ -160,7 +161,7 @@ public class DefenseModeService {
     }
 
     public FixedExpenseCheckSummary getFixedExpenseCheck(DefenseMode defenseMode) {
-        List<FinancialCommitmentSummary> commitments = financialCommitmentQueryClient.findFinancialCommitments(
+        List<FinancialCommitment> commitments = financialCommitmentPort.findFinancialCommitments(
                 defenseMode.getUserId(),
                 defenseMode.getUnavailableStartDate(),
                 defenseMode.getExpectedReturnDate());
@@ -172,7 +173,7 @@ public class DefenseModeService {
                 .map(commitment -> toFixedExpense(defenseMode, commitment))
                 .collect(Collectors.toList());
         long totalExpectedAmount = commitments.stream()
-                .map(FinancialCommitmentSummary::getExpectedAmount)
+                .map(FinancialCommitment::expectedAmount)
                 .filter(amount -> amount != null && amount > 0)
                 .mapToLong(Long::longValue)
                 .sum();
@@ -188,7 +189,7 @@ public class DefenseModeService {
             return new ExpectedIncomeLossSummary(0L, null, null, "NO_SCHEDULE", Collections.emptyList());
         }
 
-        List<JobExpectedIncomeLossSummary> jobs = expectedIncomeLossQueryClient.findExpectedIncomeLossByJob(
+        List<JobExpectedIncomeLoss> jobs = expectedIncomeLossPort.findExpectedIncomeLossByJob(
                 defenseMode.getUserId(), periodStartDate, periodEndDate);
         if (jobs == null || jobs.isEmpty()) {
             return new ExpectedIncomeLossSummary(
@@ -196,12 +197,12 @@ public class DefenseModeService {
         }
 
         long totalAmount = jobs.stream()
-                .map(JobExpectedIncomeLossSummary::getExpectedIncomeLoss)
+                .map(JobExpectedIncomeLoss::expectedIncomeLoss)
                 .filter(income -> income != null && income > 0)
                 .mapToLong(Long::longValue)
                 .sum();
         long calculatedJobCount = jobs.stream()
-                .filter(job -> job.getExpectedIncomeLoss() != null)
+                .filter(job -> job.expectedIncomeLoss() != null)
                 .count();
         String calculationStatus;
         if (calculatedJobCount == 0) {
@@ -211,8 +212,13 @@ public class DefenseModeService {
         } else {
             calculationStatus = "CALCULATED";
         }
+        // ExpectedIncomeLossSummary는 defense의 외부 발행 계약이라 work의 JobExpectedIncomeLossSummary를
+        // 그대로 담는다 - 여기서만 defense 포트 타입을 그 모양으로 되돌려 번역한다.
+        List<JobExpectedIncomeLossSummary> jobSummaries = jobs.stream()
+                .map(job -> new JobExpectedIncomeLossSummary(job.jobId(), job.jobName(), job.expectedIncomeLoss()))
+                .toList();
         return new ExpectedIncomeLossSummary(
-                totalAmount, periodStartDate, periodEndDate, calculationStatus, jobs);
+                totalAmount, periodStartDate, periodEndDate, calculationStatus, jobSummaries);
     }
 
     @Transactional
@@ -263,11 +269,11 @@ public class DefenseModeService {
         }
     }
 
-    private void applyDiagnosisSnapshot(DefenseMode defenseMode, DiagnosisDefenseSnapshot snapshot) {
-        Long reserveAmount = snapshot == null ? null : snapshot.getReserveAmount();
-        Long safeAssetAmount = snapshot == null ? null : snapshot.getSafeAssetAmount();
+    private void applyDiagnosisSnapshot(DefenseMode defenseMode, DefenseDiagnosisSnapshot snapshot) {
+        Long reserveAmount = snapshot == null ? null : snapshot.reserveAmount();
+        Long safeAssetAmount = snapshot == null ? null : snapshot.safeAssetAmount();
         Long availableAssets = sumNullable(reserveAmount, safeAssetAmount);
-        Long averageMonthlyExpense = snapshot == null ? null : snapshot.getAverageMonthlyExpense();
+        Long averageMonthlyExpense = snapshot == null ? null : snapshot.averageMonthlyExpense();
 
         defenseMode.setReserveAmountSnapshot(reserveAmount);
         defenseMode.setSafeAssetAmountSnapshot(safeAssetAmount);
@@ -291,8 +297,8 @@ public class DefenseModeService {
     }
 
     private void recalculateAndApplyDiagnosisSnapshot(DefenseMode defenseMode, LocalDate activationDate) {
-        diagnosisCommandClient.recalculate(defenseMode.getUserId(), YearMonth.from(activationDate));
-        applyDiagnosisSnapshot(defenseMode, diagnosisQueryClient.getDefenseSnapshot(defenseMode.getUserId()));
+        diagnosisRecalculationPort.recalculate(defenseMode.getUserId(), YearMonth.from(activationDate));
+        applyDiagnosisSnapshot(defenseMode, diagnosisSnapshotPort.getDefenseSnapshot(defenseMode.getUserId()));
     }
 
     private Long sumNullable(Long first, Long second) {
@@ -304,18 +310,18 @@ public class DefenseModeService {
 
     private FixedExpenseSummary toFixedExpense(
             DefenseMode defenseMode,
-            FinancialCommitmentSummary commitment) {
+            FinancialCommitment commitment) {
         CurrentDefenseState currentState = currentDefenseState(defenseMode);
         Integer dDayAfter = null;
         Integer dDayReduction = null;
-        Long expectedAmount = commitment.getExpectedAmount();
+        Long expectedAmount = commitment.expectedAmount();
         if (currentState.dDay != null
                 && currentState.availableAssets != null
                 && defenseMode.getDailyExpense() != null
                 && defenseMode.getDailyExpense() > 0
                 && expectedAmount != null
                 && expectedAmount >= 0
-                && !"INSUFFICIENT".equals(commitment.getAmountStatus())) {
+                && !"INSUFFICIENT".equals(commitment.amountStatus())) {
             long assetsAfterPayment = Math.max(currentState.availableAssets - expectedAmount, 0L);
             long calculatedDays = assetsAfterPayment / defenseMode.getDailyExpense();
             dDayAfter = calculatedDays > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculatedDays;
@@ -328,18 +334,18 @@ public class DefenseModeService {
                 expectedAmount,
                 dDayAfter,
                 dDayReduction,
-                commitment.getAmountStatus());
+                commitment.amountStatus());
         return new FixedExpenseSummary(
-                commitment.getCommitmentId(),
-                commitment.getAccountId(),
-                commitment.getExpenseType(),
-                expenseName(commitment.getExpenseType()),
-                commitment.getProductName(),
-                commitment.getOutstandingBalance(),
+                commitment.commitmentId(),
+                commitment.accountId(),
+                commitment.expenseType(),
+                expenseName(commitment.expenseType()),
+                commitment.productName(),
+                commitment.outstandingBalance(),
                 expectedAmount,
-                commitment.getNextPaymentDate(),
-                commitment.getAmountStatus(),
-                commitment.getDateStatus(),
+                commitment.nextPaymentDate(),
+                commitment.amountStatus(),
+                commitment.dateStatus(),
                 currentState.dDay,
                 dDayAfter,
                 dDayReduction,

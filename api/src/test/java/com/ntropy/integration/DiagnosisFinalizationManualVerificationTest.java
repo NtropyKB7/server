@@ -37,6 +37,7 @@ import com.ntropy.common.client.MonthlyExpenseQueryClient;
 import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
 import com.ntropy.common.dto.diagnosis.DiagnosisAnalysisSummary;
 import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
+import com.ntropy.defense.adapter.diagnosis.DiagnosisSnapshotAdapter;
 import com.ntropy.defense.domain.DefenseCalculationStatus;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseModeStatus;
@@ -158,7 +159,7 @@ class DiagnosisFinalizationManualVerificationTest {
             LocalDiagnosisQueryClient queryClient = context.getBean(LocalDiagnosisQueryClient.class);
             DefenseModeService defenseModeService = new DefenseModeService(
                     new InMemoryDefenseModeMapper(),
-                    queryClient,
+                    new DiagnosisSnapshotAdapter(queryClient),
                     (userId, from, to) -> Collections.emptyList(),
                     (userId, from, to) -> Collections.emptyList()
             );
