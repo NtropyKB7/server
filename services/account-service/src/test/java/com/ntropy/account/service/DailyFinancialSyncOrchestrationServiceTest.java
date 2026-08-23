@@ -13,11 +13,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.account.config.FinancialSyncBatchUserScopeProperties;
-import com.ntropy.common.client.ActiveUserQueryClient;
+import com.ntropy.account.port.user.SeededVirtualUserBatch;
+import com.ntropy.account.port.user.UserPort;
 import com.ntropy.common.client.DailyFinancialSyncClient;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
 import com.ntropy.common.domain.UserScope;
@@ -30,11 +32,25 @@ class DailyFinancialSyncOrchestrationServiceTest {
     private static final FinancialSyncBatchUserScopeProperties REAL_ONLY_SCOPE =
             new FinancialSyncBatchUserScopeProperties("REAL_ONLY");
 
+    private static UserPort userPortReturning(Function<UserScope, List<Long>> findActiveUserIds) {
+        return new UserPort() {
+            @Override
+            public List<Long> findActiveUserIds(UserScope scope) {
+                return findActiveUserIds.apply(scope);
+            }
+
+            @Override
+            public SeededVirtualUserBatch findSeededVirtualUsers() {
+                throw new UnsupportedOperationException("이 테스트에서는 사용하지 않습니다");
+            }
+        };
+    }
+
     @Test
     void runsPreviousSeoulDayAndCallsNtropyBeforeCodef() {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(scope -> Arrays.asList(2L, null, 2L, 1L)),
+                Optional.of(userPortReturning(scope -> Arrays.asList(2L, null, 2L, 1L))),
                 REAL_ONLY_SCOPE,
                 syncClient,
                 Clock.fixed(Instant.parse("2026-08-15T15:30:00Z"), SEOUL)
@@ -55,7 +71,7 @@ class DailyFinancialSyncOrchestrationServiceTest {
     void skipsProvidersWhenThereAreNoActiveUsers() {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(scope -> List.of()), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
+                Optional.of(userPortReturning(scope -> List.of())), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 
         service.runBatch(BUSINESS_DATE);
@@ -68,7 +84,7 @@ class DailyFinancialSyncOrchestrationServiceTest {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         syncClient.throwingProvider = DailyFinancialSyncProvider.NTROPY;
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(scope -> List.of(1L)), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
+                Optional.of(userPortReturning(scope -> List.of(1L))), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 
         service.runBatch(BUSINESS_DATE);
@@ -82,9 +98,9 @@ class DailyFinancialSyncOrchestrationServiceTest {
     @Test
     void treatsNullActiveUserResultAsEmpty() {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
-        ActiveUserQueryClient activeUserQueryClient = scope -> null;
+        UserPort userPort = userPortReturning(scope -> null);
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(activeUserQueryClient), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
+                Optional.of(userPort), REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 
         service.runBatch(BUSINESS_DATE);
@@ -97,10 +113,10 @@ class DailyFinancialSyncOrchestrationServiceTest {
         RecordingDailyFinancialSyncClient syncClient = new RecordingDailyFinancialSyncClient();
         List<UserScope> requestedScopes = new ArrayList<>();
         DailyFinancialSyncOrchestrationService service = new DailyFinancialSyncOrchestrationService(
-                Optional.of(scope -> {
+                Optional.of(userPortReturning(scope -> {
                     requestedScopes.add(scope);
                     return List.of();
-                }),
+                })),
                 REAL_ONLY_SCOPE, syncClient, Clock.system(SEOUL)
         );
 

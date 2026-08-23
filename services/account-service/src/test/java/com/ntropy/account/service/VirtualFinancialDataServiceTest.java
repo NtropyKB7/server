@@ -29,11 +29,12 @@ import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
+import com.ntropy.account.port.user.SeededVirtualUser;
+import com.ntropy.account.port.user.SeededVirtualUserBatch;
+import com.ntropy.account.port.user.UserPort;
+import com.ntropy.account.port.user.VirtualDatasetExecutionContext;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
-import com.ntropy.common.client.VirtualUserQueryClient;
-import com.ntropy.common.dto.user.VirtualDatasetContext;
-import com.ntropy.common.dto.user.VirtualUserDataset;
-import com.ntropy.common.dto.user.VirtualUserIdentity;
+import com.ntropy.common.domain.UserScope;
 
 class VirtualFinancialDataServiceTest {
 
@@ -42,10 +43,10 @@ class VirtualFinancialDataServiceTest {
         return 8_000_000_000L + ordinal * 3L;
     }
 
-    private static List<VirtualUserIdentity> fiftyUserDataset() {
-        List<VirtualUserIdentity> users = new ArrayList<>();
+    private static List<SeededVirtualUser> fiftyUserDataset() {
+        List<SeededVirtualUser> users = new ArrayList<>();
         for (int ordinal = 1; ordinal <= 50; ordinal++) {
-            users.add(new VirtualUserIdentity(userIdFor(ordinal), ordinal));
+            users.add(new SeededVirtualUser(userIdFor(ordinal), ordinal));
         }
         return users;
     }
@@ -64,10 +65,10 @@ class VirtualFinancialDataServiceTest {
                 transactionMapper,
                 new VirtualFinancialTransactionGenerator(),
                 clock,
-                null // generateForUsers()를 직접 호출하므로 VirtualUserQueryClient는 쓰이지 않는다.
+                null // generateForUsers()를 직접 호출하므로 UserPort는 쓰이지 않는다.
         );
-        List<VirtualUserIdentity> users = fiftyUserDataset();
-        VirtualDatasetContext context = new VirtualDatasetContext(
+        List<SeededVirtualUser> users = fiftyUserDataset();
+        VirtualDatasetExecutionContext context = new VirtualDatasetExecutionContext(
                 "FIN-005-test-v1", LocalDate.of(2026, 6, 30), 1L
         );
 
@@ -82,7 +83,7 @@ class VirtualFinancialDataServiceTest {
         assertEquals(50, connectionMapper.store.size());
         assertEquals(150, accountMapper.store.size());
         assertEquals(15_300, transactionMapper.store.size());
-        for (VirtualUserIdentity user : users) {
+        for (SeededVirtualUser user : users) {
             assertEquals(1, countAccounts(accountMapper, user.userId(), AccountGroup.DEPOSIT_TRUST, "11"));
             assertEquals(1, countAccounts(accountMapper, user.userId(), AccountGroup.DEPOSIT_TRUST, "12"));
             assertEquals(1, countAccounts(accountMapper, user.userId(), AccountGroup.LOAN, "40"));
@@ -121,19 +122,29 @@ class VirtualFinancialDataServiceTest {
         ZoneId zone = ZoneId.of("Asia/Seoul");
         // Clock은 generate()/generateForUsers() 경로에서 쓰이지 않아야 하므로, context와 다른 날짜로 고정해 둔다.
         Clock clock = Clock.fixed(LocalDate.of(2099, 1, 1).atStartOfDay(zone).toInstant(), zone);
-        List<VirtualUserIdentity> users = List.of(
-                new VirtualUserIdentity(7_000_000_001L, 1),
-                new VirtualUserIdentity(7_000_000_002L, 2),
-                new VirtualUserIdentity(7_000_000_003L, 3),
-                new VirtualUserIdentity(7_000_000_004L, 4)
+        List<SeededVirtualUser> users = List.of(
+                new SeededVirtualUser(7_000_000_001L, 1),
+                new SeededVirtualUser(7_000_000_002L, 2),
+                new SeededVirtualUser(7_000_000_003L, 3),
+                new SeededVirtualUser(7_000_000_004L, 4)
         );
-        VirtualDatasetContext context = new VirtualDatasetContext(
+        VirtualDatasetExecutionContext context = new VirtualDatasetExecutionContext(
                 "FIN-005-test-v2", LocalDate.of(2026, 6, 30), 42L
         );
-        VirtualUserQueryClient stubClient = () -> new VirtualUserDataset(context, users);
+        UserPort stubUserPort = new UserPort() {
+            @Override
+            public List<Long> findActiveUserIds(UserScope scope) {
+                throw new UnsupportedOperationException("이 테스트에서는 사용하지 않습니다");
+            }
+
+            @Override
+            public SeededVirtualUserBatch findSeededVirtualUsers() {
+                return new SeededVirtualUserBatch(context, users);
+            }
+        };
         VirtualFinancialDataService service = new VirtualFinancialDataService(
                 new VirtualConnectionService(connectionMapper), accountMapper, transactionMapper,
-                new VirtualFinancialTransactionGenerator(), clock, stubClient
+                new VirtualFinancialTransactionGenerator(), clock, stubUserPort
         );
 
         GenerationSummary summary = service.generate();
@@ -221,14 +232,14 @@ class VirtualFinancialDataServiceTest {
         legacyTransaction.setAfterBalance(BigDecimal.valueOf(15_000_000L));
         transactionMapper.insertAll(List.of(legacyTransaction));
 
-        VirtualDatasetContext context = new VirtualDatasetContext(
+        VirtualDatasetExecutionContext context = new VirtualDatasetExecutionContext(
                 "FIN-005-test-migration", LocalDate.of(2026, 6, 30), 1L
         );
         GenerationSummary first = service.generateForUsers(
-                List.of(new VirtualUserIdentity(userId, 26)), context
+                List.of(new SeededVirtualUser(userId, 26)), context
         );
         GenerationSummary second = service.generateForUsers(
-                List.of(new VirtualUserIdentity(userId, 26)), context
+                List.of(new SeededVirtualUser(userId, 26)), context
         );
 
         assertEquals(first, second);

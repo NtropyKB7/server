@@ -3,11 +3,11 @@ package com.ntropy.notification.service;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.ntropy.common.client.UserQueryClient;
-import com.ntropy.common.dto.user.UserSummary;
+import com.ntropy.notification.port.user.NotificationRecipient;
+import com.ntropy.notification.port.user.UserPort;
 
 /** 알림 수신 동의(alarm_agree) 값을 회원별로 지정할 수 있는 테스트용 스텁. */
-class StubUserQueryClient implements UserQueryClient {
+class StubUserQueryClient implements UserPort {
 
     private final Map<Long, Boolean> alarmAgreeByUserId = new HashMap<>();
 
@@ -17,11 +17,10 @@ class StubUserQueryClient implements UserQueryClient {
     }
 
     @Override
-    public UserSummary getUserSummary(Long userId) {
+    public NotificationRecipient findRecipient(Long userId) {
         if (!alarmAgreeByUserId.containsKey(userId)) {
             return null;
         }
-        return new UserSummary(userId, "테스트유저", "test@ntropy.com", "KAKAO",
-                alarmAgreeByUserId.get(userId), true, true);
+        return new NotificationRecipient(userId, alarmAgreeByUserId.get(userId));
     }
 }

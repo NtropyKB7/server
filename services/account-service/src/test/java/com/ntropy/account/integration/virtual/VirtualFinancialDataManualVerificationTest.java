@@ -26,14 +26,15 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
+import com.ntropy.account.port.user.SeededVirtualUser;
+import com.ntropy.account.port.user.SeededVirtualUserBatch;
+import com.ntropy.account.port.user.UserPort;
+import com.ntropy.account.port.user.VirtualDatasetExecutionContext;
 import com.ntropy.account.service.VirtualConnectionService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator;
-import com.ntropy.common.client.VirtualUserQueryClient;
-import com.ntropy.common.dto.user.VirtualDatasetContext;
-import com.ntropy.common.dto.user.VirtualUserDataset;
-import com.ntropy.common.dto.user.VirtualUserIdentity;
+import com.ntropy.common.domain.UserScope;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -41,12 +42,12 @@ import com.zaxxer.hikari.HikariDataSource;
  * RUN_VIRTUAL_FINANCIAL_DATA_TEST=true일 때 로컬 MySQL에 FIN-005 목데이터를 적재한다.
  * user-service가 먼저 기동돼 USERS 테이블에 provider=NTROPY_TEST 가상회원을 시딩해 둔 상태여야 한다
  * (VirtualUserSeedInitializer, 이슈 #167). account-service 모듈은 user-service에 컴파일 의존성이
- * 없으므로, 이 테스트는 USERS 테이블을 직접 조회하는 {@link VirtualUserQueryClient} 구현을 둔다.
+ * 없으므로, 이 테스트는 USERS 테이블을 직접 조회하는 {@link UserPort} 구현을 둔다.
  */
 class VirtualFinancialDataManualVerificationTest {
 
     private static final String VIRTUAL_TEST_PROVIDER = "NTROPY_TEST";
-    private static final VirtualDatasetContext MANUAL_DATASET_CONTEXT = new VirtualDatasetContext(
+    private static final VirtualDatasetExecutionContext MANUAL_DATASET_CONTEXT = new VirtualDatasetExecutionContext(
             "VIRTUAL-MULTI-DOMAIN-v1", LocalDate.of(2026, 8, 17), 20_260_817L
     );
 
@@ -60,16 +61,16 @@ class VirtualFinancialDataManualVerificationTest {
         try (AnnotationConfigApplicationContext context =
                      new AnnotationConfigApplicationContext(TestConfig.class)) {
             VirtualFinancialDataService service = context.getBean(VirtualFinancialDataService.class);
-            VirtualUserQueryClient virtualUserQueryClient = context.getBean(VirtualUserQueryClient.class);
+            UserPort userPort = context.getBean(UserPort.class);
             JdbcTemplate jdbc = new JdbcTemplate(context.getBean(DataSource.class));
 
-            VirtualUserDataset dataset = virtualUserQueryClient.findSeededVirtualUsers();
+            SeededVirtualUserBatch dataset = userPort.findSeededVirtualUsers();
             assumeTrue(!dataset.users().isEmpty(),
                     "user-service가 먼저 가상회원을 시딩해 둬야 합니다 (provider=NTROPY_TEST)");
 
             int userCount = dataset.users().size();
             Set<Long> expectedUserIds = dataset.users().stream()
-                    .map(VirtualUserIdentity::userId)
+                    .map(SeededVirtualUser::userId)
                     .collect(Collectors.toSet());
 
             GenerationSummary first = service.generate();
@@ -233,7 +234,7 @@ class VirtualFinancialDataManualVerificationTest {
 
         @Bean
         Clock clock() {
-            // generate()/generateForUsers()는 이 Clock 대신 VirtualDatasetContext.referenceDate()를 쓴다.
+            // generate()/generateForUsers()는 이 Clock 대신 VirtualDatasetExecutionContext.referenceDate()를 쓴다.
             return Clock.systemDefaultZone();
         }
 
@@ -243,23 +244,32 @@ class VirtualFinancialDataManualVerificationTest {
          * 수 없으므로, 같은 provider_id 형식(virtual-user-{순번6자리})만 이 테스트 안에서 다시 파싱한다.
          * 실행 컨텍스트(dataset-version/reference-date/random-seed)는 user-service의 기본값과 같은
          * 고정값을 사용한다. 수동 테스트 실행일이 바뀌어도 생성 결과는 달라지지 않는다.
+         * findActiveUserIds는 이 테스트에서 쓰이지 않는다.
          */
         @Bean
-        VirtualUserQueryClient virtualUserQueryClient(DataSource dataSource) {
+        UserPort userPort(DataSource dataSource) {
             JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-            return () -> {
-                List<VirtualUserIdentity> users = jdbc.query(
-                        "SELECT user_id, provider_id FROM USERS WHERE provider = ? ORDER BY user_id",
-                        (resultSet, rowNumber) -> new VirtualUserIdentity(
-                                resultSet.getLong("user_id"),
-                                parseOrdinal(resultSet.getString("provider_id"))
-                        ),
-                        VIRTUAL_TEST_PROVIDER
-                );
-                List<VirtualUserIdentity> sorted = users.stream()
-                        .sorted(Comparator.comparingInt(VirtualUserIdentity::ordinal))
-                        .toList();
-                return new VirtualUserDataset(MANUAL_DATASET_CONTEXT, sorted);
+            return new UserPort() {
+                @Override
+                public List<Long> findActiveUserIds(UserScope scope) {
+                    throw new UnsupportedOperationException("이 수동 검증 테스트에서는 사용하지 않습니다");
+                }
+
+                @Override
+                public SeededVirtualUserBatch findSeededVirtualUsers() {
+                    List<SeededVirtualUser> users = jdbc.query(
+                            "SELECT user_id, provider_id FROM USERS WHERE provider = ? ORDER BY user_id",
+                            (resultSet, rowNumber) -> new SeededVirtualUser(
+                                    resultSet.getLong("user_id"),
+                                    parseOrdinal(resultSet.getString("provider_id"))
+                            ),
+                            VIRTUAL_TEST_PROVIDER
+                    );
+                    List<SeededVirtualUser> sorted = users.stream()
+                            .sorted(Comparator.comparingInt(SeededVirtualUser::ordinal))
+                            .toList();
+                    return new SeededVirtualUserBatch(MANUAL_DATASET_CONTEXT, sorted);
+                }
             };
         }
 
@@ -278,10 +288,10 @@ class VirtualFinancialDataManualVerificationTest {
                 AccountTransactionMapper transactionMapper,
                 VirtualFinancialTransactionGenerator generator,
                 Clock clock,
-                VirtualUserQueryClient virtualUserQueryClient
+                UserPort userPort
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator, clock, virtualUserQueryClient
+                    connectionService, accountMapper, transactionMapper, generator, clock, userPort
             );
         }
     }

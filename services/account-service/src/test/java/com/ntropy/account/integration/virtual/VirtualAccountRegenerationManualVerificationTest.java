@@ -29,7 +29,9 @@ import com.ntropy.account.service.VirtualConnectionService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator;
-import com.ntropy.common.client.VirtualUserQueryClient;
+import com.ntropy.account.port.user.SeededVirtualUserBatch;
+import com.ntropy.account.port.user.UserPort;
+import com.ntropy.common.domain.UserScope;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -173,12 +175,22 @@ class VirtualAccountRegenerationManualVerificationTest {
         }
 
         @Bean
-        VirtualUserQueryClient virtualUserQueryClient() {
+        UserPort userPort() {
             // 이 테스트는 generateForUser(userId, bank)만 사용하므로 실제로 호출되지 않는다.
-            return () -> {
-                throw new UnsupportedOperationException(
-                        "이 수동 검증 테스트는 배치 시딩 경로를 사용하지 않습니다"
-                );
+            return new UserPort() {
+                @Override
+                public java.util.List<Long> findActiveUserIds(UserScope scope) {
+                    throw new UnsupportedOperationException(
+                            "이 수동 검증 테스트는 배치 시딩 경로를 사용하지 않습니다"
+                    );
+                }
+
+                @Override
+                public SeededVirtualUserBatch findSeededVirtualUsers() {
+                    throw new UnsupportedOperationException(
+                            "이 수동 검증 테스트는 배치 시딩 경로를 사용하지 않습니다"
+                    );
+                }
             };
         }
 
@@ -189,10 +201,10 @@ class VirtualAccountRegenerationManualVerificationTest {
                 AccountTransactionMapper transactionMapper,
                 VirtualFinancialTransactionGenerator generator,
                 Clock clock,
-                VirtualUserQueryClient virtualUserQueryClient
+                UserPort userPort
         ) {
             return new VirtualFinancialDataService(
-                    connectionService, accountMapper, transactionMapper, generator, clock, virtualUserQueryClient
+                    connectionService, accountMapper, transactionMapper, generator, clock, userPort
             );
         }
 

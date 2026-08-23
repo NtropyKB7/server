@@ -23,10 +23,10 @@ import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.service.VirtualFinancialTransactionGenerator.GeneratedTransactions;
-import com.ntropy.common.client.VirtualUserQueryClient;
-import com.ntropy.common.dto.user.VirtualDatasetContext;
-import com.ntropy.common.dto.user.VirtualUserDataset;
-import com.ntropy.common.dto.user.VirtualUserIdentity;
+import com.ntropy.account.port.user.SeededVirtualUser;
+import com.ntropy.account.port.user.SeededVirtualUserBatch;
+import com.ntropy.account.port.user.UserPort;
+import com.ntropy.account.port.user.VirtualDatasetExecutionContext;
 
 import lombok.RequiredArgsConstructor;
 
@@ -49,18 +49,18 @@ public class VirtualFinancialDataService {
     private final AccountTransactionMapper accountTransactionMapper;
     private final VirtualFinancialTransactionGenerator transactionGenerator;
     private final Clock clock;
-    private final VirtualUserQueryClient virtualUserQueryClient;
+    private final UserPort userPort;
 
     /** user-service가 시딩한 실제 가상회원 목록을 조회해 이 서비스의 생성기를 호출하는 조합 지점. */
     @Transactional
     public GenerationSummary generate() {
-        VirtualUserDataset dataset = virtualUserQueryClient.findSeededVirtualUsers();
+        SeededVirtualUserBatch dataset = userPort.findSeededVirtualUsers();
         return generateForUsers(dataset.users(), dataset.context());
     }
 
     /** 실제 USERS.user_id 목록과 실행 컨텍스트를 받아 가상 금융 데이터셋을 멱등하게 생성한다. */
     @Transactional
-    public GenerationSummary generateForUsers(List<VirtualUserIdentity> users, VirtualDatasetContext context) {
+    public GenerationSummary generateForUsers(List<SeededVirtualUser> users, VirtualDatasetExecutionContext context) {
         if (users == null || users.isEmpty()) {
             throw new IllegalArgumentException("가상회원 목록이 필요합니다");
         }
@@ -73,7 +73,7 @@ public class VirtualFinancialDataService {
         int generatedTransactions = 0;
         PersonalBank[] banks = PersonalBank.values();
 
-        for (VirtualUserIdentity identity : users) {
+        for (SeededVirtualUser identity : users) {
             int userOrdinal = identity.ordinal();
             PersonalBank bank = bankFor(userOrdinal, context.randomSeed(), banks);
             UserGenerationResult result = generateAccountsAndTransactions(
