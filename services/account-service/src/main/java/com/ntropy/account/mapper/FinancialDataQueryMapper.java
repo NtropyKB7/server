@@ -57,4 +57,9 @@ public interface FinancialDataQueryMapper {
     List<DailyClassificationTargetTransaction> findUnanalyzedTransactions(
             @Param("limit") int limit
     );
+
+    List<DailyClassificationTargetTransaction> findUnanalyzedTransactionsByUserId(
+            @Param("userId") Long userId,
+            @Param("limit") int limit
+    );
 }

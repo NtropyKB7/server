@@ -25,6 +25,7 @@ import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
+import com.ntropy.common.client.TransactionClassificationCommandClient;
 import com.ntropy.common.exception.ServiceException;
 
 class LocalFinancialAccountCommandClientTest {
@@ -133,6 +134,44 @@ class LocalFinancialAccountCommandClientTest {
         assertEquals("CODEF", result.connectionType());
         assertEquals(1, collectionService.collectCalls);
         assertEquals("19900101", collectionService.lastBirthDate);
+    }
+
+    @Test
+    void classifiesUsersTransactionsAfterCodefCollectionCompletes() {
+        StubTransactionClassificationCommandClient classificationClient =
+                new StubTransactionClassificationCommandClient();
+        LocalFinancialAccountCommandClient client = newClient(
+                new StubPersonalBankAccountService(), new StubAccountCollectionService(),
+                new StubVirtualAccountRegenerationService(), new StubVirtualFinancialDataService(),
+                new StubAccountLifecycleMapper(1, 1), new StubAccountMapper(false),
+                new StubCodefConnectionMapper(), classificationClient
+        );
+
+        client.registerAccount(
+                42L, new AccountRegistrationCommand("CODEF", "0088", "bank-id", "bank-password", null)
+        );
+
+        assertEquals(List.of(42L), classificationClient.userIds);
+    }
+
+    @Test
+    void keepsAccountRegistrationSuccessfulWhenClassificationFails() {
+        StubTransactionClassificationCommandClient classificationClient =
+                new StubTransactionClassificationCommandClient();
+        classificationClient.failure = new IllegalStateException("분류 실패");
+        LocalFinancialAccountCommandClient client = newClient(
+                new StubPersonalBankAccountService(), new StubAccountCollectionService(),
+                new StubVirtualAccountRegenerationService(), new StubVirtualFinancialDataService(),
+                new StubAccountLifecycleMapper(1, 1), new StubAccountMapper(false),
+                new StubCodefConnectionMapper(), classificationClient
+        );
+
+        var result = client.registerAccount(
+                42L, new AccountRegistrationCommand("VIRTUAL", "0088", null, null, null)
+        );
+
+        assertEquals("VIRTUAL", result.connectionType());
+        assertEquals(List.of(42L), classificationClient.userIds);
     }
 
     @Test
@@ -419,10 +458,42 @@ class LocalFinancialAccountCommandClientTest {
             AccountMapper accountMapper,
             CodefConnectionMapper connectionMapper
     ) {
+        return newClient(
+                personalBankAccountService, collectionService, regenerationService,
+                virtualFinancialDataService, lifecycleMapper, accountMapper, connectionMapper,
+                new StubTransactionClassificationCommandClient()
+        );
+    }
+
+    private static LocalFinancialAccountCommandClient newClient(
+            PersonalBankAccountService personalBankAccountService,
+            AccountCollectionService collectionService,
+            VirtualAccountRegenerationService regenerationService,
+            VirtualFinancialDataService virtualFinancialDataService,
+            AccountLifecycleMapper lifecycleMapper,
+            AccountMapper accountMapper,
+            CodefConnectionMapper connectionMapper,
+            TransactionClassificationCommandClient classificationClient
+    ) {
         return new LocalFinancialAccountCommandClient(
                 personalBankAccountService, collectionService, regenerationService, virtualFinancialDataService,
-                lifecycleMapper, accountMapper, connectionMapper
+                lifecycleMapper, accountMapper, connectionMapper, classificationClient
         );
+    }
+
+    private static class StubTransactionClassificationCommandClient
+            implements TransactionClassificationCommandClient {
+        private final List<Long> userIds = new ArrayList<>();
+        private RuntimeException failure;
+
+        @Override
+        public int classifyUnanalyzedTransactions(Long userId) {
+            userIds.add(userId);
+            if (failure != null) {
+                throw failure;
+            }
+            return 0;
+        }
     }
 
     private static class StubPersonalBankAccountService extends PersonalBankAccountService {

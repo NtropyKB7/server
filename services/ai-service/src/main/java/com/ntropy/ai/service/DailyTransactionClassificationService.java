@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ import com.ntropy.ai.dto.fastapi.TransactionClassificationResponse;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResult;
 import com.ntropy.ai.dto.fastapi.TransactionForClassification;
 import com.ntropy.common.client.AccountTransactionAnalysisClient;
+import com.ntropy.common.client.TransactionClassificationCommandClient;
 import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
 import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
 
@@ -28,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DailyTransactionClassificationService {
+public class DailyTransactionClassificationService implements TransactionClassificationCommandClient {
 
     private static final int DB_PAGE_SIZE = 500;
     private static final int FAST_API_BATCH_SIZE = 100;
@@ -70,12 +72,27 @@ public class DailyTransactionClassificationService {
      * @return 저장한 전체 거래 분석 결과 수
      */
     public int run() {
+        return runPages(() -> accountTransactionAnalysisClient
+                .findUnanalyzedTransactions(DB_PAGE_SIZE));
+    }
+
+    /** 계좌 연동을 마친 특정 사용자의 미분류 거래만 즉시 처리합니다. */
+    @Override
+    public int classifyUnanalyzedTransactions(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId는 양수여야 합니다.");
+        }
+        return runPages(() -> accountTransactionAnalysisClient
+                .findUnanalyzedTransactionsByUserId(userId, DB_PAGE_SIZE));
+    }
+
+    private int runPages(
+            Supplier<List<DailyClassificationTargetTransaction>> targetSupplier
+    ) {
         int totalProcessed = 0;
 
         while (true) {
-            List<DailyClassificationTargetTransaction> targets =
-                    accountTransactionAnalysisClient
-                            .findUnanalyzedTransactions(DB_PAGE_SIZE);
+            List<DailyClassificationTargetTransaction> targets = targetSupplier.get();
 
             if (targets == null || targets.isEmpty()) {
                 return totalProcessed;

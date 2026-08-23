@@ -241,6 +241,19 @@ class DailyTransactionClassificationServiceTest {
         );
     }
 
+    @Test
+    void classifiesOnlyTheRequestedUsersUnanalyzedTransactions() {
+        FakeAccountClient accountClient = new FakeAccountClient(
+                List.of(target(1L, "ORDINARY", "스타벅스"))
+        );
+        DailyTransactionClassificationService service = new DailyTransactionClassificationService(
+                accountClient, new FakeFastApiClient(), new TransactionPreClassificationService()
+        );
+
+        assertEquals(1, service.classifyUnanalyzedTransactions(42L));
+        assertEquals(List.of(42L, 42L), accountClient.queriedUserIds);
+    }
+
     private void assertSaved(
             List<TransactionAnalysisSaveItem> saved,
             Long transactionId,
@@ -334,6 +347,7 @@ class DailyTransactionClassificationServiceTest {
 
         private int pageIndex;
         private int queryCalls;
+        private final List<Long> queriedUserIds = new ArrayList<>();
 
         private final List<TransactionAnalysisSaveItem> saved =
                 new ArrayList<>();
@@ -365,6 +379,13 @@ class DailyTransactionClassificationServiceTest {
             }
 
             return pages.get(pageIndex++);
+        }
+
+        @Override
+        public List<DailyClassificationTargetTransaction>
+        findUnanalyzedTransactionsByUserId(Long userId, int limit) {
+            queriedUserIds.add(userId);
+            return findUnanalyzedTransactions(limit);
         }
 
         @Override
