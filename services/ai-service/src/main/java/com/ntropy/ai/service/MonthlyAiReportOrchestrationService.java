@@ -19,13 +19,13 @@ import com.ntropy.ai.config.AiReportBatchUserScopeProperties;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationRequest;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.IncomeAnalysisQueryClient;
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
-import com.ntropy.common.dto.work.summary.JobFatigueSummary;
-import com.ntropy.common.dto.work.summary.JobIncomeSummary;
-import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
+import com.ntropy.ai.port.account.MonthlyExpense;
+import com.ntropy.ai.port.account.MonthlyExpensePort;
+import com.ntropy.ai.port.user.UserPort;
+import com.ntropy.ai.port.work.IncomeAnalysisPort;
+import com.ntropy.ai.port.work.JobFatigue;
+import com.ntropy.ai.port.work.JobIncome;
+import com.ntropy.ai.port.work.MonthlyIncomeAnalysis;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,9 +66,9 @@ public class MonthlyAiReportOrchestrationService {
             "기타";
 
     /**
-     * 배치 대상 활성 사용자를 조회하는 Client입니다.
+     * 배치 대상 활성 사용자를 조회하는 포트입니다.
      */
-    private final ActiveUserQueryClient activeUserQueryClient;
+    private final UserPort userPort;
 
     /**
      * 이 배치가 대상으로 삼을 사용자 범위(batch.ai-report.user-scope) 설정입니다.
@@ -76,14 +76,14 @@ public class MonthlyAiReportOrchestrationService {
     private final AiReportBatchUserScopeProperties userScopeProperties;
 
     /**
-     * work-service에서 월별 소득 분석 결과를 조회하는 Client입니다.
+     * work-service에서 월별 소득 분석 결과를 조회하는 포트입니다.
      */
-    private final IncomeAnalysisQueryClient incomeAnalysisQueryClient;
+    private final IncomeAnalysisPort incomeAnalysisPort;
 
     /**
-     * account-service에서 월별 소비 집계를 조회하는 Client입니다.
+     * account-service에서 월별 소비 집계를 조회하는 포트입니다.
      */
-    private final MonthlyExpenseQueryClient monthlyExpenseQueryClient;
+    private final MonthlyExpensePort monthlyExpensePort;
 
     /**
      * FastAPI 금융상품 추천 Client입니다.
@@ -134,7 +134,7 @@ public class MonthlyAiReportOrchestrationService {
 
     public void runBatch(YearMonth targetYearMonth) {
         List<Long> userIds =
-                activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope());
+                userPort.findActiveUserIds(userScopeProperties.getUserScope());
 
         if (userIds == null || userIds.isEmpty()) {
             log.info(
@@ -151,10 +151,10 @@ public class MonthlyAiReportOrchestrationService {
          * 배치 전체를 막지 않고 빈 결과로 진행합니다 - 이후 각 사용자는
          * income == null과 동일하게 처리됩니다 (기존 §12 실패 처리와 동일한 형태).
          */
-        Map<Long, MonthlyIncomeAnalysisSummary> incomeByUser;
+        Map<Long, MonthlyIncomeAnalysis> incomeByUser;
         try {
             incomeByUser =
-                    incomeAnalysisQueryClient.getMonthlyIncomeAnalysisBulk(
+                    incomeAnalysisPort.getMonthlyIncomeAnalysisBulk(
                             userIds,
                             targetYearMonth
                     );
@@ -201,7 +201,7 @@ public class MonthlyAiReportOrchestrationService {
     private void processUserReport(
             Long userId,
             YearMonth targetYearMonth,
-            MonthlyIncomeAnalysisSummary income
+            MonthlyIncomeAnalysis income
     ) {
         String yearMonth =
                 targetYearMonth.toString();
@@ -213,8 +213,8 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * account-service에서 해당 월의 소비 정보를 조회합니다.
          */
-        MonthlyExpenseSummary currentExpense =
-                monthlyExpenseQueryClient.findMonthlyExpense(
+        MonthlyExpense currentExpense =
+                monthlyExpensePort.findMonthlyExpense(
                         userId,
                         yearMonth
                 );
@@ -222,8 +222,8 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * 전월 소비 정보를 조회합니다.
          */
-        MonthlyExpenseSummary previousExpense =
-                monthlyExpenseQueryClient.findMonthlyExpense(
+        MonthlyExpense previousExpense =
+                monthlyExpensePort.findMonthlyExpense(
                         userId,
                         targetYearMonth.minusMonths(1).toString()
                 );
@@ -233,18 +233,18 @@ public class MonthlyAiReportOrchestrationService {
          */
         long totalIncome =
                 income == null
-                        || income.getTotalIncome() == null
+                        || income.totalIncome() == null
                         ? 0L
-                        : income.getTotalIncome();
+                        : income.totalIncome();
 
         /*
          * 소비 정보가 없으면 총소비를 0으로 처리합니다.
          */
         long totalExpense =
                 currentExpense == null
-                        || currentExpense.getTotalExpense() == null
+                        || currentExpense.totalExpense() == null
                         ? 0L
-                        : currentExpense.getTotalExpense();
+                        : currentExpense.totalExpense();
 
         /*
          * 가용자금 = 총소득 - 총소비
@@ -279,9 +279,9 @@ public class MonthlyAiReportOrchestrationService {
 
         Long previousMonthExpense =
                 previousExpense == null
-                        || previousExpense.getTotalExpense() == null
+                        || previousExpense.totalExpense() == null
                         ? null
-                        : previousExpense.getTotalExpense();
+                        : previousExpense.totalExpense();
 
         /*
          * 전월 대비 소비 증감률입니다.
@@ -307,7 +307,7 @@ public class MonthlyAiReportOrchestrationService {
                 income == null
                         ? null
                         : roundRatio(
-                        income.getIncomeChangeRate()
+                        income.incomeChangeRate()
                 );
 
         /*
@@ -348,14 +348,14 @@ public class MonthlyAiReportOrchestrationService {
                         .previousMonthIncome(
                                 income == null
                                         ? null
-                                        : income.getPreviousMonthIncome()
+                                        : income.previousMonthIncome()
                         )
 
                         // 전월 대비 소득 증감액
                         .incomeChangeAmount(
                                 income == null
                                         ? null
-                                        : income.getIncomeChangeAmount()
+                                        : income.incomeChangeAmount()
                         )
 
                         // 전월 대비 소득 증감률
@@ -366,7 +366,7 @@ public class MonthlyAiReportOrchestrationService {
                         .incomeVolatility(
                                 income == null
                                         ? null
-                                        : income.getIncomeVolatility()
+                                        : income.incomeVolatility()
                         )
 
                         /*
@@ -494,7 +494,7 @@ public class MonthlyAiReportOrchestrationService {
      * </pre>
      */
     private List<Map<String, Object>> buildJobSummaries(
-            MonthlyIncomeAnalysisSummary income
+            MonthlyIncomeAnalysis income
     ) {
         if (income == null) {
             return List.of();
@@ -506,35 +506,35 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * 잡별 소득 데이터를 등록합니다.
          */
-        List<JobIncomeSummary> jobIncomes =
-                income.getJobIncomes();
+        List<JobIncome> jobIncomes =
+                income.jobIncomes();
 
         if (jobIncomes != null) {
-            for (JobIncomeSummary jobIncome : jobIncomes) {
+            for (JobIncome jobIncome : jobIncomes) {
                 if (jobIncome == null
-                        || jobIncome.getJobId() == null) {
+                        || jobIncome.jobId() == null) {
                     continue;
                 }
 
                 Map<String, Object> summary =
                         summaryByJob.computeIfAbsent(
-                                jobIncome.getJobId(),
+                                jobIncome.jobId(),
                                 key -> new LinkedHashMap<>()
                         );
 
                 summary.put(
                         "jobId",
-                        jobIncome.getJobId()
+                        jobIncome.jobId()
                 );
 
                 summary.put(
                         "jobName",
-                        jobIncome.getJobName()
+                        jobIncome.jobName()
                 );
 
                 summary.put(
                         "incomeAmount",
-                        jobIncome.getIncomeAmount()
+                        jobIncome.incomeAmount()
                 );
 
                 /*
@@ -547,7 +547,7 @@ public class MonthlyAiReportOrchestrationService {
                 summary.put(
                         "incomeRatio",
                         roundRatio(
-                                jobIncome.getIncomeRatio()
+                                jobIncome.incomeRatio()
                         )
                 );
             }
@@ -556,25 +556,25 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * 잡별 근무시간을 추가합니다.
          */
-        List<JobFatigueSummary> fatigueSummaries =
-                income.getFatigueSummaries();
+        List<JobFatigue> fatigueSummaries =
+                income.fatigueSummaries();
 
         if (fatigueSummaries != null) {
-            for (JobFatigueSummary fatigue : fatigueSummaries) {
+            for (JobFatigue fatigue : fatigueSummaries) {
                 if (fatigue == null
-                        || fatigue.getJobId() == null) {
+                        || fatigue.jobId() == null) {
                     continue;
                 }
 
                 Map<String, Object> summary =
                         summaryByJob.computeIfAbsent(
-                                fatigue.getJobId(),
+                                fatigue.jobId(),
                                 key -> new LinkedHashMap<>()
                         );
 
                 summary.put(
                         "jobId",
-                        fatigue.getJobId()
+                        fatigue.jobId()
                 );
 
                 /*
@@ -582,12 +582,12 @@ public class MonthlyAiReportOrchestrationService {
                  */
                 summary.putIfAbsent(
                         "jobName",
-                        fatigue.getJobName()
+                        fatigue.jobName()
                 );
 
                 summary.put(
                         "totalWorkMinutes",
-                        fatigue.getTotalWorkMinutes()
+                        fatigue.totalWorkMinutes()
                 );
             }
         }
@@ -611,7 +611,7 @@ public class MonthlyAiReportOrchestrationService {
      * - 잡별 최근 피로도
      */
     private List<Map<String, Object>> buildJobInsightInputs(
-            MonthlyIncomeAnalysisSummary income
+            MonthlyIncomeAnalysis income
     ) {
         if (income == null) {
             return List.of();
@@ -623,35 +623,35 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * 먼저 잡별 소득 정보를 등록합니다.
          */
-        List<JobIncomeSummary> jobIncomes =
-                income.getJobIncomes();
+        List<JobIncome> jobIncomes =
+                income.jobIncomes();
 
         if (jobIncomes != null) {
-            for (JobIncomeSummary jobIncome : jobIncomes) {
+            for (JobIncome jobIncome : jobIncomes) {
                 if (jobIncome == null
-                        || jobIncome.getJobId() == null) {
+                        || jobIncome.jobId() == null) {
                     continue;
                 }
 
                 Map<String, Object> input =
                         inputByJob.computeIfAbsent(
-                                jobIncome.getJobId(),
+                                jobIncome.jobId(),
                                 key -> new LinkedHashMap<>()
                         );
 
                 input.put(
                         "jobId",
-                        jobIncome.getJobId()
+                        jobIncome.jobId()
                 );
 
                 input.put(
                         "jobName",
-                        jobIncome.getJobName()
+                        jobIncome.jobName()
                 );
 
                 input.put(
                         "incomeAmount",
-                        jobIncome.getIncomeAmount()
+                        jobIncome.incomeAmount()
                 );
 
                 /*
@@ -662,7 +662,7 @@ public class MonthlyAiReportOrchestrationService {
                  */
                 input.put(
                         "incomeRatio",
-                        roundRatio(jobIncome.getIncomeRatio())
+                        roundRatio(jobIncome.incomeRatio())
                 );
             }
         }
@@ -670,25 +670,25 @@ public class MonthlyAiReportOrchestrationService {
         /*
          * 그 다음 잡별 근무시간과 피로도 정보를 추가합니다.
          */
-        List<JobFatigueSummary> fatigueSummaries =
-                income.getFatigueSummaries();
+        List<JobFatigue> fatigueSummaries =
+                income.fatigueSummaries();
 
         if (fatigueSummaries != null) {
-            for (JobFatigueSummary fatigue : fatigueSummaries) {
+            for (JobFatigue fatigue : fatigueSummaries) {
                 if (fatigue == null
-                        || fatigue.getJobId() == null) {
+                        || fatigue.jobId() == null) {
                     continue;
                 }
 
                 Map<String, Object> input =
                         inputByJob.computeIfAbsent(
-                                fatigue.getJobId(),
+                                fatigue.jobId(),
                                 key -> new LinkedHashMap<>()
                         );
 
                 input.put(
                         "jobId",
-                        fatigue.getJobId()
+                        fatigue.jobId()
                 );
 
                 /*
@@ -697,27 +697,27 @@ public class MonthlyAiReportOrchestrationService {
                  */
                 input.putIfAbsent(
                         "jobName",
-                        fatigue.getJobName()
+                        fatigue.jobName()
                 );
 
                 input.put(
                         "totalWorkMinutes",
-                        fatigue.getTotalWorkMinutes()
+                        fatigue.totalWorkMinutes()
                 );
 
                 input.put(
                         "workDays",
-                        fatigue.getWorkDays()
+                        fatigue.workDays()
                 );
 
                 input.put(
                         "averageFatigue",
-                        fatigue.getAverageFatigue()
+                        fatigue.averageFatigue()
                 );
 
                 input.put(
                         "latestFatigue",
-                        fatigue.getLatestFatigue()
+                        fatigue.latestFatigue()
                 );
             }
         }
@@ -736,13 +736,13 @@ public class MonthlyAiReportOrchestrationService {
      * </p>
      */
     List<Map<String, Object>> buildCategoryExpenses(
-            MonthlyExpenseSummary expense
+            MonthlyExpense expense
     ) {
         if (!hasValidExpense(expense)) {
             return List.of();
         }
 
-        long totalExpense = expense.getTotalExpense();
+        long totalExpense = expense.totalExpense();
 
         return getValidCategoryEntries(expense).stream()
                 .map(entry -> createCategorySummary(
@@ -770,13 +770,13 @@ public class MonthlyAiReportOrchestrationService {
      * </pre>
      */
     List<Map<String, Object>> buildTopCategories(
-            MonthlyExpenseSummary expense
+            MonthlyExpense expense
     ) {
         if (!hasValidExpense(expense)) {
             return List.of();
         }
 
-        long totalExpense = expense.getTotalExpense();
+        long totalExpense = expense.totalExpense();
         List<Map.Entry<String, Long>> validEntries =
                 getValidCategoryEntries(expense);
 
@@ -836,12 +836,12 @@ public class MonthlyAiReportOrchestrationService {
     }
 
     private boolean hasValidExpense(
-            MonthlyExpenseSummary expense
+            MonthlyExpense expense
     ) {
         return expense != null
-                && expense.getTotalExpense() != null
-                && expense.getTotalExpense() > 0L
-                && expense.getCategoryExpenses() != null;
+                && expense.totalExpense() != null
+                && expense.totalExpense() > 0L
+                && expense.categoryExpenses() != null;
     }
 
     /**
@@ -849,9 +849,9 @@ public class MonthlyAiReportOrchestrationService {
      * 같은 금액이면 카테고리 코드 오름차순으로 정렬합니다.
      */
     private List<Map.Entry<String, Long>> getValidCategoryEntries(
-            MonthlyExpenseSummary expense
+            MonthlyExpense expense
     ) {
-        return expense.getCategoryExpenses().entrySet().stream()
+        return expense.categoryExpenses().entrySet().stream()
                 .filter(entry -> entry.getKey() != null)
                 .filter(entry -> !entry.getKey().isBlank())
                 .filter(entry -> entry.getValue() != null)

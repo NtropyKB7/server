@@ -33,19 +33,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.ai.email.EmailMessage;
 import com.ntropy.ai.email.EmailSender;
 import com.ntropy.ai.exception.AiReportErrorCode;
+import com.ntropy.ai.port.payment.SubscriptionPort;
+import com.ntropy.ai.port.user.AiUser;
+import com.ntropy.ai.port.user.UserPort;
 import com.ntropy.common.client.AiReportQueryClient;
-import com.ntropy.common.client.SubscriptionQueryClient;
-import com.ntropy.common.client.UserQueryClient;
 import com.ntropy.common.domain.Feature;
 import com.ntropy.common.dto.ai.AiReportEmailDeliverySummary;
 import com.ntropy.common.dto.ai.AiReportSummary;
-import com.ntropy.common.dto.user.UserSummary;
 import com.ntropy.common.exception.ServiceException;
 
 class AiReportEmailDeliveryServiceTest {
 
-    private SubscriptionQueryClient subscriptionClient;
-    private UserQueryClient userClient;
+    private SubscriptionPort subscriptionClient;
+    private UserPort userClient;
     private AiReportQueryClient reportClient;
     private AiReportPdfService pdfService;
     private EmailSender emailSender;
@@ -53,8 +53,8 @@ class AiReportEmailDeliveryServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        subscriptionClient = mock(SubscriptionQueryClient.class);
-        userClient = mock(UserQueryClient.class);
+        subscriptionClient = mock(SubscriptionPort.class);
+        userClient = mock(UserPort.class);
         reportClient = mock(AiReportQueryClient.class);
         pdfService = mock(AiReportPdfService.class);
         emailSender = mock(EmailSender.class);
@@ -64,8 +64,8 @@ class AiReportEmailDeliveryServiceTest {
 
         ObjectMapper mapper = new ObjectMapper();
         when(subscriptionClient.supportsFeature(7L, Feature.AI_REPORT)).thenReturn(true);
-        when(userClient.getUserSummary(7L)).thenReturn(
-                new UserSummary(7L, "사용자", "billing.owner@example.com", "GOOGLE", true, true, true)
+        when(userClient.findUser(7L)).thenReturn(
+                new AiUser(7L, "billing.owner@example.com")
         );
         when(reportClient.findByUserIdAndYearMonth(7L, "2026-05")).thenReturn(
                 new AiReportSummary(31L, 7L, "2026-05", mapper.readTree("{\"total_income\":10}"),
@@ -97,14 +97,14 @@ class AiReportEmailDeliveryServiceTest {
         ServiceException exception = assertThrows(ServiceException.class, () -> service.deliver(7L, "2026-05"));
 
         assertEquals(AiReportErrorCode.EMAIL_DELIVERY_FORBIDDEN.getStatusCode(), exception.getStatusCode());
-        verify(userClient, never()).getUserSummary(any());
+        verify(userClient, never()).findUser(any());
         verify(emailSender, never()).send(any());
     }
 
     @Test
     void rejectsMissingEmailWithoutLookingUpReport() {
-        when(userClient.getUserSummary(7L)).thenReturn(
-                new UserSummary(7L, "사용자", "  ", "KAKAO", true, true, true)
+        when(userClient.findUser(7L)).thenReturn(
+                new AiUser(7L, "  ")
         );
 
         ServiceException exception = assertThrows(ServiceException.class, () -> service.deliver(7L, "2026-05"));
@@ -126,7 +126,7 @@ class AiReportEmailDeliveryServiceTest {
         assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
 
         verify(subscriptionClient).supportsFeature(7L, Feature.AI_REPORT);
-        verify(userClient).getUserSummary(7L);
+        verify(userClient).findUser(7L);
         verify(reportClient).findByUserIdAndYearMonth(7L, "2026-05");
         verify(pdfService).generate(any());
 
@@ -146,7 +146,7 @@ class AiReportEmailDeliveryServiceTest {
 
         assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
 
-        verify(userClient, never()).getUserSummary(any());
+        verify(userClient, never()).findUser(any());
         verify(reportClient, never()).findByUserIdAndYearMonth(any(), any());
         verify(pdfService, never()).generate(any());
         verify(emailSender, never()).send(any());
@@ -154,7 +154,7 @@ class AiReportEmailDeliveryServiceTest {
 
     @Test
     void automaticDeliverySkipsWhenUserLookupReturnsNull() {
-        when(userClient.getUserSummary(7L)).thenReturn(null);
+        when(userClient.findUser(7L)).thenReturn(null);
 
         assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
 
@@ -165,9 +165,9 @@ class AiReportEmailDeliveryServiceTest {
 
     @Test
     void automaticDeliverySkipsNullOrBlankEmail() {
-        when(userClient.getUserSummary(7L))
-                .thenReturn(new UserSummary(7L, "사용자", null, "GOOGLE", true, true, true))
-                .thenReturn(new UserSummary(7L, "사용자", "  ", "GOOGLE", true, true, true));
+        when(userClient.findUser(7L))
+                .thenReturn(new AiUser(7L, null))
+                .thenReturn(new AiUser(7L, "  "));
 
         assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));
         assertDoesNotThrow(() -> service.deliverAutomatically(7L, "2026-05"));

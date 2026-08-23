@@ -9,8 +9,8 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
+import com.ntropy.ai.port.account.ClassificationTargetTransaction;
+import com.ntropy.ai.port.account.TransactionAnalysisResult;
 
 class TransactionPreClassificationServiceTest {
 
@@ -19,7 +19,7 @@ class TransactionPreClassificationServiceTest {
 
     @Test
     void normalLoanRepaymentIsFixedFinanceConsumption() {
-        TransactionAnalysisSaveItem result = service.classify(
+        TransactionAnalysisResult result = service.classify(
                 target(
                         "LOAN",
                         null,
@@ -27,14 +27,14 @@ class TransactionPreClassificationServiceTest {
                 )
         ).orElseThrow();
 
-        assertTrue(result.getIsConsumption());
-        assertEquals("FINANCE", result.getCategory());
-        assertEquals("FIXED", result.getExpenseType());
+        assertTrue(result.isConsumption());
+        assertEquals("FINANCE", result.category());
+        assertEquals("FIXED", result.expenseType());
     }
 
     @Test
     void loanDisbursementIsNonConsumption() {
-        TransactionAnalysisSaveItem result = service.classify(
+        TransactionAnalysisResult result = service.classify(
                 target(
                         "LOAN",
                         "대출 실행",
@@ -42,14 +42,14 @@ class TransactionPreClassificationServiceTest {
                 )
         ).orElseThrow();
 
-        assertFalse(result.getIsConsumption());
-        assertNull(result.getCategory());
-        assertNull(result.getExpenseType());
+        assertFalse(result.isConsumption());
+        assertNull(result.category());
+        assertNull(result.expenseType());
     }
 
     @Test
     void installmentPaymentIsFixedFinanceConsumption() {
-        TransactionAnalysisSaveItem result = service.classify(
+        TransactionAnalysisResult result = service.classify(
                 target(
                         "INSTALLMENT",
                         null,
@@ -57,14 +57,14 @@ class TransactionPreClassificationServiceTest {
                 )
         ).orElseThrow();
 
-        assertTrue(result.getIsConsumption());
-        assertEquals("FINANCE", result.getCategory());
-        assertEquals("FIXED", result.getExpenseType());
+        assertTrue(result.isConsumption());
+        assertEquals("FINANCE", result.category());
+        assertEquals("FIXED", result.expenseType());
     }
 
     @Test
     void clearFinancialTransferIsNonConsumption() {
-        TransactionAnalysisSaveItem result = service.classify(
+        TransactionAnalysisResult result = service.classify(
                 target(
                         "ORDINARY",
                         null,
@@ -72,14 +72,14 @@ class TransactionPreClassificationServiceTest {
                 )
         ).orElseThrow();
 
-        assertFalse(result.getIsConsumption());
-        assertNull(result.getCategory());
-        assertNull(result.getExpenseType());
+        assertFalse(result.isConsumption());
+        assertNull(result.category());
+        assertNull(result.expenseType());
     }
 
     @Test
     void genericTransactionChannelIsNotEnoughForNonConsumption() {
-        Optional<TransactionAnalysisSaveItem> result = service.classify(
+        Optional<TransactionAnalysisResult> result = service.classify(
                 target(
                         "ORDINARY",
                         null,
@@ -126,7 +126,7 @@ class TransactionPreClassificationServiceTest {
             String expectedCategory,
             String expectedExpenseType
     ) {
-        TransactionAnalysisSaveItem result = service.classify(
+        TransactionAnalysisResult result = service.classify(
                 target(
                         "ORDINARY",
                         null,
@@ -134,23 +134,23 @@ class TransactionPreClassificationServiceTest {
                 )
         ).orElseThrow();
 
-        assertTrue(result.getIsConsumption());
+        assertTrue(result.isConsumption());
         assertEquals(
                 expectedCategory,
-                result.getCategory()
+                result.category()
         );
         assertEquals(
                 expectedExpenseType,
-                result.getExpenseType()
+                result.expenseType()
         );
     }
 
-    private DailyClassificationTargetTransaction target(
+    private ClassificationTargetTransaction target(
             String transactionCategory,
             String loanTransactionTypeName,
             String desc3
     ) {
-        return new DailyClassificationTargetTransaction(
+        return new ClassificationTargetTransaction(
                 1L,
                 10L,
                 transactionCategory,

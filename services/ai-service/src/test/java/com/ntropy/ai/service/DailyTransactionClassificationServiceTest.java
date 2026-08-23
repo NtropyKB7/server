@@ -12,11 +12,9 @@ import com.ntropy.ai.dto.fastapi.TransactionClassificationData;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResponse;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResult;
 import com.ntropy.ai.dto.fastapi.TransactionForClassification;
-import com.ntropy.common.client.AccountTransactionAnalysisClient;
-import com.ntropy.common.dto.account.ClassificationTargetTransaction;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
+import com.ntropy.ai.port.account.ClassificationTargetTransaction;
+import com.ntropy.ai.port.account.TransactionAnalysisPort;
+import com.ntropy.ai.port.account.TransactionAnalysisResult;
 
 class DailyTransactionClassificationServiceTest {
 
@@ -104,7 +102,7 @@ class DailyTransactionClassificationServiceTest {
 
     @Test
     void splitsFastApiRequestsIntoBatchesOfAtMostOneHundred() {
-        List<DailyClassificationTargetTransaction> targets =
+        List<ClassificationTargetTransaction> targets =
                 new ArrayList<>();
 
         for (long id = 1; id <= 101; id++) {
@@ -255,15 +253,15 @@ class DailyTransactionClassificationServiceTest {
     }
 
     private void assertSaved(
-            List<TransactionAnalysisSaveItem> saved,
+            List<TransactionAnalysisResult> saved,
             Long transactionId,
             String expectedCategory,
             String expectedExpenseType
     ) {
-        TransactionAnalysisSaveItem item = saved.stream()
+        TransactionAnalysisResult item = saved.stream()
                 .filter(
                         value -> transactionId.equals(
-                                value.getTransactionId()
+                                value.transactionId()
                         )
                 )
                 .findFirst()
@@ -271,16 +269,16 @@ class DailyTransactionClassificationServiceTest {
 
         assertEquals(
                 expectedCategory,
-                item.getCategory()
+                item.category()
         );
 
         assertEquals(
                 expectedExpenseType,
-                item.getExpenseType()
+                item.expenseType()
         );
     }
 
-    private DailyClassificationTargetTransaction target(
+    private ClassificationTargetTransaction target(
             Long transactionId,
             String transactionCategory,
             String desc3
@@ -295,7 +293,7 @@ class DailyTransactionClassificationServiceTest {
                         ? 10_000L
                         : 0L;
 
-        return new DailyClassificationTargetTransaction(
+        return new ClassificationTargetTransaction(
                 transactionId,
                 10L,
                 transactionCategory,
@@ -339,21 +337,21 @@ class DailyTransactionClassificationServiceTest {
     }
 
     private static class FakeAccountClient
-            implements AccountTransactionAnalysisClient {
+            implements TransactionAnalysisPort {
 
         private final List<
-                List<DailyClassificationTargetTransaction>
+                List<ClassificationTargetTransaction>
                 > pages;
 
         private int pageIndex;
         private int queryCalls;
         private final List<Long> queriedUserIds = new ArrayList<>();
 
-        private final List<TransactionAnalysisSaveItem> saved =
+        private final List<TransactionAnalysisResult> saved =
                 new ArrayList<>();
 
         private FakeAccountClient(
-                List<DailyClassificationTargetTransaction> nextPage
+                List<ClassificationTargetTransaction> nextPage
         ) {
             this.pages = List.of(
                     List.copyOf(nextPage)
@@ -361,7 +359,7 @@ class DailyTransactionClassificationServiceTest {
         }
 
         private FakeAccountClient(
-                List<List<DailyClassificationTargetTransaction>> pages,
+                List<List<ClassificationTargetTransaction>> pages,
                 boolean multiplePages
         ) {
             this.pages = pages.stream()
@@ -370,7 +368,7 @@ class DailyTransactionClassificationServiceTest {
         }
 
         @Override
-        public List<DailyClassificationTargetTransaction>
+        public List<ClassificationTargetTransaction>
         findUnanalyzedTransactions(int limit) {
             queryCalls++;
 
@@ -382,7 +380,7 @@ class DailyTransactionClassificationServiceTest {
         }
 
         @Override
-        public List<DailyClassificationTargetTransaction>
+        public List<ClassificationTargetTransaction>
         findUnanalyzedTransactionsByUserId(Long userId, int limit) {
             queriedUserIds.add(userId);
             return findUnanalyzedTransactions(limit);
@@ -390,25 +388,9 @@ class DailyTransactionClassificationServiceTest {
 
         @Override
         public void saveDailyTransactionAnalyses(
-                List<TransactionAnalysisSaveItem> analyses
+                List<TransactionAnalysisResult> analyses
         ) {
             saved.addAll(analyses);
-        }
-
-        @Override
-        public List<ClassificationTargetTransaction>
-        findClassificationTargets(
-                Long userId,
-                String yearMonth
-        ) {
-            return List.of();
-        }
-
-        @Override
-        public void saveTransactionAnalyses(
-                TransactionAnalysisSaveRequest request
-        ) {
-            // 기존 월간 분류 계약은 이 테스트에서 사용하지 않습니다.
         }
     }
 }

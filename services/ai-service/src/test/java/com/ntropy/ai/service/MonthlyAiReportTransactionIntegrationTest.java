@@ -31,7 +31,10 @@ import com.ntropy.ai.config.AiReportBatchUserScopeProperties;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
 import com.ntropy.ai.mapper.AiReportMapper;
-import com.ntropy.common.client.IncomeAnalysisQueryClient;
+import com.ntropy.ai.port.user.AiUser;
+import com.ntropy.ai.port.user.UserPort;
+import com.ntropy.ai.port.work.IncomeAnalysisPort;
+import com.ntropy.common.domain.UserScope;
 
 class MonthlyAiReportTransactionIntegrationTest {
 
@@ -88,7 +91,7 @@ class MonthlyAiReportTransactionIntegrationTest {
             AiReportService aiReportService,
             AiReportEmailDeliveryService deliveryService
     ) {
-        IncomeAnalysisQueryClient incomeClient = mock(IncomeAnalysisQueryClient.class);
+        IncomeAnalysisPort incomeClient = mock(IncomeAnalysisPort.class);
         when(incomeClient.getMonthlyIncomeAnalysisBulk(anyList(), eq(TARGET_MONTH)))
                 .thenReturn(Map.of());
         FastApiProductRecommendationClient recommendationClient =
@@ -96,8 +99,20 @@ class MonthlyAiReportTransactionIntegrationTest {
         when(recommendationClient.recommend(any()))
                 .thenReturn(new ProductRecommendationResponse());
 
+        UserPort userPort = new UserPort() {
+            @Override
+            public java.util.List<Long> findActiveUserIds(UserScope scope) {
+                return java.util.List.of(USER_ID);
+            }
+
+            @Override
+            public AiUser findUser(Long userId) {
+                throw new UnsupportedOperationException("이 테스트에서는 사용하지 않습니다");
+            }
+        };
+
         return new MonthlyAiReportOrchestrationService(
-                scope -> java.util.List.of(USER_ID),
+                userPort,
                 new AiReportBatchUserScopeProperties("REAL_ONLY"),
                 incomeClient,
                 (userId, yearMonth) -> null,

@@ -8,14 +8,14 @@ import org.springframework.stereotype.Service;
 import com.ntropy.ai.email.EmailMessage;
 import com.ntropy.ai.email.EmailSender;
 import com.ntropy.ai.exception.AiReportErrorCode;
+import com.ntropy.ai.port.payment.SubscriptionPort;
+import com.ntropy.ai.port.user.AiUser;
+import com.ntropy.ai.port.user.UserPort;
 import com.ntropy.common.client.AiReportQueryClient;
-import com.ntropy.common.client.SubscriptionQueryClient;
-import com.ntropy.common.client.UserQueryClient;
 import com.ntropy.common.domain.Feature;
 import com.ntropy.common.dto.ai.AiReportDetailSummary;
 import com.ntropy.common.dto.ai.AiReportEmailDeliverySummary;
 import com.ntropy.common.dto.ai.AiReportSummary;
-import com.ntropy.common.dto.user.UserSummary;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
@@ -37,8 +37,8 @@ public class AiReportEmailDeliveryService {
     private static final String FAILURE_PDF_GENERATION = "PDF_GENERATION_FAILED";
     private static final String FAILURE_EMAIL_DELIVERY = "EMAIL_DELIVERY_FAILED";
 
-    private final SubscriptionQueryClient subscriptionQueryClient;
-    private final UserQueryClient userQueryClient;
+    private final SubscriptionPort subscriptionPort;
+    private final UserPort userPort;
     private final AiReportQueryClient aiReportQueryClient;
     private final AiReportPdfService aiReportPdfService;
     private final EmailSender emailSender;
@@ -47,11 +47,11 @@ public class AiReportEmailDeliveryService {
         String yearMonth = validateYearMonth(requestedYearMonth);
         Long reportId = null;
         try {
-            if (!subscriptionQueryClient.supportsFeature(userId, Feature.AI_REPORT)) {
+            if (!subscriptionPort.supportsFeature(userId, Feature.AI_REPORT)) {
                 throw new ServiceException(AiReportErrorCode.EMAIL_DELIVERY_FORBIDDEN);
             }
 
-            UserSummary user = userQueryClient.getUserSummary(userId);
+            AiUser user = userPort.findUser(userId);
             String recipient = user == null ? null : user.email();
             if (recipient == null || recipient.isBlank()) {
                 throw new ServiceException(AiReportErrorCode.EMAIL_NOT_AVAILABLE);
@@ -81,7 +81,7 @@ public class AiReportEmailDeliveryService {
             yearMonth = validateYearMonth(requestedYearMonth);
 
             failureCode = FAILURE_SUBSCRIPTION_CHECK;
-            if (!subscriptionQueryClient.supportsFeature(userId, Feature.AI_REPORT)) {
+            if (!subscriptionPort.supportsFeature(userId, Feature.AI_REPORT)) {
                 log.info("AI 리포트 자동 전달 건너뜀. userId={}, reportId={}, yearMonth={}, "
                                 + "channel=EMAIL, deliveryType=AUTO, result=SKIPPED, "
                                 + "failureCode={}",
@@ -90,7 +90,7 @@ public class AiReportEmailDeliveryService {
             }
 
             failureCode = FAILURE_USER_LOOKUP;
-            UserSummary user = userQueryClient.getUserSummary(userId);
+            AiUser user = userPort.findUser(userId);
             String recipient = user == null ? null : user.email();
             if (recipient == null || recipient.isBlank()) {
                 log.info("AI 리포트 자동 전달 건너뜀. userId={}, reportId={}, yearMonth={}, "

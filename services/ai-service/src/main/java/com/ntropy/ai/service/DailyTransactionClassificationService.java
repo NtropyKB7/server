@@ -15,10 +15,10 @@ import com.ntropy.ai.client.fastapi.FastApiTransactionClassificationClient;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResponse;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResult;
 import com.ntropy.ai.dto.fastapi.TransactionForClassification;
-import com.ntropy.common.client.AccountTransactionAnalysisClient;
+import com.ntropy.ai.port.account.ClassificationTargetTransaction;
+import com.ntropy.ai.port.account.TransactionAnalysisPort;
+import com.ntropy.ai.port.account.TransactionAnalysisResult;
 import com.ntropy.common.client.TransactionClassificationCommandClient;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,8 +56,8 @@ public class DailyTransactionClassificationService implements TransactionClassif
                     "VARIABLE"
             );
 
-    private final AccountTransactionAnalysisClient
-            accountTransactionAnalysisClient;
+    private final TransactionAnalysisPort
+            transactionAnalysisPort;
 
     private final FastApiTransactionClassificationClient
             fastApiClient;
@@ -72,7 +72,7 @@ public class DailyTransactionClassificationService implements TransactionClassif
      * @return 저장한 전체 거래 분석 결과 수
      */
     public int run() {
-        return runPages(() -> accountTransactionAnalysisClient
+        return runPages(() -> transactionAnalysisPort
                 .findUnanalyzedTransactions(DB_PAGE_SIZE));
     }
 
@@ -82,26 +82,26 @@ public class DailyTransactionClassificationService implements TransactionClassif
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("userId는 양수여야 합니다.");
         }
-        return runPages(() -> accountTransactionAnalysisClient
+        return runPages(() -> transactionAnalysisPort
                 .findUnanalyzedTransactionsByUserId(userId, DB_PAGE_SIZE));
     }
 
     private int runPages(
-            Supplier<List<DailyClassificationTargetTransaction>> targetSupplier
+            Supplier<List<ClassificationTargetTransaction>> targetSupplier
     ) {
         int totalProcessed = 0;
 
         while (true) {
-            List<DailyClassificationTargetTransaction> targets = targetSupplier.get();
+            List<ClassificationTargetTransaction> targets = targetSupplier.get();
 
             if (targets == null || targets.isEmpty()) {
                 return totalProcessed;
             }
 
-            List<TransactionAnalysisSaveItem> analyses =
+            List<TransactionAnalysisResult> analyses =
                     classifyPage(targets);
 
-            accountTransactionAnalysisClient
+            transactionAnalysisPort
                     .saveDailyTransactionAnalyses(analyses);
 
             totalProcessed += analyses.size();
@@ -119,17 +119,17 @@ public class DailyTransactionClassificationService implements TransactionClassif
      * 조회한 한 페이지의 거래를 Spring 결정적 규칙 대상과
      * FastAPI 대상 거래로 분리합니다.
      */
-    private List<TransactionAnalysisSaveItem> classifyPage(
-            List<DailyClassificationTargetTransaction> targets
+    private List<TransactionAnalysisResult> classifyPage(
+            List<ClassificationTargetTransaction> targets
     ) {
-        List<TransactionAnalysisSaveItem> analyses =
+        List<TransactionAnalysisResult> analyses =
                 new ArrayList<>();
 
-        List<DailyClassificationTargetTransaction> fastApiTargets =
+        List<ClassificationTargetTransaction> fastApiTargets =
                 new ArrayList<>();
 
-        for (DailyClassificationTargetTransaction target : targets) {
-            Optional<TransactionAnalysisSaveItem> deterministicResult =
+        for (ClassificationTargetTransaction target : targets) {
+            Optional<TransactionAnalysisResult> deterministicResult =
                     preClassificationService.classify(target);
 
             if (deterministicResult.isPresent()) {
@@ -170,18 +170,18 @@ public class DailyTransactionClassificationService implements TransactionClassif
      * 응답 누락, 중복, 잘못된 값 또는 호출 실패는
      * ETC / VARIABLE로 확정합니다.
      */
-    private List<TransactionAnalysisSaveItem> classifyWithFastApi(
-            List<DailyClassificationTargetTransaction> targets
+    private List<TransactionAnalysisResult> classifyWithFastApi(
+            List<ClassificationTargetTransaction> targets
     ) {
-        Map<Long, DailyClassificationTargetTransaction> targetById =
+        Map<Long, ClassificationTargetTransaction> targetById =
                 new HashMap<>();
 
         List<TransactionForClassification> request =
                 new ArrayList<>();
 
-        for (DailyClassificationTargetTransaction target : targets) {
+        for (ClassificationTargetTransaction target : targets) {
             targetById.put(
-                    target.getTransactionId(),
+                    target.transactionId(),
                     target
             );
 
@@ -190,7 +190,7 @@ public class DailyTransactionClassificationService implements TransactionClassif
             );
         }
 
-        Map<Long, TransactionAnalysisSaveItem> validResults =
+        Map<Long, TransactionAnalysisResult> validResults =
                 new HashMap<>();
 
         try {
@@ -243,18 +243,18 @@ public class DailyTransactionClassificationService implements TransactionClassif
             );
         }
 
-        List<TransactionAnalysisSaveItem> completed =
+        List<TransactionAnalysisResult> completed =
                 new ArrayList<>();
 
         /*
          * FastAPI 응답 순서와 관계없이 원래 요청 순서대로 저장 결과를
          * 생성하고, 결과가 없는 거래는 반드시 fallback 처리합니다.
          */
-        for (DailyClassificationTargetTransaction target : targets) {
+        for (ClassificationTargetTransaction target : targets) {
             completed.add(
                     validResults.getOrDefault(
-                            target.getTransactionId(),
-                            fallback(target.getTransactionId())
+                            target.transactionId(),
+                            fallback(target.transactionId())
                     )
             );
         }
@@ -295,24 +295,24 @@ public class DailyTransactionClassificationService implements TransactionClassif
      * amount에는 outAmount를 사용합니다.
      */
     private TransactionForClassification toFastApiRequest(
-            DailyClassificationTargetTransaction target
+            ClassificationTargetTransaction target
     ) {
         return new TransactionForClassification(
-                target.getTransactionId(),
-                target.getOutAmount(),
-                target.getTransactionCategory(),
-                target.getOrganizationCode(),
-                target.getDesc1(),
-                target.getDesc2(),
-                target.getDesc3(),
-                target.getDesc4()
+                target.transactionId(),
+                target.outAmount(),
+                target.transactionCategory(),
+                target.organizationCode(),
+                target.desc1(),
+                target.desc2(),
+                target.desc3(),
+                target.desc4()
         );
     }
 
-    private TransactionAnalysisSaveItem toSaveItem(
+    private TransactionAnalysisResult toSaveItem(
             TransactionClassificationResult result
     ) {
-        return new TransactionAnalysisSaveItem(
+        return new TransactionAnalysisResult(
                 result.getTransactionId(),
                 result.getIsConsumption(),
                 result.getCategory(),
@@ -320,10 +320,10 @@ public class DailyTransactionClassificationService implements TransactionClassif
         );
     }
 
-    private TransactionAnalysisSaveItem fallback(
+    private TransactionAnalysisResult fallback(
             Long transactionId
     ) {
-        return new TransactionAnalysisSaveItem(
+        return new TransactionAnalysisResult(
                 transactionId,
                 true,
                 "ETC",

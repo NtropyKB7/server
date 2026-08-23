@@ -6,9 +6,9 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.ai.port.account.ClassificationTargetTransaction;
+import com.ntropy.ai.port.account.TransactionAnalysisResult;
 import com.ntropy.common.domain.LoanDisbursementKeywords;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
 
 /**
  * FastAPI 호출 전에 거래 유형과 명확한 키워드를 이용해
@@ -71,11 +71,11 @@ public class TransactionPreClassificationService {
      * Spring에서 결과를 확정할 수 있으면 분석 결과를 반환하고,
      * FastAPI 분류가 필요하면 Optional.empty()를 반환합니다.
      */
-    public Optional<TransactionAnalysisSaveItem> classify(
-            DailyClassificationTargetTransaction transaction
+    public Optional<TransactionAnalysisResult> classify(
+            ClassificationTargetTransaction transaction
     ) {
         String transactionCategory = normalize(
-                transaction.getTransactionCategory()
+                transaction.transactionCategory()
         );
 
         /*
@@ -90,16 +90,16 @@ public class TransactionPreClassificationService {
          */
         if ("LOAN".equals(transactionCategory)) {
             if (LoanDisbursementKeywords.matches(
-                    transaction.getLoanTransactionTypeName()
+                    transaction.loanTransactionTypeName()
             )) {
                 return Optional.of(
-                        nonConsumption(transaction.getTransactionId())
+                        nonConsumption(transaction.transactionId())
                 );
             }
 
             return Optional.of(
                     consumption(
-                            transaction.getTransactionId(),
+                            transaction.transactionId(),
                             "FINANCE",
                             "FIXED"
                     )
@@ -113,7 +113,7 @@ public class TransactionPreClassificationService {
         if ("INSTALLMENT".equals(transactionCategory)) {
             return Optional.of(
                     consumption(
-                            transaction.getTransactionId(),
+                            transaction.transactionId(),
                             "FINANCE",
                             "FIXED"
                     )
@@ -126,7 +126,7 @@ public class TransactionPreClassificationService {
          */
         if (!"ORDINARY".equals(transactionCategory)) {
             return Optional.of(
-                    nonConsumption(transaction.getTransactionId())
+                    nonConsumption(transaction.transactionId())
             );
         }
 
@@ -142,7 +142,7 @@ public class TransactionPreClassificationService {
                 FINANCIAL_TRANSFER_KEYWORDS
         )) {
             return Optional.of(
-                    nonConsumption(transaction.getTransactionId())
+                    nonConsumption(transaction.transactionId())
             );
         }
 
@@ -156,7 +156,7 @@ public class TransactionPreClassificationService {
         )) {
             return Optional.of(
                     consumption(
-                            transaction.getTransactionId(),
+                            transaction.transactionId(),
                             "ETC",
                             "VARIABLE"
                     )
@@ -173,7 +173,7 @@ public class TransactionPreClassificationService {
         )) {
             return Optional.of(
                     consumption(
-                            transaction.getTransactionId(),
+                            transaction.transactionId(),
                             "ETC",
                             "VARIABLE"
                     )
@@ -189,7 +189,7 @@ public class TransactionPreClassificationService {
         )) {
             return Optional.of(
                     consumption(
-                            transaction.getTransactionId(),
+                            transaction.transactionId(),
                             "INSURANCE",
                             "FIXED"
                     )
@@ -206,15 +206,15 @@ public class TransactionPreClassificationService {
      * desc3을 우선 배치하고 나머지 필드는 보조 정보로 연결합니다.
      */
     private String joinedDescription(
-            DailyClassificationTargetTransaction transaction
+            ClassificationTargetTransaction transaction
     ) {
         return String.join(
                 " ",
                 List.of(
-                        valueOrEmpty(transaction.getDesc3()),
-                        valueOrEmpty(transaction.getDesc1()),
-                        valueOrEmpty(transaction.getDesc2()),
-                        valueOrEmpty(transaction.getDesc4())
+                        valueOrEmpty(transaction.desc3()),
+                        valueOrEmpty(transaction.desc1()),
+                        valueOrEmpty(transaction.desc2()),
+                        valueOrEmpty(transaction.desc4())
                 )
         );
     }
@@ -244,12 +244,12 @@ public class TransactionPreClassificationService {
         return value == null ? "" : value;
     }
 
-    private TransactionAnalysisSaveItem consumption(
+    private TransactionAnalysisResult consumption(
             Long transactionId,
             String category,
             String expenseType
     ) {
-        return new TransactionAnalysisSaveItem(
+        return new TransactionAnalysisResult(
                 transactionId,
                 true,
                 category,
@@ -257,10 +257,10 @@ public class TransactionPreClassificationService {
         );
     }
 
-    private TransactionAnalysisSaveItem nonConsumption(
+    private TransactionAnalysisResult nonConsumption(
             Long transactionId
     ) {
-        return new TransactionAnalysisSaveItem(
+        return new TransactionAnalysisResult(
                 transactionId,
                 false,
                 null,

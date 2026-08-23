@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,12 +25,13 @@ import com.ntropy.ai.config.AiReportBatchUserScopeProperties;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationRequest;
 import com.ntropy.ai.dto.fastapi.ProductRecommendationResponse;
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.IncomeAnalysisQueryClient;
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
+import com.ntropy.ai.port.account.MonthlyExpense;
+import com.ntropy.ai.port.account.MonthlyExpensePort;
+import com.ntropy.ai.port.user.AiUser;
+import com.ntropy.ai.port.user.UserPort;
+import com.ntropy.ai.port.work.IncomeAnalysisPort;
+import com.ntropy.ai.port.work.MonthlyIncomeAnalysis;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
-import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 
 class MonthlyAiReportOrchestrationServiceTest {
 
@@ -54,23 +57,26 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
-    @DisplayName("소득분석은 사용자별 개별 호출이 아니라 벌크 조회를 사용한다")
+    @DisplayName("소득분석은 벌크 조회를 통해 한 번에 처리된다")
     void runBatch_usesBulkIncomeAnalysisInsteadOfPerUserCalls() {
-        RecordingIncomeAnalysisQueryClient income =
-                new RecordingIncomeAnalysisQueryClient();
+        RecordingIncomeAnalysisPort income =
+                new RecordingIncomeAnalysisPort();
 
-        MonthlyAiReportOrchestrationService service = createService(
-                scope -> List.of(1L, 2L, 3L),
+        UserPort userPort = activeUserIdsPort(scope -> List.of(1L, 2L, 3L));
+        MonthlyExpensePort expensePort = (userId, yearMonth) -> null;
+        MonthlyAiReportOrchestrationService service = new MonthlyAiReportOrchestrationService(
+                userPort,
+                new AiReportBatchUserScopeProperties("REAL_ONLY"),
                 income,
-                (userId, yearMonth) -> null,
+                expensePort,
                 new CapturingRecommendationClient(),
-                new CapturingAiReportService()
+                new CapturingAiReportService(),
+                new NoOpAutomaticDeliveryService(),
+                objectMapper
         );
 
         service.runBatch(YearMonth.of(2026, 7));
 
-        assertEquals(0, income.singleCallCount,
-                "getMonthlyIncomeAnalysis(단건)는 더 이상 호출되면 안 됩니다");
         assertEquals(1, income.bulkCallCount,
                 "getMonthlyIncomeAnalysisBulk는 사용자 수와 무관하게 1번만 호출돼야 합니다");
         assertEquals(List.of(1L, 2L, 3L), income.lastBulkUserIds);
@@ -80,7 +86,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("카테고리가 4개 이상이면 상위 3개와 합산된 기타를 반환한다")
     void buildTopCategories_whenFourOrMoreCategories_returnsTopThreeAndAggregatedOther() {
         MonthlyAiReportOrchestrationService service = createUnitService();
-        MonthlyExpenseSummary expense = expenseSummary(
+        MonthlyExpense expense = expense(
                 2_680_000L,
                 linkedCategories(
                         entry("FOOD", 760_000L),
@@ -111,7 +117,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("구체적인 카테고리가 3개이고 원천 ETC가 없으면 기타를 만들지 않는다")
     void buildTopCategories_whenThreeConcreteCategoriesAndNoEtc_doesNotCreateAggregatedOther() {
         MonthlyAiReportOrchestrationService service = createUnitService();
-        MonthlyExpenseSummary expense = expenseSummary(
+        MonthlyExpense expense = expense(
                 600_000L,
                 linkedCategories(
                         entry("FOOD", 300_000L),
@@ -132,7 +138,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("구체적인 카테고리가 3개이고 원천 ETC가 있으면 기타를 만든다")
     void buildTopCategories_whenThreeConcreteCategoriesAndSourceEtc_createsAggregatedOther() {
         MonthlyAiReportOrchestrationService service = createUnitService();
-        MonthlyExpenseSummary expense = expenseSummary(
+        MonthlyExpense expense = expense(
                 700_000L,
                 linkedCategories(
                         entry("FOOD", 300_000L),
@@ -155,7 +161,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("금액이 null/0/음수인 카테고리는 제외한다")
     void buildTopCategories_excludesNullZeroAndNegativeAmounts() {
         MonthlyAiReportOrchestrationService service = createUnitService();
-        MonthlyExpenseSummary expense = expenseSummary(
+        MonthlyExpense expense = expense(
                 300_000L,
                 linkedCategories(
                         entry("FOOD", 300_000L),
@@ -177,7 +183,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("금액이 동률이면 카테고리 코드 오름차순으로 정렬한다")
     void buildTopCategories_whenAmountsAreEqual_usesCategoryCodeAsTieBreaker() {
         MonthlyAiReportOrchestrationService service = createUnitService();
-        MonthlyExpenseSummary expense = expenseSummary(
+        MonthlyExpense expense = expense(
                 400_000L,
                 linkedCategories(
                         entry("SHOPPING", 100_000L),
@@ -200,7 +206,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("총소비가 0이면 빈 리스트를 반환한다")
     void buildTopCategories_whenTotalExpenseIsZero_returnsEmptyList() {
         MonthlyAiReportOrchestrationService service = createUnitService();
-        MonthlyExpenseSummary expense = expenseSummary(
+        MonthlyExpense expense = expense(
                 0L,
                 Map.of("FOOD", 100_000L)
         );
@@ -212,7 +218,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     @DisplayName("FastAPI에는 전체 카테고리를, 저장에는 요약된 상위 카테고리를 사용한다")
     void runBatch_sendsAllCategoriesToFastApiAndStoresSummarizedCategories()
             throws Exception {
-        MonthlyExpenseSummary currentExpense = expenseSummary(
+        MonthlyExpense currentExpense = expense(
                 2_680_000L,
                 linkedCategories(
                         entry("FOOD", 760_000L),
@@ -357,7 +363,7 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     @Test
-    @DisplayName("설정된 batch.ai-report.user-scope를 ActiveUserQueryClient에 그대로 전달한다")
+    @DisplayName("설정된 batch.ai-report.user-scope를 UserPort에 그대로 전달한다")
     void runBatch_passesConfiguredUserScopeToClient() {
         List<UserScope> requestedScopes = new ArrayList<>();
         MonthlyAiReportOrchestrationService service = createService(
@@ -387,16 +393,16 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     private MonthlyAiReportOrchestrationService createService(
-            ActiveUserQueryClient activeUserQueryClient,
-            IncomeAnalysisQueryClient incomeAnalysisQueryClient,
-            MonthlyExpenseQueryClient monthlyExpenseQueryClient,
+            Function<UserScope, List<Long>> activeUserIdsFn,
+            BiFunction<Long, YearMonth, MonthlyIncomeAnalysis> incomeFn,
+            BiFunction<Long, String, MonthlyExpense> expenseFn,
             FastApiProductRecommendationClient recommendationClient,
             AiReportService aiReportService
     ) {
         return createService(
-                activeUserQueryClient,
-                incomeAnalysisQueryClient,
-                monthlyExpenseQueryClient,
+                activeUserIdsFn,
+                incomeFn,
+                expenseFn,
                 recommendationClient,
                 aiReportService,
                 new NoOpAutomaticDeliveryService()
@@ -404,18 +410,27 @@ class MonthlyAiReportOrchestrationServiceTest {
     }
 
     private MonthlyAiReportOrchestrationService createService(
-            ActiveUserQueryClient activeUserQueryClient,
-            IncomeAnalysisQueryClient incomeAnalysisQueryClient,
-            MonthlyExpenseQueryClient monthlyExpenseQueryClient,
+            Function<UserScope, List<Long>> activeUserIdsFn,
+            BiFunction<Long, YearMonth, MonthlyIncomeAnalysis> incomeFn,
+            BiFunction<Long, String, MonthlyExpense> expenseFn,
             FastApiProductRecommendationClient recommendationClient,
             AiReportService aiReportService,
             AiReportEmailDeliveryService deliveryService
     ) {
+        UserPort userPort = activeUserIdsPort(activeUserIdsFn);
+        IncomeAnalysisPort incomeAnalysisPort = (userIds, yearMonth) -> {
+            Map<Long, MonthlyIncomeAnalysis> result = new LinkedHashMap<>();
+            for (Long userId : userIds) {
+                result.put(userId, incomeFn.apply(userId, yearMonth));
+            }
+            return result;
+        };
+        MonthlyExpensePort expensePort = expenseFn::apply;
         return new MonthlyAiReportOrchestrationService(
-                activeUserQueryClient,
+                userPort,
                 new AiReportBatchUserScopeProperties("REAL_ONLY"),
-                incomeAnalysisQueryClient,
-                monthlyExpenseQueryClient,
+                incomeAnalysisPort,
+                expensePort,
                 recommendationClient,
                 aiReportService,
                 deliveryService,
@@ -423,17 +438,25 @@ class MonthlyAiReportOrchestrationServiceTest {
         );
     }
 
-    private MonthlyExpenseSummary expenseSummary(
+    private static UserPort activeUserIdsPort(Function<UserScope, List<Long>> activeUserIdsFn) {
+        return new UserPort() {
+            @Override
+            public List<Long> findActiveUserIds(UserScope scope) {
+                return activeUserIdsFn.apply(scope);
+            }
+
+            @Override
+            public AiUser findUser(Long userId) {
+                throw new UnsupportedOperationException("이 테스트에서는 사용하지 않습니다");
+            }
+        };
+    }
+
+    private MonthlyExpense expense(
             Long totalExpense,
             Map<String, Long> categories
     ) {
-        return new MonthlyExpenseSummary(
-                1L,
-                "2026-07",
-                totalExpense,
-                0L,
-                categories
-        );
+        return new MonthlyExpense(totalExpense, 0L, categories);
     }
 
     @SafeVarargs
@@ -512,33 +535,20 @@ class MonthlyAiReportOrchestrationServiceTest {
         }
     }
 
-    /**
-     * getMonthlyIncomeAnalysis(단건)와 getMonthlyIncomeAnalysisBulk(벌크) 호출 횟수를
-     * 각각 세는 fake. 람다로는 두 메서드를 다 구현할 수 없어(함수형 인터페이스가 아니게 됨),
-     * runBatch가 실제로 벌크 경로를 타는지(default 폴백이 아니라) 검증하려면 명시적 구현이 필요하다.
-     */
-    private static class RecordingIncomeAnalysisQueryClient
-            implements IncomeAnalysisQueryClient {
+    /** getMonthlyIncomeAnalysisBulk 호출 횟수와 마지막 인자를 기록하는 fake. */
+    private static class RecordingIncomeAnalysisPort
+            implements IncomeAnalysisPort {
 
-        private int singleCallCount;
         private int bulkCallCount;
         private List<Long> lastBulkUserIds;
 
         @Override
-        public MonthlyIncomeAnalysisSummary getMonthlyIncomeAnalysis(
-                Long userId, YearMonth yearMonth
-        ) {
-            singleCallCount++;
-            return null;
-        }
-
-        @Override
-        public Map<Long, MonthlyIncomeAnalysisSummary> getMonthlyIncomeAnalysisBulk(
+        public Map<Long, MonthlyIncomeAnalysis> getMonthlyIncomeAnalysisBulk(
                 List<Long> userIds, YearMonth yearMonth
         ) {
             bulkCallCount++;
             lastBulkUserIds = userIds;
-            Map<Long, MonthlyIncomeAnalysisSummary> result = new LinkedHashMap<>();
+            Map<Long, MonthlyIncomeAnalysis> result = new LinkedHashMap<>();
             for (Long userId : userIds) {
                 result.put(userId, null);
             }
