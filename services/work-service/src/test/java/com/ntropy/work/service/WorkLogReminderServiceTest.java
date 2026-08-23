@@ -13,16 +13,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
-import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.InMemoryJobMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogMapper;
+import com.ntropy.work.port.notification.NotificationPort;
+import com.ntropy.work.port.notification.NotificationRequest;
+import com.ntropy.work.port.user.UserPort;
 
 class WorkLogReminderServiceTest {
 
@@ -31,19 +30,19 @@ class WorkLogReminderServiceTest {
 
     private final InMemoryWorkLogMapper workLogMapper = new InMemoryWorkLogMapper();
     private final InMemoryJobMapper jobMapper = new InMemoryJobMapper();
-    private final StubActiveUserQueryClient activeUserQueryClient = new StubActiveUserQueryClient();
-    private final StubNotificationCommandClient notificationCommandClient = new StubNotificationCommandClient();
+    private final StubUserPort userPort = new StubUserPort();
+    private final StubNotificationPort notificationPort = new StubNotificationPort();
     private final WorkLogReminderService service =
             new WorkLogReminderService(
-                    activeUserQueryClient,
+                    userPort,
                     new WorkReminderBatchUserScopeProperties("REAL_ONLY"),
                     workLogMapper,
                     jobMapper,
-                    notificationCommandClient);
+                    notificationPort);
 
     @BeforeEach
     void setUp() {
-        activeUserQueryClient.userIds = List.of(USER_ID);
+        userPort.userIds = List.of(USER_ID);
         jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).jobName("배달의민족").isActive(true).build());
     }
 
@@ -52,8 +51,8 @@ class WorkLogReminderServiceTest {
     void checkNoWorkLogToday_noLogs_sendsNotification() {
         service.checkNoWorkLogToday();
 
-        assertEquals(1, notificationCommandClient.created.size());
-        assertEquals("WORK", notificationCommandClient.created.get(0).notificationType());
+        assertEquals(1, notificationPort.sent.size());
+        assertEquals("WORK", notificationPort.sent.get(0).notificationType());
     }
 
     @Test
@@ -63,7 +62,7 @@ class WorkLogReminderServiceTest {
 
         service.checkNoWorkLogToday();
 
-        assertEquals(0, notificationCommandClient.created.size());
+        assertEquals(0, notificationPort.sent.size());
     }
 
     @Test
@@ -74,8 +73,8 @@ class WorkLogReminderServiceTest {
 
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(1, notificationCommandClient.created.size());
-        assertEquals("worklog-unconfirmed-" + log.getLogId(), notificationCommandClient.created.get(0).eventId());
+        assertEquals(1, notificationPort.sent.size());
+        assertEquals("worklog-unconfirmed-" + log.getLogId(), notificationPort.sent.get(0).eventId());
     }
 
     @Test
@@ -94,11 +93,11 @@ class WorkLogReminderServiceTest {
 
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(1, notificationCommandClient.created.size());
+        assertEquals(1, notificationPort.sent.size());
         String expectedDate = endAt.toLocalDate().format(DateTimeFormatter.ofPattern("yy.M.d", Locale.KOREA));
         assertEquals(
                 "종료되었는데 확정되지 않은 근무가 있어요. (" + expectedDate + " 배달의민족)",
-                notificationCommandClient.created.get(0).body());
+                notificationPort.sent.get(0).body());
     }
 
     @Test
@@ -117,11 +116,11 @@ class WorkLogReminderServiceTest {
 
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(1, notificationCommandClient.created.size());
+        assertEquals(1, notificationPort.sent.size());
         String expectedDate = endAt.toLocalDate().format(DateTimeFormatter.ofPattern("yy.M.d", Locale.KOREA));
         assertEquals(
                 "종료되었는데 확정되지 않은 근무가 있어요. (" + expectedDate + ")",
-                notificationCommandClient.created.get(0).body());
+                notificationPort.sent.get(0).body());
     }
 
     @Test
@@ -131,7 +130,7 @@ class WorkLogReminderServiceTest {
 
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(0, notificationCommandClient.created.size());
+        assertEquals(0, notificationPort.sent.size());
     }
 
     @Test
@@ -141,7 +140,7 @@ class WorkLogReminderServiceTest {
 
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(0, notificationCommandClient.created.size());
+        assertEquals(0, notificationPort.sent.size());
     }
 
     @Test
@@ -152,7 +151,7 @@ class WorkLogReminderServiceTest {
 
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(2, notificationCommandClient.created.size());
+        assertEquals(2, notificationPort.sent.size());
     }
 
     @Test
@@ -160,15 +159,15 @@ class WorkLogReminderServiceTest {
     void checkUnconfirmedWorkLogs_noLogsAtAll_doesNotSendNotification() {
         service.checkUnconfirmedWorkLogs();
 
-        assertEquals(0, notificationCommandClient.created.size());
+        assertEquals(0, notificationPort.sent.size());
     }
 
     @Test
-    @DisplayName("설정된 batch.work-reminder.user-scope를 ActiveUserQueryClient에 그대로 전달한다")
+    @DisplayName("설정된 batch.work-reminder.user-scope를 UserPort에 그대로 전달한다")
     void checkNoWorkLogToday_passesConfiguredUserScopeToClient() {
         service.checkNoWorkLogToday();
 
-        assertEquals(UserScope.REAL_ONLY, activeUserQueryClient.lastRequestedScope);
+        assertEquals(UserScope.REAL_ONLY, userPort.lastRequestedScope);
     }
 
     private static WorkLog workLog(LocalDate workDate, String status) {
@@ -191,7 +190,7 @@ class WorkLogReminderServiceTest {
                 .build();
     }
 
-    private static final class StubActiveUserQueryClient implements ActiveUserQueryClient {
+    private static final class StubUserPort implements UserPort {
         private List<Long> userIds = List.of();
         private UserScope lastRequestedScope;
 
@@ -202,21 +201,12 @@ class WorkLogReminderServiceTest {
         }
     }
 
-    private static final class StubNotificationCommandClient implements NotificationCommandClient {
-        private final List<NotificationCreateCommand> created = new ArrayList<>();
+    private static final class StubNotificationPort implements NotificationPort {
+        private final List<NotificationRequest> sent = new ArrayList<>();
 
         @Override
-        public NotificationSummary create(NotificationCreateCommand command) {
-            created.add(command);
-            return null;
-        }
-
-        @Override
-        public void markAsRead(Long userId, Long notificationId) {
-        }
-
-        @Override
-        public void delete(Long userId, Long notificationId) {
+        public void notify(NotificationRequest request) {
+            sent.add(request);
         }
     }
 }

@@ -12,11 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.NotificationCommandClient;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
-import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.work.client.holiday.HolidayApiClient;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.entity.Holiday;
@@ -37,6 +33,9 @@ import com.ntropy.work.mapper.InMemoryWorkLogMapper;
 import com.ntropy.work.mapper.InMemoryWorkLogPlatformIncomeMapper;
 import com.ntropy.work.port.account.IncomingTransaction;
 import com.ntropy.work.port.account.IncomingTransactionPort;
+import com.ntropy.work.port.notification.NotificationPort;
+import com.ntropy.work.port.notification.NotificationRequest;
+import com.ntropy.work.port.user.UserPort;
 
 class SettlementServiceTest {
 
@@ -56,8 +55,8 @@ class SettlementServiceTest {
     private final InMemoryHolidayMapper holidayMapperForTest = new InMemoryHolidayMapper();
     private final HolidayService holidayService =
             new HolidayService(new HolidayApiClient(null, null), holidayMapperForTest);
-    private final StubActiveUserQueryClient activeUserQueryClient = new StubActiveUserQueryClient();
-    private final StubNotificationCommandClient notificationCommandClient = new StubNotificationCommandClient();
+    private final StubUserPort userPort = new StubUserPort();
+    private final StubNotificationPort notificationPort = new StubNotificationPort();
     private StubIncomingTransactionPort incomingTransactionPort;
     private SettlementService service;
 
@@ -72,10 +71,10 @@ class SettlementServiceTest {
         jobMapper.seed(Job.builder().jobId(JOB_ID).userId(USER_ID).isActive(true).build());
         incomingTransactionPort = new StubIncomingTransactionPort();
         service = new SettlementService(
-                incomingTransactionPort, activeUserQueryClient,
+                incomingTransactionPort, userPort,
                 new SettlementBatchUserScopeProperties("REAL_ONLY"), platformMapper, jobMapper,
                 jobPlatformMappingMapper, workLogMapper, workLogPlatformIncomeMapper, settlementMapper, holidayService,
-                notificationCommandClient);
+                notificationPort);
     }
 
     @Test
@@ -360,7 +359,7 @@ class SettlementServiceTest {
     @DisplayName("runDailyBatch는 활성 사용자 전원에 대해 최근 BACKFILL_DAYS일씩 정산을 재확인한다")
     void runDailyBatch_processesActiveUsersAndRecentDays() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
-        activeUserQueryClient.userIds = List.of(USER_ID);
+        userPort.userIds = List.of(USER_ID);
         LocalDate today = LocalDate.now();
         WorkLog logForYesterday = workLog(today.minusDays(2), "CONFIRMED", 48_000L); // offset=1이라 today-1 입금 시 today-2가 근무일
         workLogMapper.insert(logForYesterday);
@@ -378,7 +377,7 @@ class SettlementServiceTest {
     @Test
     @DisplayName("runDailyBatch는 활성 사용자가 없으면 아무것도 처리하지 않는다")
     void runDailyBatch_noActiveUsers_doesNothing() {
-        activeUserQueryClient.userIds = List.of();
+        userPort.userIds = List.of();
 
         service.runDailyBatch();
 
@@ -386,18 +385,18 @@ class SettlementServiceTest {
     }
 
     @Test
-    @DisplayName("설정된 batch.settlement.user-scope를 ActiveUserQueryClient에 그대로 전달한다")
+    @DisplayName("설정된 batch.settlement.user-scope를 UserPort에 그대로 전달한다")
     void runDailyBatch_passesConfiguredUserScopeToClient() {
         service.runDailyBatch();
 
-        assertEquals(UserScope.REAL_ONLY, activeUserQueryClient.lastRequestedScope);
+        assertEquals(UserScope.REAL_ONLY, userPort.lastRequestedScope);
     }
 
     @Test
     @DisplayName("runDailyBatch에서 여러 날짜의 정산이 생성돼도 유저당 정산 완료 알림은 1건만 발송되고, 건수/총액이 합산되어 본문에 담긴다")
     void runDailyBatch_settlementCreatedOnMultipleDays_sendsSingleNotificationPerUser() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
-        activeUserQueryClient.userIds = List.of(USER_ID);
+        userPort.userIds = List.of(USER_ID);
         LocalDate today = LocalDate.now();
         // offset=1이라 today, today-1 각각 입금되면 today-1, today-2가 근무일
         workLogMapper.insert(workLog(today.minusDays(1), "CONFIRMED", 40_000L));
@@ -410,8 +409,8 @@ class SettlementServiceTest {
         service.runDailyBatch();
 
         assertEquals(2, settlementMapper.findAll().size());
-        assertEquals(1, notificationCommandClient.created.size());
-        NotificationCreateCommand notification = notificationCommandClient.created.get(0);
+        assertEquals(1, notificationPort.sent.size());
+        NotificationRequest notification = notificationPort.sent.get(0);
         assertEquals(USER_ID, notification.userId());
         assertEquals("settlement-completed-" + USER_ID + "-" + today, notification.eventId());
         assertEquals("오늘 정산 2건, 총 88,000원이 처리됐어요.", notification.body());
@@ -450,21 +449,21 @@ class SettlementServiceTest {
     @Test
     @DisplayName("UNMATCHED 거래만 있으면 정산 완료 알림을 보내지 않는다")
     void runDailyBatch_onlyUnmatchedTransactions_doesNotSendNotification() {
-        activeUserQueryClient.userIds = List.of(USER_ID);
+        userPort.userIds = List.of(USER_ID);
         incomingTransactionPort.transactions = List.of(
                 new IncomingTransaction(1L, LocalDate.now(), LocalTime.NOON, "알수없는입금처", BigDecimal.valueOf(10_000L))
         );
 
         service.runDailyBatch();
 
-        assertEquals(0, notificationCommandClient.created.size());
+        assertEquals(0, notificationPort.sent.size());
     }
 
     @Test
     @DisplayName("이미 처리된 거래만 재확인되면(백필 재실행) 알림을 다시 보내지 않는다")
     void runDailyBatch_onlyAlreadyProcessedTransactions_doesNotResendNotification() {
         jobPlatformMappingMapper.insert(JobPlatformMapping.builder().jobId(JOB_ID).platformId(PLATFORM_ID).build());
-        activeUserQueryClient.userIds = List.of(USER_ID);
+        userPort.userIds = List.of(USER_ID);
         LocalDate today = LocalDate.now();
         settlementMapper.insert(Settlement.builder()
                 .userId(USER_ID).status(SettlementMatchStatus.MATCHED)
@@ -480,7 +479,7 @@ class SettlementServiceTest {
         service.runDailyBatch();
 
         assertEquals(1, settlementMapper.findAll().size());
-        assertEquals(0, notificationCommandClient.created.size());
+        assertEquals(0, notificationPort.sent.size());
     }
 
     private static WorkLog workLog(LocalDate workDate, String status, long estimatedIncome) {
@@ -519,7 +518,7 @@ class SettlementServiceTest {
         }
     }
 
-    private static final class StubActiveUserQueryClient implements ActiveUserQueryClient {
+    private static final class StubUserPort implements UserPort {
         private List<Long> userIds = List.of();
         private UserScope lastRequestedScope;
 
@@ -530,21 +529,12 @@ class SettlementServiceTest {
         }
     }
 
-    private static final class StubNotificationCommandClient implements NotificationCommandClient {
-        private final List<NotificationCreateCommand> created = new java.util.ArrayList<>();
+    private static final class StubNotificationPort implements NotificationPort {
+        private final List<NotificationRequest> sent = new java.util.ArrayList<>();
 
         @Override
-        public NotificationSummary create(NotificationCreateCommand command) {
-            created.add(command);
-            return null;
-        }
-
-        @Override
-        public void markAsRead(Long userId, Long notificationId) {
-        }
-
-        @Override
-        public void delete(Long userId, Long notificationId) {
+        public void notify(NotificationRequest request) {
+            sent.add(request);
         }
     }
 }

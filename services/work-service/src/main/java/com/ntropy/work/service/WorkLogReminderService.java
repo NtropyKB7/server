@@ -9,22 +9,22 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.NotificationCommandClient;
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.work.config.WorkReminderBatchUserScopeProperties;
 import com.ntropy.work.domain.WorkLogStatus;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.JobMapper;
 import com.ntropy.work.mapper.WorkLogMapper;
+import com.ntropy.work.port.notification.NotificationPort;
+import com.ntropy.work.port.notification.NotificationRequest;
+import com.ntropy.work.port.user.UserPort;
 
 import lombok.RequiredArgsConstructor;
 
 /**
  * 근무일지 관련 리마인더를 위해 활성 유저를 폴링해서 알림을 만드는 서비스.
  * WorkLog는 work-service가 소유한 데이터이므로, 상태(미기록/미확정) 판단도 work-service가
- * 직접 하고 NotificationCommandClient로 알림 생성만 요청한다 - 원래 notification-service의
+ * 직접 하고 NotificationPort로 알림 생성만 요청한다 - 원래 notification-service의
  * NotificationTriggerService에 있던 로직을 이 도메인으로 옮긴 것이다.
  * 스케줄러(WorkLogReminderScheduler)가 주기적으로 호출한다.
  */
@@ -37,19 +37,19 @@ public class WorkLogReminderService {
     private static final DateTimeFormatter UNCONFIRMED_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yy.M.d", Locale.KOREA);
 
-    private final ActiveUserQueryClient activeUserQueryClient;
+    private final UserPort userPort;
     private final WorkReminderBatchUserScopeProperties userScopeProperties;
     private final WorkLogMapper workLogMapper;
     private final JobMapper jobMapper;
-    private final NotificationCommandClient notificationCommandClient;
+    private final NotificationPort notificationPort;
 
     /** 매일 지정된 시각에 실행. 오늘 근무 기록이 없는 유저에게 리마인더를 보낸다. */
     public void checkNoWorkLogToday() {
         LocalDate today = LocalDate.now();
-        for (Long userId : activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope())) {
+        for (Long userId : userPort.findActiveUserIds(userScopeProperties.getUserScope())) {
             List<WorkLog> logs = workLogMapper.findByUserIdAndWorkDate(userId, today);
             if (logs.isEmpty()) {
-                notificationCommandClient.create(new NotificationCreateCommand(
+                notificationPort.notify(new NotificationRequest(
                         userId,
                         "worklog-noWork-" + userId + "-" + today,
                         "WORK",
@@ -68,7 +68,7 @@ public class WorkLogReminderService {
     public void checkUnconfirmedWorkLogs() {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
-        for (Long userId : activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope())) {
+        for (Long userId : userPort.findActiveUserIds(userScopeProperties.getUserScope())) {
             // 자정을 넘기는 근무는 work_date가 시작일 기준으로 저장되므로 어제 날짜도 함께 조회한다.
             for (WorkLog workLog : workLogMapper.findByUserIdAndDateRange(userId, today.minusDays(1), today)) {
                 if (!STATUS_PLANNED.equals(workLog.getStatus())) {
@@ -87,7 +87,7 @@ public class WorkLogReminderService {
                 if (now.isBefore(reminderAt)) {
                     continue;
                 }
-                notificationCommandClient.create(new NotificationCreateCommand(
+                notificationPort.notify(new NotificationRequest(
                         userId,
                         "worklog-unconfirmed-" + workLog.getLogId(),
                         "WORK",

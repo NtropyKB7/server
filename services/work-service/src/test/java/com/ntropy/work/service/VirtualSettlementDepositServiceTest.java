@@ -20,6 +20,7 @@ import com.ntropy.work.mapper.projection.VirtualSettlementIncome;
 import com.ntropy.work.port.account.SettlementDepositOutcome;
 import com.ntropy.work.port.account.SettlementDepositPort;
 import com.ntropy.work.port.account.SettlementDepositRequest;
+import com.ntropy.work.port.user.UserPort;
 
 class VirtualSettlementDepositServiceTest {
 

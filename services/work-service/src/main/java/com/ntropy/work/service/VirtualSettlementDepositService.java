@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.client.ActiveUserQueryClient;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.ExpectedSettlementDateCalculator;
 import com.ntropy.work.domain.SettlementPeriod;
@@ -27,6 +26,7 @@ import com.ntropy.work.mapper.projection.VirtualSettlementIncome;
 import com.ntropy.work.port.account.SettlementDepositOutcome;
 import com.ntropy.work.port.account.SettlementDepositPort;
 import com.ntropy.work.port.account.SettlementDepositRequest;
+import com.ntropy.work.port.user.UserPort;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +41,7 @@ public class VirtualSettlementDepositService {
     private static final String BUSINESS_DAY = "BUSINESS_DAY";
     private static final int HOLIDAY_LOOKAHEAD_DAYS = 62;
 
-    private final ActiveUserQueryClient activeUserQueryClient;
+    private final UserPort userPort;
     private final SettlementBatchUserScopeProperties userScopeProperties;
     private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private final PlatformMapper platformMapper;
@@ -50,7 +50,7 @@ public class VirtualSettlementDepositService {
 
     /** 전체 활성 사용자의 오늘까지 도래한 가상 정산 입금을 생성한다. */
     public VirtualSettlementDepositBatchResult runDailyBatch(LocalDate processDate) {
-        List<Long> userIds = activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope());
+        List<Long> userIds = userPort.findActiveUserIds(userScopeProperties.getUserScope());
         if (userIds == null || userIds.isEmpty()) {
             return VirtualSettlementDepositBatchResult.empty();
         }

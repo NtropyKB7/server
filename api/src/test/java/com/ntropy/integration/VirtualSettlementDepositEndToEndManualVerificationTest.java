@@ -39,6 +39,8 @@ import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.work.adapter.account.AccountIncomingTransactionAdapter;
 import com.ntropy.work.adapter.account.AccountSettlementDepositAdapter;
+import com.ntropy.work.adapter.notification.NotificationAdapter;
+import com.ntropy.work.adapter.user.UserActiveUsersAdapter;
 import com.ntropy.work.client.LocalVirtualSettlementDepositBatchCommandClient;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.mapper.JobMapper;
@@ -49,6 +51,8 @@ import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.port.account.IncomingTransactionPort;
 import com.ntropy.work.port.account.SettlementDepositPort;
+import com.ntropy.work.port.notification.NotificationPort;
+import com.ntropy.work.port.user.UserPort;
 import com.ntropy.work.service.HolidayService;
 import com.ntropy.work.service.SettlementService;
 import com.ntropy.work.service.VirtualSettlementDepositService;
@@ -330,22 +334,32 @@ class VirtualSettlementDepositEndToEndManualVerificationTest {
         }
 
         @Bean
+        UserPort userPort(ActiveUserQueryClient activeUserQueryClient) {
+            return new UserActiveUsersAdapter(activeUserQueryClient);
+        }
+
+        @Bean
+        NotificationPort notificationPort(NotificationCommandClient notificationCommandClient) {
+            return new NotificationAdapter(notificationCommandClient);
+        }
+
+        @Bean
         VirtualSettlementDepositService virtualSettlementDepositService(
-                ActiveUserQueryClient activeUserQueryClient,
+                UserPort userPort,
                 SettlementBatchUserScopeProperties userScopeProperties,
                 WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper,
                 PlatformMapper platformMapper,
                 HolidayService holidayService,
                 SettlementDepositPort settlementDepositPort) {
             return new VirtualSettlementDepositService(
-                    activeUserQueryClient, userScopeProperties, workLogPlatformIncomeMapper,
+                    userPort, userScopeProperties, workLogPlatformIncomeMapper,
                     platformMapper, holidayService, settlementDepositPort);
         }
 
         @Bean
         SettlementService settlementService(
                 IncomingTransactionPort incomingTransactionPort,
-                ActiveUserQueryClient activeUserQueryClient,
+                UserPort userPort,
                 SettlementBatchUserScopeProperties userScopeProperties,
                 PlatformMapper platformMapper,
                 JobMapper jobMapper,
@@ -354,11 +368,11 @@ class VirtualSettlementDepositEndToEndManualVerificationTest {
                 WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper,
                 SettlementMapper settlementMapper,
                 HolidayService holidayService,
-                NotificationCommandClient notificationCommandClient) {
+                NotificationPort notificationPort) {
             return new SettlementService(
-                    incomingTransactionPort, activeUserQueryClient, userScopeProperties,
+                    incomingTransactionPort, userPort, userScopeProperties,
                     platformMapper, jobMapper, jobPlatformMappingMapper, workLogMapper,
-                    workLogPlatformIncomeMapper, settlementMapper, holidayService, notificationCommandClient);
+                    workLogPlatformIncomeMapper, settlementMapper, holidayService, notificationPort);
         }
 
         @Bean

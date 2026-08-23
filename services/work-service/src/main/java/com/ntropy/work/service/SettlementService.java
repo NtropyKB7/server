@@ -8,9 +8,6 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.client.ActiveUserQueryClient;
-import com.ntropy.common.client.NotificationCommandClient;
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.work.config.SettlementBatchUserScopeProperties;
 import com.ntropy.work.domain.PlatformMatchResult;
 import com.ntropy.work.domain.PlatformMatcher;
@@ -32,6 +29,9 @@ import com.ntropy.work.mapper.WorkLogMapper;
 import com.ntropy.work.mapper.WorkLogPlatformIncomeMapper;
 import com.ntropy.work.port.account.IncomingTransaction;
 import com.ntropy.work.port.account.IncomingTransactionPort;
+import com.ntropy.work.port.notification.NotificationPort;
+import com.ntropy.work.port.notification.NotificationRequest;
+import com.ntropy.work.port.user.UserPort;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +76,7 @@ public class SettlementService {
     private static final int BACKFILL_DAYS = 3;
 
     private final IncomingTransactionPort incomingTransactionPort;
-    private final ActiveUserQueryClient activeUserQueryClient;
+    private final UserPort userPort;
     private final SettlementBatchUserScopeProperties userScopeProperties;
     private final PlatformMapper platformMapper;
     private final JobMapper jobMapper;
@@ -85,7 +85,7 @@ public class SettlementService {
     private final WorkLogPlatformIncomeMapper workLogPlatformIncomeMapper;
     private final SettlementMapper settlementMapper;
     private final HolidayService holidayService;
-    private final NotificationCommandClient notificationCommandClient;
+    private final NotificationPort notificationPort;
 
     /**
      * 전체 활성 사용자를 대상으로, 오늘부터 최근 BACKFILL_DAYS일을 매번 재확인하는 배치.
@@ -93,7 +93,7 @@ public class SettlementService {
      * 예외가 나도 다른 사용자 처리에 영향을 주지 않도록 사용자 단위로 예외를 격리한다.
      */
     public void runDailyBatch() {
-        List<Long> userIds = activeUserQueryClient.findActiveUserIds(userScopeProperties.getUserScope());
+        List<Long> userIds = userPort.findActiveUserIds(userScopeProperties.getUserScope());
         if (userIds == null || userIds.isEmpty()) {
             log.info("[정산 배치] 대상 사용자가 없습니다.");
             return;
@@ -301,7 +301,7 @@ public class SettlementService {
      *  배치가 같은 날 재실행돼도 중복 발송되지 않게 한다. 테스트 컨트롤러(LocalSettlementBatchCommandClient)도
      *  processSettlementDetailed 성공 시 이 메서드를 호출하므로 public으로 열어둔다. */
     public void notifySettlementCompleted(Long userId, LocalDate today, int count, long totalAmount) {
-        notificationCommandClient.create(new NotificationCreateCommand(
+        notificationPort.notify(new NotificationRequest(
                 userId,
                 "settlement-completed-" + userId + "-" + today,
                 "WORK",
