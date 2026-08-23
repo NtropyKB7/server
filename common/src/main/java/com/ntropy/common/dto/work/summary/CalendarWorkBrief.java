@@ -17,6 +17,7 @@ public class CalendarWorkBrief {
     private LocalTime startTime;
     private LocalTime endTime;
     private String status;
+    private String settlementStatus;
     private Long taskCount;
     private Long fatigue;
 }

@@ -266,6 +266,7 @@ class CalendarServiceTest {
         assertEquals(1, summary.getWorks().size());
         assertEquals("배민 배달", summary.getWorks().get(0).getJobName());
         assertEquals(3L, summary.getWorks().get(0).getFatigue());
+        assertEquals("NONE", summary.getWorks().get(0).getSettlementStatus());
     }
 
     @Test
