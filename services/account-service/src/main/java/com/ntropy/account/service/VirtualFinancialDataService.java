@@ -239,7 +239,7 @@ public class VirtualFinancialDataService {
         Account account = baseAccount(userOrdinal, userId, connection, bank, 2, referenceDate);
         account.setAccountGroup(AccountGroup.DEPOSIT_TRUST);
         account.setDepositTypeCode("12");
-        account.setAccountName(bank.getDisplayName() + " 가상 적금");
+        account.setAccountName("청년희망적금");
         account.setBalance(BigDecimal.ZERO);
         account.setOverdraftYn(null);
         account.setNextPaymentDate(DefaultPaymentSchedule.nextAfter(referenceDate));
@@ -254,7 +254,7 @@ public class VirtualFinancialDataService {
         Account account = baseAccount(userOrdinal, userId, connection, bank, 3, referenceDate);
         account.setAccountGroup(AccountGroup.LOAN);
         account.setDepositTypeCode("40");
-        account.setAccountName(bank.getDisplayName() + " 가상 대출");
+        account.setAccountName("주택담보대출");
         account.setBalance(BigDecimal.ZERO);
         account.setOverdraftYn(null);
         account.setNextPaymentDate(DefaultPaymentSchedule.nextAfter(referenceDate));

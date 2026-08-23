@@ -25,13 +25,10 @@ import com.ntropy.account.service.VirtualFinancialTransactionGenerator.Generated
 class VirtualFinancialTransactionGeneratorTest {
 
     private static final Set<String> INSURANCE_PRODUCTS = Set.of(
-            "삼성생명 실손보험", "현대해상 건강보험", "DB손해보험 운전자보험",
-            "KB손해보험 암보험", "교보생명 종신보험", "한화생명 연금보험"
+            "삼성생명 실손보험", "KB 이륜차 운전자보험"
     );
     private static final Set<String> INCOME_COUNTERPARTY_NAMES = Set.of(
-            "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "GOOGLE",
-            "쿠팡-용역비", "티맵모빌리티", "CJ대한통운", "로젠택배", "생활연구소",
-            "유한회사미소", "케어닥", "펫피플", "PAYPAL", "네이버"
+            "우아한청년들", "쿠팡이츠정산", "위대한상상", "카카오모빌리티", "펫피플"
     );
     // work-service PLATFORM.platform_name 시드값 중 deposit_name과 다른 것들.
     // (로젠택배·케어닥은 platform_name==deposit_name이라 제외, 미소는 platform_name "미소"가
