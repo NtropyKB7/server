@@ -36,15 +36,28 @@ public class TxnAnalysisService {
      */
     public List<DailyClassificationTargetTransaction>
     findUnanalyzedTransactions(int limit) {
+        validateDailyQueryLimit(limit);
 
+        return financialDataQueryMapper.findUnanalyzedTransactions(limit);
+    }
+
+    /** 특정 사용자의 아직 분석되지 않은 일간 분석 대상 거래를 조회합니다. */
+    public List<DailyClassificationTargetTransaction>
+    findUnanalyzedTransactionsByUserId(Long userId, int limit) {
+        if (userId == null || userId <= 0) {
+            throw new ServiceException(AccountErrorCode.INVALID_REQUEST, "userId는 양수여야 합니다.");
+        }
+        validateDailyQueryLimit(limit);
+        return financialDataQueryMapper.findUnanalyzedTransactionsByUserId(userId, limit);
+    }
+
+    private void validateDailyQueryLimit(int limit) {
         if (limit <= 0 || limit > MAX_DAILY_QUERY_SIZE) {
             throw new ServiceException(
                     AccountErrorCode.INVALID_REQUEST,
                     "limit은 1~500이어야 합니다."
             );
         }
-
-        return financialDataQueryMapper.findUnanalyzedTransactions(limit);
     }
 
     /**

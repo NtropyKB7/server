@@ -20,6 +20,7 @@ import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.client.FinancialAccountCommandClient;
+import com.ntropy.common.client.TransactionClassificationCommandClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
 import com.ntropy.common.dto.account.AccountRegistrationSummary;
 import com.ntropy.common.dto.account.BankSummary;
@@ -44,6 +45,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
     private final AccountLifecycleMapper accountLifecycleMapper;
     private final AccountMapper accountMapper;
     private final CodefConnectionMapper codefConnectionMapper;
+    private final TransactionClassificationCommandClient transactionClassificationCommandClient;
 
     @Override
     public List<BankSummary> findSupportedBanks() {
@@ -80,6 +82,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
 
         if ("VIRTUAL".equals(connectionType)) {
             GenerationSummary summary = virtualAccountRegenerationService.regenerateForUser(userId, bank);
+            classifyTransactionsSafely(userId);
             return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), summary.accounts());
         }
 
@@ -94,7 +97,17 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         );
         ensureVirtualDatasetSafely(userId, bank);
         int accountCount = accountCollectionService.collect(userId, bank, birthDate, startDate, endDate).size();
+        classifyTransactionsSafely(userId);
         return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), accountCount);
+    }
+
+    private void classifyTransactionsSafely(Long userId) {
+        try {
+            int processed = transactionClassificationCommandClient.classifyUnanalyzedTransactions(userId);
+            log.info("계좌 연동 후 소비 분류 완료: userId={}, processed={}", userId, processed);
+        } catch (RuntimeException e) {
+            log.warn("계좌 연동 후 소비 분류 실패: userId={}", userId, e);
+        }
     }
 
     private void ensureVirtualDatasetSafely(Long userId, PersonalBank bank) {

@@ -398,5 +398,11 @@ class TxnAnalysisServiceTest {
                 findUnanalyzedTransactions(int limit) {
             return List.of();
         }
+
+        @Override
+        public List<DailyClassificationTargetTransaction>
+                findUnanalyzedTransactionsByUserId(Long userId, int limit) {
+            return List.of();
+        }
     }
 }

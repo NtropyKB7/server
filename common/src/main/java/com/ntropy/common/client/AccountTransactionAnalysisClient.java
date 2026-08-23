@@ -24,6 +24,12 @@ public interface AccountTransactionAnalysisClient {
             int limit
     );
 
+    /** 특정 사용자의 아직 분석되지 않은 일간 소비 분석 대상 거래를 조회합니다. */
+    List<DailyClassificationTargetTransaction> findUnanalyzedTransactionsByUserId(
+            Long userId,
+            int limit
+    );
+
     /**
      * 일간 소비 분류 결과를 TXN_ANALYSIS에 저장합니다.
      *

@@ -29,6 +29,12 @@ public class LocalAccountTransactionAnalysisClient
         return txnAnalysisService.findUnanalyzedTransactions(limit);
     }
 
+    @Override
+    public List<DailyClassificationTargetTransaction>
+    findUnanalyzedTransactionsByUserId(Long userId, int limit) {
+        return txnAnalysisService.findUnanalyzedTransactionsByUserId(userId, limit);
+    }
+
     /**
      * 일간 배치에서 생성한 소비·비소비 분석 결과를 저장합니다.
      */
