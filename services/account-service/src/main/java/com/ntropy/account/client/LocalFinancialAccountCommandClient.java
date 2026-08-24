@@ -10,6 +10,7 @@ import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.InstitutionKeys;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.CodefConnection;
+import com.ntropy.account.event.AccountTransactionClassificationEventPublisher;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
 import com.ntropy.account.mapper.AccountMapper;
@@ -20,7 +21,6 @@ import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.client.FinancialAccountCommandClient;
-import com.ntropy.common.client.TransactionClassificationCommandClient;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
 import com.ntropy.common.dto.account.AccountRegistrationSummary;
 import com.ntropy.common.dto.account.BankSummary;
@@ -45,7 +45,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
     private final AccountLifecycleMapper accountLifecycleMapper;
     private final AccountMapper accountMapper;
     private final CodefConnectionMapper codefConnectionMapper;
-    private final TransactionClassificationCommandClient transactionClassificationCommandClient;
+    private final AccountTransactionClassificationEventPublisher classificationEventPublisher;
 
     @Override
     public List<BankSummary> findSupportedBanks() {
@@ -82,7 +82,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
 
         if ("VIRTUAL".equals(connectionType)) {
             GenerationSummary summary = virtualAccountRegenerationService.regenerateForUser(userId, bank);
-            classifyTransactionsSafely(userId);
+            requestTransactionClassificationSafely(userId);
             return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), summary.accounts());
         }
 
@@ -97,16 +97,18 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
         );
         ensureVirtualDatasetSafely(userId, bank);
         int accountCount = accountCollectionService.collect(userId, bank, birthDate, startDate, endDate).size();
-        classifyTransactionsSafely(userId);
+        requestTransactionClassificationSafely(userId);
         return new AccountRegistrationSummary(connectionType, bank.getOrganizationCode(), accountCount);
     }
 
-    private void classifyTransactionsSafely(Long userId) {
+    private void requestTransactionClassificationSafely(Long userId) {
         try {
-            int processed = transactionClassificationCommandClient.classifyUnanalyzedTransactions(userId);
-            log.info("계좌 연동 후 소비 분류 완료: userId={}, processed={}", userId, processed);
+            classificationEventPublisher.publishAfterCommit(userId);
         } catch (RuntimeException e) {
-            log.warn("계좌 연동 후 소비 분류 실패: userId={}", userId, e);
+            log.warn(
+                    "계좌 연동 후 소비 분류 작업 등록 실패: userId={}, errorKind={}",
+                    userId, e.getClass().getSimpleName()
+            );
         }
     }
 

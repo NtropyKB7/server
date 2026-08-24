@@ -10,12 +10,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.CodefConnection;
 import com.ntropy.account.exception.AccountErrorCode;
+import com.ntropy.account.event.AccountTransactionClassificationEventPublisher;
+import com.ntropy.account.event.AccountTransactionsCollectedEvent;
 import com.ntropy.account.mapper.AccountLifecycleMapper;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
@@ -25,7 +28,6 @@ import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.common.dto.account.AccountRegistrationCommand;
-import com.ntropy.common.client.TransactionClassificationCommandClient;
 import com.ntropy.common.exception.ServiceException;
 
 class LocalFinancialAccountCommandClientTest {
@@ -137,33 +139,36 @@ class LocalFinancialAccountCommandClientTest {
     }
 
     @Test
-    void classifiesUsersTransactionsAfterCodefCollectionCompletes() {
-        StubTransactionClassificationCommandClient classificationClient =
-                new StubTransactionClassificationCommandClient();
+    void requestsUsersTransactionClassificationAfterCodefCollectionCompletes() {
+        StubApplicationEventPublisher eventPublisher = new StubApplicationEventPublisher();
         LocalFinancialAccountCommandClient client = newClient(
                 new StubPersonalBankAccountService(), new StubAccountCollectionService(),
                 new StubVirtualAccountRegenerationService(), new StubVirtualFinancialDataService(),
                 new StubAccountLifecycleMapper(1, 1), new StubAccountMapper(false),
-                new StubCodefConnectionMapper(), classificationClient
+                new StubCodefConnectionMapper(),
+                new AccountTransactionClassificationEventPublisher(eventPublisher)
         );
 
         client.registerAccount(
                 42L, new AccountRegistrationCommand("CODEF", "0088", "bank-id", "bank-password", null)
         );
 
-        assertEquals(List.of(42L), classificationClient.userIds);
+        assertEquals(
+                List.of(new AccountTransactionsCollectedEvent(42L)),
+                eventPublisher.events
+        );
     }
 
     @Test
-    void keepsAccountRegistrationSuccessfulWhenClassificationFails() {
-        StubTransactionClassificationCommandClient classificationClient =
-                new StubTransactionClassificationCommandClient();
-        classificationClient.failure = new IllegalStateException("분류 실패");
+    void keepsAccountRegistrationSuccessfulWhenClassificationRequestFails() {
+        StubApplicationEventPublisher eventPublisher = new StubApplicationEventPublisher();
+        eventPublisher.failure = new IllegalStateException("작업 등록 실패");
         LocalFinancialAccountCommandClient client = newClient(
                 new StubPersonalBankAccountService(), new StubAccountCollectionService(),
                 new StubVirtualAccountRegenerationService(), new StubVirtualFinancialDataService(),
                 new StubAccountLifecycleMapper(1, 1), new StubAccountMapper(false),
-                new StubCodefConnectionMapper(), classificationClient
+                new StubCodefConnectionMapper(),
+                new AccountTransactionClassificationEventPublisher(eventPublisher)
         );
 
         var result = client.registerAccount(
@@ -171,7 +176,6 @@ class LocalFinancialAccountCommandClientTest {
         );
 
         assertEquals("VIRTUAL", result.connectionType());
-        assertEquals(List.of(42L), classificationClient.userIds);
     }
 
     @Test
@@ -461,7 +465,9 @@ class LocalFinancialAccountCommandClientTest {
         return newClient(
                 personalBankAccountService, collectionService, regenerationService,
                 virtualFinancialDataService, lifecycleMapper, accountMapper, connectionMapper,
-                new StubTransactionClassificationCommandClient()
+                new AccountTransactionClassificationEventPublisher(
+                        new StubApplicationEventPublisher()
+                )
         );
     }
 
@@ -473,26 +479,24 @@ class LocalFinancialAccountCommandClientTest {
             AccountLifecycleMapper lifecycleMapper,
             AccountMapper accountMapper,
             CodefConnectionMapper connectionMapper,
-            TransactionClassificationCommandClient classificationClient
+            AccountTransactionClassificationEventPublisher classificationEventPublisher
     ) {
         return new LocalFinancialAccountCommandClient(
                 personalBankAccountService, collectionService, regenerationService, virtualFinancialDataService,
-                lifecycleMapper, accountMapper, connectionMapper, classificationClient
+                lifecycleMapper, accountMapper, connectionMapper, classificationEventPublisher
         );
     }
 
-    private static class StubTransactionClassificationCommandClient
-            implements TransactionClassificationCommandClient {
-        private final List<Long> userIds = new ArrayList<>();
+    private static class StubApplicationEventPublisher implements ApplicationEventPublisher {
+        private final List<Object> events = new ArrayList<>();
         private RuntimeException failure;
 
         @Override
-        public int classifyUnanalyzedTransactions(Long userId) {
-            userIds.add(userId);
+        public void publishEvent(Object event) {
             if (failure != null) {
                 throw failure;
             }
-            return 0;
+            events.add(event);
         }
     }
 

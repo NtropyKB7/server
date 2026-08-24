@@ -1,0 +1,4 @@
+# 계좌 연동 응답과 분리해 실행하는 사용자 단위 소비 분류 작업 executor 설정
+account.classification.async.core-pool-size=1
+account.classification.async.max-pool-size=2
+account.classification.async.queue-capacity=100
