@@ -1,10 +1,10 @@
-package com.ntropy.common.client;
+package com.ntropy.payment.api.client;
 
 import com.ntropy.common.domain.Feature;
-import com.ntropy.common.dto.payment.PaymentSummary;
-import com.ntropy.common.dto.payment.PaymentConfigSummary;
-import com.ntropy.common.dto.payment.PlanSummary;
-import com.ntropy.common.dto.payment.SubscriptionSummary;
+import com.ntropy.payment.api.dto.PaymentSummary;
+import com.ntropy.payment.api.dto.PaymentConfigSummary;
+import com.ntropy.payment.api.dto.PlanSummary;
+import com.ntropy.payment.api.dto.SubscriptionSummary;
 
 import java.util.List;
 

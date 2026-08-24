@@ -3,8 +3,8 @@ package com.ntropy.ai.adapter.payment;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.ai.port.payment.SubscriptionPort;
-import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.domain.Feature;
+import com.ntropy.payment.api.client.SubscriptionQueryClient;
 
 import lombok.RequiredArgsConstructor;
 

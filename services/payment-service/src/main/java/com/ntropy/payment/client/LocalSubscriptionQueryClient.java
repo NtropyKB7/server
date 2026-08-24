@@ -1,12 +1,12 @@
 package com.ntropy.payment.client;
 
-import com.ntropy.common.client.SubscriptionCommandClient;
-import com.ntropy.common.client.SubscriptionQueryClient;
 import com.ntropy.common.domain.Feature;
-import com.ntropy.common.dto.payment.PaymentSummary;
-import com.ntropy.common.dto.payment.PaymentConfigSummary;
-import com.ntropy.common.dto.payment.PlanSummary;
-import com.ntropy.common.dto.payment.SubscriptionSummary;
+import com.ntropy.payment.api.client.SubscriptionCommandClient;
+import com.ntropy.payment.api.client.SubscriptionQueryClient;
+import com.ntropy.payment.api.dto.PaymentSummary;
+import com.ntropy.payment.api.dto.PaymentConfigSummary;
+import com.ntropy.payment.api.dto.PlanSummary;
+import com.ntropy.payment.api.dto.SubscriptionSummary;
 import com.ntropy.payment.domain.Payment;
 import com.ntropy.payment.domain.PlanCode;
 import com.ntropy.payment.domain.Subscription;

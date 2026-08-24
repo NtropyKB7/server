@@ -1,6 +1,6 @@
 package com.ntropy.payment.client;
 
-import com.ntropy.common.dto.payment.PaymentConfigSummary;
+import com.ntropy.payment.api.dto.PaymentConfigSummary;
 import com.ntropy.payment.config.PortOneProperties;
 import com.ntropy.payment.domain.PaymentMethod;
 import com.ntropy.payment.service.SubscriptionService;

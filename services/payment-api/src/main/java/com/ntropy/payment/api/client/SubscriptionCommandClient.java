@@ -1,6 +1,6 @@
-package com.ntropy.common.client;
+package com.ntropy.payment.api.client;
 
-import com.ntropy.common.dto.payment.SubscriptionSummary;
+import com.ntropy.payment.api.dto.SubscriptionSummary;
 
 public interface SubscriptionCommandClient {
 
