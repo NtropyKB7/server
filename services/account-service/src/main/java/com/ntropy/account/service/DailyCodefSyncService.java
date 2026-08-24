@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.ntropy.account.api.dto.DailyFinancialSyncResult;
+import com.ntropy.account.api.dto.DailyFinancialSyncResult.InstitutionSyncResult;
 import com.ntropy.account.config.IncrementalSyncPolicy;
 import com.ntropy.account.domain.AccountSyncStatus;
 import com.ntropy.account.domain.ConnectionProvider;
@@ -29,8 +31,6 @@ import com.ntropy.account.security.BirthDateCipher;
 import com.ntropy.account.service.AccountCollectionService.AccountCollectionOutcome;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult.InstitutionSyncResult;
 
 import lombok.RequiredArgsConstructor;
 

@@ -16,6 +16,7 @@ import java.util.function.BooleanSupplier;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.account.config.BirthDateEncryptionProperties;
 import com.ntropy.account.config.IncrementalSyncPolicy;
 import com.ntropy.account.domain.PersonalBank;
@@ -29,7 +30,6 @@ import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.security.BirthDateCipher;
 import com.ntropy.account.service.AccountCollectionService.AccountCollectionOutcome;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult;
 
 class DailyCodefSyncServiceTest {
 

@@ -8,11 +8,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.account.api.dto.FinancialPositionSummary;
 import com.ntropy.account.domain.AccountGroup;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialPositionMapper;
 import com.ntropy.account.mapper.projection.FinancialPositionAccountRow;
-import com.ntropy.common.dto.account.FinancialPositionSummary;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;

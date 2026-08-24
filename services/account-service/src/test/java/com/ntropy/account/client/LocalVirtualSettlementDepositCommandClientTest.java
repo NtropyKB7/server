@@ -11,13 +11,13 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.VirtualSettlementDepositCommand;
+import com.ntropy.account.api.dto.VirtualSettlementDepositResult;
 import com.ntropy.account.domain.AccountGroup;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.VirtualSettlementDepositMapper;
-import com.ntropy.common.dto.account.VirtualSettlementDepositCommand;
-import com.ntropy.common.dto.account.VirtualSettlementDepositResult;
 
 class LocalVirtualSettlementDepositCommandClientTest {
 

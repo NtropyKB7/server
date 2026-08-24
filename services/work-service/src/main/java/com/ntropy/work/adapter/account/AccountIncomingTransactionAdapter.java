@@ -5,8 +5,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.IncomingTransactionQueryClient;
-import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
+import com.ntropy.account.api.client.IncomingTransactionQueryClient;
+import com.ntropy.account.api.dto.internal.NormalizedIncomingTransaction;
 import com.ntropy.work.port.account.IncomingTransaction;
 import com.ntropy.work.port.account.IncomingTransactionPort;
 

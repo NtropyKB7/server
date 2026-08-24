@@ -23,11 +23,11 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import com.ntropy.account.api.dto.CategoryExpenseAmount;
 import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.MonthlyExpenseMapper;
 import com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow;
 import com.ntropy.common.domain.LoanDisbursementKeywords;
-import com.ntropy.common.dto.account.CategoryExpenseAmount;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 

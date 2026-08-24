@@ -5,8 +5,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
+import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.api.client.DiagnosisAnalysisQueryClient;
 import com.ntropy.diagnosis.api.dto.CategoryExpenseSummary;

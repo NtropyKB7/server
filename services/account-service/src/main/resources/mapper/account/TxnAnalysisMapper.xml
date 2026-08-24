@@ -25,7 +25,7 @@
     </insert>
 
     <insert id="upsertAnalyses"
-            parameterType="com.ntropy.common.dto.account.TransactionAnalysisSaveRequest">
+            parameterType="com.ntropy.account.api.dto.TransactionAnalysisSaveRequest">
 
         INSERT INTO TXN_ANALYSIS (
         account_transaction_id,

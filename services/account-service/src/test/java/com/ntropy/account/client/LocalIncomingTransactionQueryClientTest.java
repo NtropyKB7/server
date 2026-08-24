@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.mapper.IncomingTransactionQueryMapper;
 import com.ntropy.account.mapper.projection.IncomingTransactionRow;
-import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
+import com.ntropy.account.api.dto.internal.NormalizedIncomingTransaction;
 
 class LocalIncomingTransactionQueryClientTest {
 

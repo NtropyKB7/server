@@ -11,6 +11,10 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.ClassificationTargetTransaction;
+import com.ntropy.account.api.dto.DailyClassificationTargetTransaction;
+import com.ntropy.account.api.dto.TransactionAnalysisSaveItem;
+import com.ntropy.account.api.dto.TransactionAnalysisSaveRequest;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.TxnAnalysis;
 import com.ntropy.account.exception.AccountErrorCode;
@@ -18,10 +22,6 @@ import com.ntropy.account.mapper.FinancialDataQueryMapper;
 import com.ntropy.account.mapper.TxnAnalysisMapper;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
 import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
-import com.ntropy.common.dto.account.ClassificationTargetTransaction;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
 import com.ntropy.common.exception.ServiceException;
 
 class TxnAnalysisServiceTest {

@@ -9,8 +9,8 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.ntropy.common.dto.account.ClassificationTargetTransaction;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
+import com.ntropy.account.api.dto.ClassificationTargetTransaction;
+import com.ntropy.account.api.dto.DailyClassificationTargetTransaction;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.account.domain.AccountGroup;
@@ -20,8 +20,8 @@ import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialDataQueryMapper;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
 import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
-import com.ntropy.common.dto.account.AccountSummary;
-import com.ntropy.common.dto.account.AccountTransactionSummary;
+import com.ntropy.account.api.dto.AccountSummary;
+import com.ntropy.account.api.dto.AccountTransactionSummary;
 import com.ntropy.common.dto.account.PageSummary;
 import com.ntropy.common.exception.ServiceException;
 

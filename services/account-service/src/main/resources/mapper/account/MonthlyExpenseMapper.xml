@@ -61,7 +61,7 @@
         동일합니다. 카테고리는 TXN_ANALYSIS.category를 그대로 사용합니다.
     -->
     <select id="findCategoryExpenses"
-            resultType="com.ntropy.common.dto.account.CategoryExpenseAmount">
+            resultType="com.ntropy.account.api.dto.CategoryExpenseAmount">
 
         SELECT
         analysis_row.category AS category,

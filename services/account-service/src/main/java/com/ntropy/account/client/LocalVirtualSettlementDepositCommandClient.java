@@ -7,6 +7,9 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.account.api.client.VirtualSettlementDepositCommandClient;
+import com.ntropy.account.api.dto.VirtualSettlementDepositCommand;
+import com.ntropy.account.api.dto.VirtualSettlementDepositResult;
 import com.ntropy.account.domain.AccountGroup;
 import com.ntropy.account.domain.AccountTransactionCategory;
 import com.ntropy.account.domain.ConnectionProvider;
@@ -15,9 +18,6 @@ import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.entity.AccountTransaction;
 import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.VirtualSettlementDepositMapper;
-import com.ntropy.common.client.VirtualSettlementDepositCommandClient;
-import com.ntropy.common.dto.account.VirtualSettlementDepositCommand;
-import com.ntropy.common.dto.account.VirtualSettlementDepositResult;
 
 import lombok.RequiredArgsConstructor;
 

@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.ntropy.common.dto.account.CategoryExpenseAmount;
+import com.ntropy.account.api.dto.CategoryExpenseAmount;
 
 /**
  * 월별 소비 집계를 담당하는 MyBatis Mapper입니다.

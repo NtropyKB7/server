@@ -5,9 +5,9 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import com.ntropy.account.api.dto.TransactionAnalysisSaveItem;
+import com.ntropy.account.api.dto.TransactionAnalysisSaveRequest;
 import com.ntropy.account.domain.entity.TxnAnalysis;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
 
 @Mapper
 public interface TxnAnalysisMapper {

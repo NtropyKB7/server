@@ -6,6 +6,11 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.FinancialAccountCommandClient;
+import com.ntropy.account.api.dto.AccountRegistrationCommand;
+import com.ntropy.account.api.dto.AccountRegistrationSummary;
+import com.ntropy.account.api.dto.BankSummary;
+import com.ntropy.account.api.dto.MyDataConnectionSummary;
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.InstitutionKeys;
 import com.ntropy.account.domain.PersonalBank;
@@ -19,12 +24,7 @@ import com.ntropy.account.service.PersonalBankAccountService;
 import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
-import com.ntropy.common.client.FinancialAccountCommandClient;
 import com.ntropy.common.client.TransactionClassificationCommandClient;
-import com.ntropy.common.dto.account.AccountRegistrationCommand;
-import com.ntropy.common.dto.account.AccountRegistrationSummary;
-import com.ntropy.common.dto.account.BankSummary;
-import com.ntropy.common.dto.account.MyDataConnectionSummary;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;

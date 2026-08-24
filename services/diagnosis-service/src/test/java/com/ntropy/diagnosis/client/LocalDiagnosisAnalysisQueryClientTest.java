@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
+import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.api.dto.CategoryExpenseSummary;
 import com.ntropy.diagnosis.api.dto.DiagnosisAnalysisSummary;

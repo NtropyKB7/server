@@ -3,7 +3,7 @@
 <mapper namespace="com.ntropy.account.mapper.FinancialDataQueryMapper">
 
     <select id="findUnanalyzedTransactions"
-            resultType="com.ntropy.common.dto.account.DailyClassificationTargetTransaction">
+            resultType="com.ntropy.account.api.dto.DailyClassificationTargetTransaction">
         SELECT
             transaction_row.account_transaction_id AS transactionId,
             account_row.user_id AS userId,
@@ -44,7 +44,7 @@
     </select>
 
     <select id="findUnanalyzedTransactionsByUserId"
-            resultType="com.ntropy.common.dto.account.DailyClassificationTargetTransaction">
+            resultType="com.ntropy.account.api.dto.DailyClassificationTargetTransaction">
         SELECT
             transaction_row.account_transaction_id AS transactionId,
             account_row.user_id AS userId,
@@ -186,7 +186,7 @@
     </sql>
 
     <select id="findClassificationTargets"
-            resultType="com.ntropy.common.dto.account.ClassificationTargetTransaction">
+            resultType="com.ntropy.account.api.dto.ClassificationTargetTransaction">
 
         SELECT
             transaction_row.account_transaction_id AS transactionId,

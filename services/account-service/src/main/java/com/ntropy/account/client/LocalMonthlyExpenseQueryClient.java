@@ -2,9 +2,9 @@ package com.ntropy.account.client;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.account.service.MonthlyExpenseService;
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 
 import lombok.RequiredArgsConstructor;
 

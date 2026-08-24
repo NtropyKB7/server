@@ -10,9 +10,9 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.CategoryExpenseAmount;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.account.mapper.MonthlyExpenseMapper;
-import com.ntropy.common.dto.account.CategoryExpenseAmount;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 
 class MonthlyExpenseServiceTest {
 

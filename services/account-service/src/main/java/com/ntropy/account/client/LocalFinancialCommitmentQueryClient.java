@@ -5,9 +5,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.FinancialCommitmentQueryClient;
+import com.ntropy.account.api.dto.FinancialCommitmentSummary;
 import com.ntropy.account.service.FinancialCommitmentService;
-import com.ntropy.common.client.FinancialCommitmentQueryClient;
-import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 
 import lombok.RequiredArgsConstructor;
 

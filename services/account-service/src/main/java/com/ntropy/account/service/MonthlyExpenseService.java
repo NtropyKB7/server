@@ -9,9 +9,9 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ntropy.account.api.dto.CategoryExpenseAmount;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.account.mapper.MonthlyExpenseMapper;
-import com.ntropy.common.dto.account.CategoryExpenseAmount;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 
 import lombok.RequiredArgsConstructor;
 

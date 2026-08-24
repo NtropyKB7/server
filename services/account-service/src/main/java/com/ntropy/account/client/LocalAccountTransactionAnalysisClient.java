@@ -4,12 +4,12 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.AccountTransactionAnalysisClient;
+import com.ntropy.account.api.dto.ClassificationTargetTransaction;
+import com.ntropy.account.api.dto.DailyClassificationTargetTransaction;
+import com.ntropy.account.api.dto.TransactionAnalysisSaveItem;
+import com.ntropy.account.api.dto.TransactionAnalysisSaveRequest;
 import com.ntropy.account.service.TxnAnalysisService;
-import com.ntropy.common.client.AccountTransactionAnalysisClient;
-import com.ntropy.common.dto.account.ClassificationTargetTransaction;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveItem;
-import com.ntropy.common.dto.account.TransactionAnalysisSaveRequest;
 
 import lombok.RequiredArgsConstructor;
 

@@ -17,12 +17,12 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.FinancialCommitmentSummary;
 import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.projection.InsuranceOutflowRow;
 import com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow;
 import com.ntropy.account.mapper.projection.SavingCommitmentCandidateRow;
-import com.ntropy.common.dto.account.FinancialCommitmentSummary;
 import com.ntropy.common.exception.ServiceException;
 
 class FinancialCommitmentServiceTest {

@@ -15,11 +15,11 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
-import com.ntropy.common.client.FinancialPositionQueryClient;
+import com.ntropy.account.api.client.FinancialPositionQueryClient;
+import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
+import com.ntropy.account.api.dto.FinancialPositionSummary;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.common.client.IncomeAnalysisQueryClient;
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
-import com.ntropy.common.dto.account.FinancialPositionSummary;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.diagnosis.api.client.DiagnosisCommandClient;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;

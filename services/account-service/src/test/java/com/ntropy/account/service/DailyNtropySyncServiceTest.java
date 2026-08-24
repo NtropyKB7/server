@@ -14,6 +14,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.account.config.IncrementalSyncPolicy;
 import com.ntropy.account.domain.AccountGroup;
 import com.ntropy.account.domain.entity.Account;
@@ -25,7 +26,6 @@ import com.ntropy.account.mapper.AccountSyncStateMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult;
 
 class DailyNtropySyncServiceTest {
 

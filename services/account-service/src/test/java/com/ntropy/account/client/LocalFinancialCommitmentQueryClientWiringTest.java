@@ -15,12 +15,12 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
+import com.ntropy.account.api.client.FinancialCommitmentQueryClient;
 import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.projection.InsuranceOutflowRow;
 import com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow;
 import com.ntropy.account.mapper.projection.SavingCommitmentCandidateRow;
 import com.ntropy.account.service.FinancialCommitmentService;
-import com.ntropy.common.client.FinancialCommitmentQueryClient;
 
 /**
  * com.ntropy.account 패키지를 컴포넌트 스캔했을 때 FinancialCommitmentQueryClient가

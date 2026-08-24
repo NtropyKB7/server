@@ -2,9 +2,9 @@ package com.ntropy.work.adapter.account;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.VirtualSettlementDepositCommandClient;
-import com.ntropy.common.dto.account.VirtualSettlementDepositCommand;
-import com.ntropy.common.dto.account.VirtualSettlementDepositResult;
+import com.ntropy.account.api.client.VirtualSettlementDepositCommandClient;
+import com.ntropy.account.api.dto.VirtualSettlementDepositCommand;
+import com.ntropy.account.api.dto.VirtualSettlementDepositResult;
 import com.ntropy.work.port.account.SettlementDepositOutcome;
 import com.ntropy.work.port.account.SettlementDepositPort;
 import com.ntropy.work.port.account.SettlementDepositRequest;

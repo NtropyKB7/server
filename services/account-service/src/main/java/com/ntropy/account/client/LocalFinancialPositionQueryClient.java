@@ -4,9 +4,9 @@ import java.time.LocalDate;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.FinancialPositionQueryClient;
+import com.ntropy.account.api.dto.FinancialPositionSummary;
 import com.ntropy.account.service.FinancialPositionService;
-import com.ntropy.common.client.FinancialPositionQueryClient;
-import com.ntropy.common.dto.account.FinancialPositionSummary;
 
 import lombok.RequiredArgsConstructor;
 

@@ -8,11 +8,11 @@ import java.time.ZoneId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.FinancialPositionQueryClient;
+import com.ntropy.account.api.client.FinancialPositionQueryClient;
+import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
+import com.ntropy.account.api.dto.FinancialPositionSummary;
+import com.ntropy.account.api.dto.MonthlyExpenseSummary;
 import com.ntropy.common.client.IncomeAnalysisQueryClient;
-import com.ntropy.common.client.MonthlyExpenseQueryClient;
-import com.ntropy.common.dto.account.FinancialPositionSummary;
-import com.ntropy.common.dto.account.MonthlyExpenseSummary;
 import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.api.client.DiagnosisCommandClient;

@@ -3,8 +3,8 @@ package com.ntropy.account.mapper;
 import java.time.LocalDate;
 import java.util.List;
 
-import com.ntropy.common.dto.account.ClassificationTargetTransaction;
-import com.ntropy.common.dto.account.DailyClassificationTargetTransaction;
+import com.ntropy.account.api.dto.ClassificationTargetTransaction;
+import com.ntropy.account.api.dto.DailyClassificationTargetTransaction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

@@ -13,14 +13,14 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.dto.DailyFinancialSyncResult;
+import com.ntropy.account.api.dto.DailyFinancialSyncResult.InstitutionSyncResult;
 import com.ntropy.account.domain.BatchExecutionStatus;
 import com.ntropy.account.service.BatchExecutionLeaseService;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
 import com.ntropy.account.service.DailyCodefSyncService;
 import com.ntropy.account.service.DailyNtropySyncService;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult.InstitutionSyncResult;
 
 class LocalDailyFinancialSyncClientTest {
 

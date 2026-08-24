@@ -6,11 +6,11 @@ import java.util.Objects;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.IncomingTransactionQueryClient;
+import com.ntropy.account.api.dto.internal.NormalizedIncomingTransaction;
 import com.ntropy.account.domain.IncomingCounterpartyNameExtractor;
 import com.ntropy.account.mapper.IncomingTransactionQueryMapper;
 import com.ntropy.account.mapper.projection.IncomingTransactionRow;
-import com.ntropy.common.client.IncomingTransactionQueryClient;
-import com.ntropy.common.dto.account.internal.NormalizedIncomingTransaction;
 
 import lombok.RequiredArgsConstructor;
 

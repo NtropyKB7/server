@@ -5,6 +5,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.ntropy.account.api.client.AccountQueryClient;
+import com.ntropy.account.api.dto.AccountSummary;
+import com.ntropy.account.api.dto.AccountTransactionSummary;
 import com.ntropy.account.domain.entity.Account;
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
@@ -12,9 +15,6 @@ import com.ntropy.account.exception.AccountErrorCode;
 import com.ntropy.account.mapper.FinancialDataQueryMapper;
 import com.ntropy.account.mapper.projection.OwnedAccountTransactionRow;
 import com.ntropy.account.mapper.projection.OwnedTransactionCountRow;
-import com.ntropy.common.client.AccountQueryClient;
-import com.ntropy.common.dto.account.AccountSummary;
-import com.ntropy.common.dto.account.AccountTransactionSummary;
 import com.ntropy.common.dto.account.PageSummary;
 import com.ntropy.common.exception.ServiceException;
 

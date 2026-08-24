@@ -8,6 +8,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ntropy.account.api.client.DailyFinancialSyncClient;
+import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.account.domain.BatchExecutionStatus;
 import com.ntropy.account.domain.InstanceOwnerId;
 import com.ntropy.account.exception.LeaseLostException;
@@ -15,9 +17,7 @@ import com.ntropy.account.service.BatchExecutionLeaseService;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
 import com.ntropy.account.service.DailyCodefSyncService;
 import com.ntropy.account.service.DailyNtropySyncService;
-import com.ntropy.common.client.DailyFinancialSyncClient;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult;
 
 import lombok.RequiredArgsConstructor;
 

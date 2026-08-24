@@ -17,13 +17,13 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
+import com.ntropy.account.api.client.DailyFinancialSyncClient;
+import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.account.config.FinancialSyncBatchUserScopeProperties;
 import com.ntropy.account.port.user.SeededVirtualUserBatch;
 import com.ntropy.account.port.user.UserPort;
-import com.ntropy.common.client.DailyFinancialSyncClient;
 import com.ntropy.common.domain.DailyFinancialSyncProvider;
 import com.ntropy.common.domain.UserScope;
-import com.ntropy.common.dto.account.DailyFinancialSyncResult;
 
 class DailyFinancialSyncOrchestrationServiceTest {
 
