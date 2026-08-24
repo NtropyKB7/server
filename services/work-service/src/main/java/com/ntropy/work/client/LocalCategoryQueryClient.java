@@ -5,8 +5,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.CategoryQueryClient;
-import com.ntropy.common.dto.work.summary.CategorySummary;
+import com.ntropy.work.api.client.CategoryQueryClient;
+import com.ntropy.work.api.dto.summary.CategorySummary;
 import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.service.CategoryService;
 

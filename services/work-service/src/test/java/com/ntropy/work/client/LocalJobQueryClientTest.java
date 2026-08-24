@@ -10,9 +10,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.work.summary.JobScheduleSummary;
-import com.ntropy.common.dto.work.summary.JobSummary;
-import com.ntropy.common.dto.work.summary.PlatformBrief;
+import com.ntropy.work.api.dto.summary.JobScheduleSummary;
+import com.ntropy.work.api.dto.summary.JobSummary;
+import com.ntropy.work.api.dto.summary.PlatformBrief;
 import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;

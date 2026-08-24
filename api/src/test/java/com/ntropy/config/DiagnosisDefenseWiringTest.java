@@ -19,7 +19,7 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
-import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
+import com.ntropy.defense.api.dto.command.DefenseModeEnterCommand;
 import com.ntropy.defense.adapter.diagnosis.DiagnosisSnapshotAdapter;
 import com.ntropy.defense.domain.DefenseCalculationStatus;
 import com.ntropy.defense.domain.DefenseMode;

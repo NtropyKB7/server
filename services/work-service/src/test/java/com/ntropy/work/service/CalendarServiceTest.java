@@ -12,12 +12,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.client.WeatherQueryClient;
-import com.ntropy.common.dto.work.summary.CalendarDailySummary;
-import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
-import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
-import com.ntropy.common.dto.work.summary.WeatherForecast;
-import com.ntropy.common.dto.work.summary.WeatherForecastList;
+import com.ntropy.work.api.client.WeatherQueryClient;
+import com.ntropy.work.api.dto.summary.CalendarDailySummary;
+import com.ntropy.work.api.dto.summary.CalendarFatigueGauge;
+import com.ntropy.work.api.dto.summary.CalendarMonthlySummary;
+import com.ntropy.work.api.dto.summary.WeatherForecast;
+import com.ntropy.work.api.dto.summary.WeatherForecastList;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.SavingGoal;
@@ -346,7 +346,7 @@ class CalendarServiceTest {
         assertNull(summary.getWeather());
     }
 
-    private com.ntropy.common.dto.work.summary.CalendarDaySummary findDay(CalendarMonthlySummary summary, LocalDate date) {
+    private com.ntropy.work.api.dto.summary.CalendarDaySummary findDay(CalendarMonthlySummary summary, LocalDate date) {
         return summary.getDays().stream()
                 .filter(day -> day.getDate().equals(date))
                 .findFirst()

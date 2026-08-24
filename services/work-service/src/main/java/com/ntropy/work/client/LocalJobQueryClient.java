@@ -5,10 +5,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.JobQueryClient;
-import com.ntropy.common.dto.work.summary.JobScheduleSummary;
-import com.ntropy.common.dto.work.summary.JobSummary;
-import com.ntropy.common.dto.work.summary.PlatformBrief;
+import com.ntropy.work.api.client.JobQueryClient;
+import com.ntropy.work.api.dto.summary.JobScheduleSummary;
+import com.ntropy.work.api.dto.summary.JobSummary;
+import com.ntropy.work.api.dto.summary.PlatformBrief;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobPlatformMapping;
 import com.ntropy.work.domain.entity.JobSchedule;

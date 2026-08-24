@@ -11,8 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.work.summary.WeatherForecast;
-import com.ntropy.common.dto.work.summary.WeatherForecastList;
+import com.ntropy.work.api.dto.summary.WeatherForecast;
+import com.ntropy.work.api.dto.summary.WeatherForecastList;
 import com.ntropy.work.client.kma.KmaForecastClient;
 import com.ntropy.work.client.kma.KmaForecastItem;
 import com.ntropy.work.config.WeatherProperties;

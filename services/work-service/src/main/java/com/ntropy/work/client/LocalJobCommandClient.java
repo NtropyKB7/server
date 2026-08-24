@@ -6,10 +6,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.JobCommandClient;
-import com.ntropy.common.dto.work.command.JobRegisterCommand;
-import com.ntropy.common.dto.work.command.JobScheduleCommand;
-import com.ntropy.common.dto.work.command.JobUpdateCommand;
+import com.ntropy.work.api.client.JobCommandClient;
+import com.ntropy.work.api.dto.command.JobRegisterCommand;
+import com.ntropy.work.api.dto.command.JobScheduleCommand;
+import com.ntropy.work.api.dto.command.JobUpdateCommand;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.JobSchedule;
 import com.ntropy.work.domain.enums.SettlementType;

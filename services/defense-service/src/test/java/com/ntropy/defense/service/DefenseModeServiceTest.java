@@ -1,10 +1,10 @@
 package com.ntropy.defense.service;
 
-import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
-import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
-import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
-import com.ntropy.common.dto.defense.summary.FixedExpenseMaintainStatus;
-import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
+import com.ntropy.defense.api.dto.command.DefenseModeEnterCommand;
+import com.ntropy.defense.api.dto.command.DefenseModeReleaseCommand;
+import com.ntropy.defense.api.dto.summary.FixedExpenseCheckSummary;
+import com.ntropy.defense.api.dto.summary.FixedExpenseMaintainStatus;
+import com.ntropy.defense.api.dto.summary.ExpectedIncomeLossSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseCalculationStatus;

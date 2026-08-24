@@ -33,7 +33,7 @@ import com.ntropy.account.mapper.AccountMapper;
 import com.ntropy.account.mapper.IncomingTransactionQueryMapper;
 import com.ntropy.account.mapper.VirtualSettlementDepositMapper;
 import com.ntropy.common.client.NotificationCommandClient;
-import com.ntropy.common.client.VirtualSettlementDepositBatchCommandClient.BatchResult;
+import com.ntropy.work.api.client.VirtualSettlementDepositBatchCommandClient.BatchResult;
 import com.ntropy.common.dto.notification.NotificationCreateCommand;
 import com.ntropy.common.dto.notification.NotificationSummary;
 import com.ntropy.user.api.client.ActiveUserQueryClient;

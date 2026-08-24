@@ -1,16 +1,16 @@
 package com.ntropy.defense.client;
 
-import com.ntropy.common.client.DefenseModeCommandClient;
-import com.ntropy.common.client.DefenseModeQueryClient;
-import com.ntropy.common.dto.defense.command.DefenseModeEnterCommand;
-import com.ntropy.common.dto.defense.command.DefenseModeReleaseCommand;
-import com.ntropy.common.dto.defense.summary.DefenseChecklistSummary;
-import com.ntropy.common.dto.defense.summary.DefenseCalendarPeriodSummary;
-import com.ntropy.common.dto.defense.summary.DefenseCauseSummary;
-import com.ntropy.common.dto.defense.summary.DefenseModeSummary;
-import com.ntropy.common.dto.defense.summary.FixedExpenseCheckSummary;
-import com.ntropy.common.dto.defense.summary.ExpectedIncomeLossSummary;
-import com.ntropy.common.dto.defense.summary.GrowthModeSummary;
+import com.ntropy.defense.api.client.DefenseModeCommandClient;
+import com.ntropy.defense.api.client.DefenseModeQueryClient;
+import com.ntropy.defense.api.dto.command.DefenseModeEnterCommand;
+import com.ntropy.defense.api.dto.command.DefenseModeReleaseCommand;
+import com.ntropy.defense.api.dto.summary.DefenseChecklistSummary;
+import com.ntropy.defense.api.dto.summary.DefenseCalendarPeriodSummary;
+import com.ntropy.defense.api.dto.summary.DefenseCauseSummary;
+import com.ntropy.defense.api.dto.summary.DefenseModeSummary;
+import com.ntropy.defense.api.dto.summary.FixedExpenseCheckSummary;
+import com.ntropy.defense.api.dto.summary.ExpectedIncomeLossSummary;
+import com.ntropy.defense.api.dto.summary.GrowthModeSummary;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseCause;
 import com.ntropy.defense.domain.DefenseModeStatus;

@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
+import com.ntropy.work.api.dto.summary.CalendarFatigueGauge;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.mapper.SavingGoalMapper;

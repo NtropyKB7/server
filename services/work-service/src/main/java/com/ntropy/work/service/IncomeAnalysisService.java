@@ -14,10 +14,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.dto.work.summary.EarnedDepositComparison;
-import com.ntropy.common.dto.work.summary.JobFatigueSummary;
-import com.ntropy.common.dto.work.summary.JobIncomeSummary;
-import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
+import com.ntropy.work.api.dto.summary.EarnedDepositComparison;
+import com.ntropy.work.api.dto.summary.JobFatigueSummary;
+import com.ntropy.work.api.dto.summary.JobIncomeSummary;
+import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.entity.WorkLog;

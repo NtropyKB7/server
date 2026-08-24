@@ -9,9 +9,9 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.ntropy.common.dto.work.summary.JobSummary;
-import com.ntropy.common.dto.work.summary.RecommendedJobHoursSummary;
-import com.ntropy.common.dto.work.summary.RecommendedWorkHoursSummary;
+import com.ntropy.work.api.dto.summary.JobSummary;
+import com.ntropy.work.api.dto.summary.RecommendedJobHoursSummary;
+import com.ntropy.work.api.dto.summary.RecommendedWorkHoursSummary;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.SavingGoal;

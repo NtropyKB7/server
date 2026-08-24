@@ -11,10 +11,10 @@ import com.ntropy.ai.port.work.IncomeAnalysisPort;
 import com.ntropy.ai.port.work.JobFatigue;
 import com.ntropy.ai.port.work.JobIncome;
 import com.ntropy.ai.port.work.MonthlyIncomeAnalysis;
-import com.ntropy.common.client.IncomeAnalysisQueryClient;
-import com.ntropy.common.dto.work.summary.JobFatigueSummary;
-import com.ntropy.common.dto.work.summary.JobIncomeSummary;
-import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
+import com.ntropy.work.api.client.IncomeAnalysisQueryClient;
+import com.ntropy.work.api.dto.summary.JobFatigueSummary;
+import com.ntropy.work.api.dto.summary.JobIncomeSummary;
+import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 
 import lombok.RequiredArgsConstructor;
 

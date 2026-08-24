@@ -13,16 +13,16 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.client.WeatherQueryClient;
-import com.ntropy.common.dto.work.summary.CalendarDailySummary;
-import com.ntropy.common.dto.work.summary.CalendarDaySummary;
-import com.ntropy.common.dto.work.summary.CalendarFatigueGauge;
-import com.ntropy.common.dto.work.summary.CalendarJobBrief;
-import com.ntropy.common.dto.work.summary.CalendarMonthlyHours;
-import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
-import com.ntropy.common.dto.work.summary.CalendarWorkBrief;
-import com.ntropy.common.dto.work.summary.WeatherForecast;
-import com.ntropy.common.dto.work.summary.WeatherForecastList;
+import com.ntropy.work.api.client.WeatherQueryClient;
+import com.ntropy.work.api.dto.summary.CalendarDailySummary;
+import com.ntropy.work.api.dto.summary.CalendarDaySummary;
+import com.ntropy.work.api.dto.summary.CalendarFatigueGauge;
+import com.ntropy.work.api.dto.summary.CalendarJobBrief;
+import com.ntropy.work.api.dto.summary.CalendarMonthlyHours;
+import com.ntropy.work.api.dto.summary.CalendarMonthlySummary;
+import com.ntropy.work.api.dto.summary.CalendarWorkBrief;
+import com.ntropy.work.api.dto.summary.WeatherForecast;
+import com.ntropy.work.api.dto.summary.WeatherForecastList;
 import com.ntropy.work.domain.WorkLogStatus;
 import com.ntropy.work.domain.entity.AllocationGoal;
 import com.ntropy.work.domain.entity.Job;

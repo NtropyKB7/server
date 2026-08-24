@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.SettlementBatchCommandClient;
+import com.ntropy.work.api.client.SettlementBatchCommandClient;
 import com.ntropy.work.service.SettlementService;
 
 import lombok.RequiredArgsConstructor;

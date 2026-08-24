@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.VirtualSettlementDepositBatchCommandClient;
+import com.ntropy.work.api.client.VirtualSettlementDepositBatchCommandClient;
 import com.ntropy.work.domain.VirtualSettlementDepositBatchResult;
 import com.ntropy.work.service.SettlementService;
 import com.ntropy.work.service.VirtualSettlementDepositService;

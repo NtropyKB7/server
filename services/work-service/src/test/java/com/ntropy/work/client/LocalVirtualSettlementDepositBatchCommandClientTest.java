@@ -9,7 +9,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.client.VirtualSettlementDepositBatchCommandClient.BatchResult;
+import com.ntropy.work.api.client.VirtualSettlementDepositBatchCommandClient.BatchResult;
 import com.ntropy.work.domain.VirtualSettlementDepositBatchResult;
 import com.ntropy.work.domain.VirtualSettlementDepositBatchResult.MatchTarget;
 import com.ntropy.work.service.SettlementService;

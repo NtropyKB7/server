@@ -5,9 +5,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.JobCandidateQueryClient;
-import com.ntropy.common.dto.work.summary.JobCandidateSummary;
-import com.ntropy.common.dto.work.summary.PlatformMatchSummary;
+import com.ntropy.work.api.client.JobCandidateQueryClient;
+import com.ntropy.work.api.dto.summary.JobCandidateSummary;
+import com.ntropy.work.api.dto.summary.PlatformMatchSummary;
 import com.ntropy.work.domain.JobCandidate;
 import com.ntropy.work.domain.PlatformMatch;
 import com.ntropy.work.service.OnboardingJobCandidateService;

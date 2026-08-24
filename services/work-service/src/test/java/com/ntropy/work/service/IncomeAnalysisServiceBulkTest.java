@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
+import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.entity.WorkLog;

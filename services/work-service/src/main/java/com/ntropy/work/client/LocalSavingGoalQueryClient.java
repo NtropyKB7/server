@@ -2,8 +2,8 @@ package com.ntropy.work.client;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.SavingGoalQueryClient;
-import com.ntropy.common.dto.work.summary.SavingGoalSummary;
+import com.ntropy.work.api.client.SavingGoalQueryClient;
+import com.ntropy.work.api.dto.summary.SavingGoalSummary;
 import com.ntropy.work.domain.entity.SavingGoal;
 import com.ntropy.work.service.SavingGoalService;
 

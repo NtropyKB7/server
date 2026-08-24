@@ -16,7 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
+import com.ntropy.work.api.dto.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.work.domain.entity.Category;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.enums.SettlementType;

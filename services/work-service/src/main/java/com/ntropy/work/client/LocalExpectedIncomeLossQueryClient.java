@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.ExpectedIncomeLossQueryClient;
-import com.ntropy.common.dto.work.summary.JobExpectedIncomeLossSummary;
+import com.ntropy.work.api.client.ExpectedIncomeLossQueryClient;
+import com.ntropy.work.api.dto.summary.JobExpectedIncomeLossSummary;
 import com.ntropy.work.domain.entity.Job;
 import com.ntropy.work.domain.entity.Settlement;
 import com.ntropy.work.domain.enums.SettlementMatchStatus;

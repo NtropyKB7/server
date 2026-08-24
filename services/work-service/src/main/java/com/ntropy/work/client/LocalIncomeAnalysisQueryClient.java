@@ -6,8 +6,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.IncomeAnalysisQueryClient;
-import com.ntropy.common.dto.work.summary.MonthlyIncomeAnalysisSummary;
+import com.ntropy.work.api.client.IncomeAnalysisQueryClient;
+import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.work.service.IncomeAnalysisService;
 
 import lombok.RequiredArgsConstructor;

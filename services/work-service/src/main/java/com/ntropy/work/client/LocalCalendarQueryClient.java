@@ -4,9 +4,9 @@ import java.time.LocalDate;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.CalendarQueryClient;
-import com.ntropy.common.dto.work.summary.CalendarDailySummary;
-import com.ntropy.common.dto.work.summary.CalendarMonthlySummary;
+import com.ntropy.work.api.client.CalendarQueryClient;
+import com.ntropy.work.api.dto.summary.CalendarDailySummary;
+import com.ntropy.work.api.dto.summary.CalendarMonthlySummary;
 import com.ntropy.work.service.CalendarService;
 
 import lombok.RequiredArgsConstructor;

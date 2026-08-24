@@ -2,9 +2,9 @@ package com.ntropy.work.client;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.WorkLogCommandClient;
-import com.ntropy.common.dto.work.command.WorkLogPatchCommand;
-import com.ntropy.common.dto.work.command.WorkLogRegisterCommand;
+import com.ntropy.work.api.client.WorkLogCommandClient;
+import com.ntropy.work.api.dto.command.WorkLogPatchCommand;
+import com.ntropy.work.api.dto.command.WorkLogRegisterCommand;
 import com.ntropy.work.domain.entity.WorkLog;
 import com.ntropy.work.service.WorkLogService;
 

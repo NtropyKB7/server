@@ -11,8 +11,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.dto.work.summary.WeatherForecast;
-import com.ntropy.common.dto.work.summary.WeatherForecastList;
+import com.ntropy.work.api.dto.summary.WeatherForecast;
+import com.ntropy.work.api.dto.summary.WeatherForecastList;
 import com.ntropy.work.client.kma.KmaForecastClient;
 import com.ntropy.work.client.kma.KmaForecastItem;
 import com.ntropy.work.config.WeatherProperties;
