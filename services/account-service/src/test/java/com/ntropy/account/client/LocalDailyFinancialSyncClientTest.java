@@ -20,7 +20,7 @@ import com.ntropy.account.service.BatchExecutionLeaseService;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
 import com.ntropy.account.service.DailyCodefSyncService;
 import com.ntropy.account.service.DailyNtropySyncService;
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 
 class LocalDailyFinancialSyncClientTest {
 

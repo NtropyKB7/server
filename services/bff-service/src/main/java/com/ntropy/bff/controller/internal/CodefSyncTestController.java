@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ntropy.account.api.client.DailyFinancialSyncClient;
 import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.bff.dto.common.ApiResponse;
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

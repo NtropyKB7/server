@@ -1,4 +1,4 @@
-package com.ntropy.common.domain;
+package com.ntropy.account.api.domain;
 
 import java.util.List;
 import java.util.Locale;

@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.ntropy.account.api.dto.DailyFinancialSyncResult;
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 
 /**
  * provider별 일일 금융거래 증분 동기화 명령 계약 (이슈 #158).

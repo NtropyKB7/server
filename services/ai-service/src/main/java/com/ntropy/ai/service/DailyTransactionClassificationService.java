@@ -18,7 +18,7 @@ import com.ntropy.ai.dto.fastapi.TransactionForClassification;
 import com.ntropy.ai.port.account.ClassificationTargetTransaction;
 import com.ntropy.ai.port.account.TransactionAnalysisPort;
 import com.ntropy.ai.port.account.TransactionAnalysisResult;
-import com.ntropy.common.client.TransactionClassificationCommandClient;
+import com.ntropy.ai.api.client.TransactionClassificationCommandClient;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

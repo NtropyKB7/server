@@ -22,7 +22,7 @@ import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.account.config.FinancialSyncBatchUserScopeProperties;
 import com.ntropy.account.port.user.SeededVirtualUserBatch;
 import com.ntropy.account.port.user.UserPort;
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 import com.ntropy.common.domain.UserScope;
 
 class DailyFinancialSyncOrchestrationServiceTest {

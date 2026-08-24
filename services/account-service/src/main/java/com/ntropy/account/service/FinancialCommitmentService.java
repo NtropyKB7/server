@@ -21,7 +21,7 @@ import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.projection.InsuranceOutflowRow;
 import com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow;
 import com.ntropy.account.mapper.projection.SavingCommitmentCandidateRow;
-import com.ntropy.common.domain.LoanDisbursementKeywords;
+import com.ntropy.account.api.domain.LoanDisbursementKeywords;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;

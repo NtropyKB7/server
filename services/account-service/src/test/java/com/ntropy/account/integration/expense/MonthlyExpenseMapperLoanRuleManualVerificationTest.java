@@ -27,7 +27,7 @@ import com.ntropy.account.api.dto.CategoryExpenseAmount;
 import com.ntropy.account.mapper.FinancialCommitmentMapper;
 import com.ntropy.account.mapper.MonthlyExpenseMapper;
 import com.ntropy.account.mapper.projection.LoanCommitmentCandidateRow;
-import com.ntropy.common.domain.LoanDisbursementKeywords;
+import com.ntropy.account.api.domain.LoanDisbursementKeywords;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 

@@ -24,7 +24,7 @@ import com.ntropy.account.service.PersonalBankAccountService;
 import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
-import com.ntropy.common.client.TransactionClassificationCommandClient;
+import com.ntropy.ai.api.client.TransactionClassificationCommandClient;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;

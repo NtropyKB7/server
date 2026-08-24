@@ -5,7 +5,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 
 /**
  * 일일 금융거래 증분 동기화 한 번의 실행 결과 (이슈 #158). provider 단위로 반환되며,

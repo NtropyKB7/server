@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 
 import com.ntropy.ai.port.account.ClassificationTargetTransaction;
 import com.ntropy.ai.port.account.TransactionAnalysisResult;
-import com.ntropy.common.domain.LoanDisbursementKeywords;
+import com.ntropy.account.api.domain.LoanDisbursementKeywords;
 
 /**
  * FastAPI 호출 전에 거래 유형과 명확한 키워드를 이용해
@@ -80,7 +80,7 @@ public class TransactionPreClassificationService {
 
         /*
          * LOAN 신규·실행·증액은 대출금 지급 거래이므로 비소비입니다.
-         * 판정 키워드는 LoanDisbursementKeywords(common)를 MonthlyExpenseMapper·
+         * 판정 키워드는 LoanDisbursementKeywords(account-api)를 MonthlyExpenseMapper·
          * FinancialCommitmentMapper의 SQL 판정과 공유합니다.
          *
          * 그 외 LOAN 거래는 정상 상환으로 보고 FINANCE / FIXED 소비로 분류합니다.

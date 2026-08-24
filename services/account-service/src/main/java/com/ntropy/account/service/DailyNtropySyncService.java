@@ -30,7 +30,7 @@ import com.ntropy.account.mapper.AccountSyncStateMapper;
 import com.ntropy.account.mapper.AccountTransactionMapper;
 import com.ntropy.account.mapper.CodefConnectionMapper;
 import com.ntropy.account.service.BatchExecutionLeaseService.LeaseHandle;
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 
 import lombok.RequiredArgsConstructor;
 

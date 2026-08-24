@@ -12,7 +12,7 @@ import com.ntropy.account.api.client.DailyFinancialSyncClient;
 import com.ntropy.account.api.dto.DailyFinancialSyncResult;
 import com.ntropy.account.config.FinancialSyncBatchUserScopeProperties;
 import com.ntropy.account.port.user.UserPort;
-import com.ntropy.common.domain.DailyFinancialSyncProvider;
+import com.ntropy.account.api.domain.DailyFinancialSyncProvider;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
