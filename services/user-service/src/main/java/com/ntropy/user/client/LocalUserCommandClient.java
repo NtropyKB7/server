@@ -1,10 +1,10 @@
 package com.ntropy.user.client;
 
 import com.ntropy.user.dto.OAuthLoginResponse;
-import com.ntropy.common.client.UserCommandClient;
-import com.ntropy.common.dto.user.OAuthLoginResult;
-import com.ntropy.common.dto.user.TokenPair;
-import com.ntropy.common.dto.user.command.UserUpdateCommand;
+import com.ntropy.user.api.client.UserCommandClient;
+import com.ntropy.user.api.dto.OAuthLoginResult;
+import com.ntropy.user.api.dto.TokenPair;
+import com.ntropy.user.api.dto.UserUpdateCommand;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.user.dto.TokenRefreshResponseDto;
 import com.ntropy.user.exception.UserErrorCode;

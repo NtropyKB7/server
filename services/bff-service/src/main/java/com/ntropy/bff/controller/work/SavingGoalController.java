@@ -18,7 +18,7 @@ import com.ntropy.bff.dto.work.response.SavingGoalResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
 import com.ntropy.work.api.client.SavingGoalCommandClient;
 import com.ntropy.work.api.client.SavingGoalQueryClient;
-import com.ntropy.common.client.UserCommandClient;
+import com.ntropy.user.api.client.UserCommandClient;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

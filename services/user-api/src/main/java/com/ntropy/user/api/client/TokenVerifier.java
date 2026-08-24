@@ -1,6 +1,6 @@
-package com.ntropy.common.client;
+package com.ntropy.user.api.client;
 
-import com.ntropy.common.dto.user.VerifiedToken;
+import com.ntropy.user.api.dto.VerifiedToken;
 
 /**
  * 회원 도메인이 제공할 액세스 토큰 검증 계약.

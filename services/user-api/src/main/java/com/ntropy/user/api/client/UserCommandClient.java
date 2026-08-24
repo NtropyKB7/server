@@ -1,8 +1,8 @@
-package com.ntropy.common.client;
+package com.ntropy.user.api.client;
 
-import com.ntropy.common.dto.user.OAuthLoginResult;
-import com.ntropy.common.dto.user.TokenPair;
-import com.ntropy.common.dto.user.command.UserUpdateCommand;
+import com.ntropy.user.api.dto.OAuthLoginResult;
+import com.ntropy.user.api.dto.TokenPair;
+import com.ntropy.user.api.dto.UserUpdateCommand;
 
 /** 회원 도메인이 제공할 인증·회원 명령 계약. */
 public interface UserCommandClient {

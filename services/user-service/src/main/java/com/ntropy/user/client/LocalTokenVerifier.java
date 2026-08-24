@@ -1,8 +1,8 @@
 package com.ntropy.user.client;
 
 import com.ntropy.user.security.JwtProvider;
-import com.ntropy.common.client.TokenVerifier;
-import com.ntropy.common.dto.user.VerifiedToken;
+import com.ntropy.user.api.client.TokenVerifier;
+import com.ntropy.user.api.dto.VerifiedToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

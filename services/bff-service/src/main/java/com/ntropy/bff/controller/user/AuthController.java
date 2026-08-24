@@ -17,7 +17,7 @@ import com.ntropy.bff.dto.user.response.OAuthLoginResponse;
 import com.ntropy.bff.dto.user.response.TokenRefreshResponse;
 import com.ntropy.bff.dto.user.response.UserResponse;
 import com.ntropy.bff.security.AuthenticatedUserIdResolver;
-import com.ntropy.common.client.UserCommandClient;
+import com.ntropy.user.api.client.UserCommandClient;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.user.api.client.UserQueryClient;
 import com.ntropy.user.api.dto.UserSummary;
