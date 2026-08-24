@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import com.ntropy.ai.dto.fastapi.TransactionClassificationRequest;
 import com.ntropy.ai.dto.fastapi.TransactionClassificationResponse;
@@ -20,17 +21,23 @@ import com.ntropy.ai.config.FastApiProperties;
 @Component
 public class FastApiTransactionClassificationClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     private final String fastApiBaseUrl;
 
     @Autowired
     public FastApiTransactionClassificationClient(FastApiProperties properties) {
         this.fastApiBaseUrl = properties.getBaseUrl();
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(properties.getConnectTimeoutMillis());
+        requestFactory.setReadTimeout(properties.getReadTimeoutMillis());
+        this.restTemplate = new RestTemplate(requestFactory);
     }
 
     protected FastApiTransactionClassificationClient() {
         this.fastApiBaseUrl = null;
+        this.restTemplate = new RestTemplate();
     }
 
     public TransactionClassificationResponse classifyTransactions(

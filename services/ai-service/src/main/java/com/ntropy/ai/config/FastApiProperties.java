@@ -11,6 +11,8 @@ import lombok.Getter;
 public class FastApiProperties {
 
     private final String baseUrl;
+    private final int connectTimeoutMillis;
+    private final int readTimeoutMillis;
 
     public FastApiProperties(Environment environment) {
         String configuredBaseUrl = environment.getProperty("fastapi.base-url");
@@ -24,9 +26,27 @@ public class FastApiProperties {
             );
         }
         this.baseUrl = configuredBaseUrl.trim();
+        this.connectTimeoutMillis = positiveInt(
+                environment.getProperty("fastapi.connect-timeout-ms"), 5_000
+        );
+        this.readTimeoutMillis = positiveInt(
+                environment.getProperty("fastapi.read-timeout-ms"), 120_000
+        );
     }
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private int positiveInt(String value, int defaultValue) {
+        if (isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return parsed > 0 ? parsed : defaultValue;
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
     }
 }

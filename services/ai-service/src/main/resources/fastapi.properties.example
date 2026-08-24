@@ -2,3 +2,6 @@
 # ${NTROPY_CONFIG_DIR}/fastapi.properties로 복사해 값을 변경하세요.
 # base URL에는 Swagger 경로인 /docs를 포함하지 않습니다.
 fastapi.base-url=https://your-fastapi-server.example.com
+fastapi.classification.parallelism=4
+fastapi.connect-timeout-ms=5000
+fastapi.read-timeout-ms=120000

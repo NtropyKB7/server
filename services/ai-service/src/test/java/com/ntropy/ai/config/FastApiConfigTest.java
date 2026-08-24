@@ -71,6 +71,37 @@ class FastApiConfigTest {
     }
 
     @Test
+    void loadsClassificationHttpTimeoutsWithSafeDefaults() {
+        StandardEnvironment defaultsEnvironment = new StandardEnvironment();
+        defaultsEnvironment.getPropertySources().addFirst(
+                new MapPropertySource(
+                        "fastApiDefaults",
+                        Map.of("fastapi.base-url", "https://fastapi.example.test")
+                )
+        );
+
+        FastApiProperties defaults = new FastApiProperties(defaultsEnvironment);
+        assertEquals(5_000, defaults.getConnectTimeoutMillis());
+        assertEquals(120_000, defaults.getReadTimeoutMillis());
+
+        StandardEnvironment configuredEnvironment = new StandardEnvironment();
+        configuredEnvironment.getPropertySources().addFirst(
+                new MapPropertySource(
+                        "fastApiTimeouts",
+                        Map.of(
+                                "fastapi.base-url", "https://fastapi.example.test",
+                                "fastapi.connect-timeout-ms", "3000",
+                                "fastapi.read-timeout-ms", "60000"
+                        )
+                )
+        );
+
+        FastApiProperties configured = new FastApiProperties(configuredEnvironment);
+        assertEquals(3_000, configured.getConnectTimeoutMillis());
+        assertEquals(60_000, configured.getReadTimeoutMillis());
+    }
+
+    @Test
     void missingPropertyAndEnvironmentVariableFailsClearly() {
         StandardEnvironment environment = new StandardEnvironment();
         environment.getPropertySources().remove(
