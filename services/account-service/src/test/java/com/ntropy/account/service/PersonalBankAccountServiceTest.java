@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -205,6 +207,14 @@ class PersonalBankAccountServiceTest {
         public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
             return connection != null && userId.equals(connection.getUserId())
                     && provider.equals(connection.getProvider()) ? connection : null;
+        }
+
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
         }
     }
 }

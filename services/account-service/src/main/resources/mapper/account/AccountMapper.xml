@@ -33,6 +33,39 @@
             deactivated_at = NULL
     </insert>
 
+    <!-- upsert의 다중 VALUES bulk 버전 (이슈 #233). ON DUPLICATE KEY UPDATE 갱신 규칙은 upsert와 동일하게 유지한다. -->
+    <insert id="upsertAll">
+        INSERT INTO ACCOUNT (
+            codef_connection_id, user_id, organization_code, account_group, deposit_type_code,
+            account_no_masked, account_no_hash, account_name, balance,
+            loan_contract_principal, interest_rate, currency_code,
+            account_start_date, maturity_date, last_tran_date, overdraft_yn, next_payment_date,
+            status, deactivated_at
+        ) VALUES
+        <foreach collection="list" item="account" separator=",">
+            (#{account.codefConnectionId}, #{account.userId}, #{account.organizationCode}, #{account.accountGroup}, #{account.depositTypeCode},
+             #{account.accountNoMasked}, #{account.accountNoHash}, #{account.accountName}, #{account.balance},
+             #{account.loanContractPrincipal}, #{account.interestRate}, #{account.currencyCode},
+             #{account.accountStartDate}, #{account.maturityDate}, #{account.lastTranDate}, #{account.overdraftYn}, #{account.nextPaymentDate},
+             COALESCE(#{account.status}, 'ACTIVE'), #{account.deactivatedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            account_no_masked = VALUES(account_no_masked),
+            account_name = VALUES(account_name),
+            balance = VALUES(balance),
+            loan_contract_principal = COALESCE(VALUES(loan_contract_principal), loan_contract_principal),
+            -- interest_rate는 고정금리 정책상 이미 값이 있으면 재동기화로 자동 덮어쓰지 않는다
+            interest_rate = COALESCE(interest_rate, VALUES(interest_rate)),
+            currency_code = VALUES(currency_code),
+            account_start_date = VALUES(account_start_date),
+            maturity_date = COALESCE(VALUES(maturity_date), maturity_date),
+            last_tran_date = VALUES(last_tran_date),
+            overdraft_yn = VALUES(overdraft_yn),
+            next_payment_date = VALUES(next_payment_date),
+            status = 'ACTIVE',
+            deactivated_at = NULL
+    </insert>
+
     <update id="updateAccountDetails" parameterType="com.ntropy.account.domain.entity.Account">
         UPDATE ACCOUNT
         SET account_start_date = COALESCE(#{accountStartDate}, account_start_date),
@@ -71,6 +104,37 @@
         FROM ACCOUNT
         WHERE codef_connection_id = #{codefConnectionId}
           AND account_no_hash = #{accountNoHash}
+    </select>
+
+    <select id="findByConnectionIdAndAccountNoHashes" resultType="com.ntropy.account.domain.entity.Account">
+        SELECT account_id          AS id,
+               codef_connection_id AS codefConnectionId,
+               user_id             AS userId,
+               organization_code   AS organizationCode,
+               account_group       AS accountGroup,
+               deposit_type_code   AS depositTypeCode,
+               account_no_masked   AS accountNoMasked,
+               account_no_hash     AS accountNoHash,
+               account_name        AS accountName,
+               balance,
+               loan_contract_principal AS loanContractPrincipal,
+               interest_rate       AS interestRate,
+               currency_code       AS currencyCode,
+               account_start_date  AS accountStartDate,
+               maturity_date       AS maturityDate,
+               last_tran_date      AS lastTranDate,
+               overdraft_yn        AS overdraftYn,
+               next_payment_date   AS nextPaymentDate,
+               status,
+               deactivated_at      AS deactivatedAt,
+               created_at          AS createdAt,
+               updated_at          AS updatedAt
+        FROM ACCOUNT
+        WHERE codef_connection_id = #{codefConnectionId}
+          AND account_no_hash IN
+        <foreach collection="accountNoHashes" item="hash" open="(" separator="," close=")">
+            #{hash}
+        </foreach>
     </select>
 
     <select id="findByIdAndUserIdAndProvider" resultType="com.ntropy.account.domain.entity.Account">

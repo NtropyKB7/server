@@ -197,6 +197,14 @@ class VirtualAccountRegenerationServiceTest {
             return store.get(userId + ":" + provider);
         }
 
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
+
         private static String key(CodefConnection connection) {
             return connection.getUserId() + ":" + connection.getProvider();
         }
@@ -225,12 +233,25 @@ class VirtualAccountRegenerationServiceTest {
         }
 
         @Override
+        public void upsertAll(List<Account> accounts) {
+            accounts.forEach(this::upsert);
+        }
+
+        @Override
         public void updateAccountDetails(Account account) {
         }
 
         @Override
         public Account findByConnectionIdAndAccountNoHash(Long codefConnectionId, String accountNoHash) {
             return store.get(key(codefConnectionId, accountNoHash));
+        }
+
+        @Override
+        public List<Account> findByConnectionIdAndAccountNoHashes(Long codefConnectionId, List<String> accountNoHashes) {
+            return accountNoHashes.stream()
+                    .map(hash -> findByConnectionIdAndAccountNoHash(codefConnectionId, hash))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
         }
 
         @Override

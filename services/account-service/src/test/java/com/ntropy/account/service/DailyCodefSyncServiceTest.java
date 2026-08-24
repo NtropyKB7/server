@@ -328,6 +328,15 @@ class DailyCodefSyncServiceTest {
             }
             return byKey.getOrDefault(key, List.of());
         }
+
+        @Override
+        public List<AccountCollectionOutcome> collectForDailySync(Long userId, PersonalBank bank,
+                                                                   CodefConnection connection, String birthDate,
+                                                                   LocalDate transactionStartDate,
+                                                                   LocalDate transactionEndDate,
+                                                                   BooleanSupplier heartbeat) {
+            return collectForDailySync(userId, bank, birthDate, transactionStartDate, transactionEndDate, heartbeat);
+        }
     }
 
     private static class FakeCodefConnectionMapper implements CodefConnectionMapper {
@@ -353,6 +362,14 @@ class DailyCodefSyncServiceTest {
         @Override
         public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
             return byUserId.get(userId);
+        }
+
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
         }
     }
 

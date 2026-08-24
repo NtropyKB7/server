@@ -301,6 +301,73 @@ class AccountCollectionServiceTest {
     }
 
     @Test
+    void savesAccountListWithOneBulkUpsertAndOneBulkLookup() throws Exception {
+        String twoOrdinaryAccounts = """
+                {
+                  "result": {"code": "CF-00000"},
+                  "data": {"resDepositTrust": [
+                    {"resAccount": "110111111111", "resAccountDeposit": "11",
+                     "resAccountBalance": "10000", "resAccountCurrency": "KRW"},
+                    {"resAccount": "110222222222", "resAccountDeposit": "11",
+                     "resAccountBalance": "20000", "resAccountCurrency": "KRW"}
+                  ]}
+                }
+                """;
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        AccountCollectionService service = new AccountCollectionService(
+                new StubPersonalBankAccountService(objectMapper.readTree(twoOrdinaryAccounts)),
+                new FakeCodefConnectionMapper(1L, "connected-id"),
+                new FakeCodefBankTransactionClient(objectMapper.readTree(
+                        "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")),
+                null, null, accountMapper, new FakeAccountTransactionMapper()
+        );
+
+        List<AccountCollectionService.AccountCollectionOutcome> outcomes = service.collectForDailySync(
+                1L, PersonalBank.SHINHAN_BANK, null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), () -> true
+        );
+
+        assertEquals(2, outcomes.size());
+        assertEquals(1, accountMapper.bulkUpsertCalls);
+        assertEquals(1, accountMapper.bulkFindCalls);
+    }
+
+    @Test
+    void failsFastWhenBulkLookupOmitsAnUpsertedAccount() throws Exception {
+        String twoOrdinaryAccounts = """
+                {
+                  "result": {"code": "CF-00000"},
+                  "data": {"resDepositTrust": [
+                    {"resAccount": "110111111111", "resAccountDeposit": "11",
+                     "resAccountBalance": "10000", "resAccountCurrency": "KRW"},
+                    {"resAccount": "110222222222", "resAccountDeposit": "11",
+                     "resAccountBalance": "20000", "resAccountCurrency": "KRW"}
+                  ]}
+                }
+                """;
+        FakeAccountMapper accountMapper = new FakeAccountMapper();
+        accountMapper.omitLastBulkResult = true;
+        AccountCollectionService service = new AccountCollectionService(
+                new StubPersonalBankAccountService(objectMapper.readTree(twoOrdinaryAccounts)),
+                new FakeCodefConnectionMapper(1L, "connected-id"),
+                new FakeCodefBankTransactionClient(objectMapper.readTree("{}")),
+                null, null, accountMapper, new FakeAccountTransactionMapper()
+        );
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.collectForDailySync(
+                        1L, PersonalBank.SHINHAN_BANK, null,
+                        LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), () -> true
+                )
+        );
+
+        assertTrue(exception.getMessage().contains("bulk upsert 결과가 누락"));
+        assertEquals(1, accountMapper.bulkUpsertCalls);
+        assertEquals(1, accountMapper.bulkFindCalls);
+    }
+
+    @Test
     void collectsInstallmentSavingsForDepositType12() throws Exception {
         FakeCodefConnectionMapper connectionMapper = new FakeCodefConnectionMapper(1L, "connected-id");
         FakeAccountMapper accountMapper = new FakeAccountMapper();
@@ -582,6 +649,14 @@ class AccountCollectionServiceTest {
             connection.setConnectedId(connectedId);
             return connection;
         }
+
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
     }
 
     private static class FakeAccountMapper implements AccountMapper {
@@ -589,6 +664,9 @@ class AccountCollectionServiceTest {
         private final Map<String, Account> store = new HashMap<>();
         private long nextId = 1;
         private int updatedAccountDetails;
+        private int bulkUpsertCalls;
+        private int bulkFindCalls;
+        private boolean omitLastBulkResult;
 
         @Override
         public void upsert(Account account) {
@@ -599,6 +677,12 @@ class AccountCollectionServiceTest {
                 account.setId(store.get(key).getId());
             }
             store.put(key, account);
+        }
+
+        @Override
+        public void upsertAll(List<Account> accounts) {
+            bulkUpsertCalls++;
+            accounts.forEach(this::upsert);
         }
 
         @Override
@@ -624,6 +708,19 @@ class AccountCollectionServiceTest {
         @Override
         public Account findByConnectionIdAndAccountNoHash(Long codefConnectionId, String accountNoHash) {
             return store.get(codefConnectionId + ":" + accountNoHash);
+        }
+
+        @Override
+        public List<Account> findByConnectionIdAndAccountNoHashes(Long codefConnectionId, List<String> accountNoHashes) {
+            bulkFindCalls++;
+            List<Account> results = accountNoHashes.stream()
+                    .map(hash -> findByConnectionIdAndAccountNoHash(codefConnectionId, hash))
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+            if (omitLastBulkResult && !results.isEmpty()) {
+                results.remove(results.size() - 1);
+            }
+            return results;
         }
 
         @Override

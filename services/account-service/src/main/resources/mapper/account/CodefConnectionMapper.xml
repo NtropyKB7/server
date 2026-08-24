@@ -49,4 +49,23 @@
           AND provider = #{provider}
     </select>
 
+    <select id="findByUserIdsAndProvider" resultType="com.ntropy.account.domain.entity.CodefConnection">
+        SELECT codef_connection_id         AS id,
+               user_id                     AS userId,
+               provider,
+               connected_id                AS connectedId,
+               registered_institution_keys AS registeredInstitutionKeys,
+               birth_date_ciphertext       AS birthDateCiphertext,
+               birth_date_iv               AS birthDateIv,
+               birth_date_key_version      AS birthDateKeyVersion,
+               created_at                  AS createdAt,
+               updated_at                  AS updatedAt
+        FROM CODEF_CONNECTION
+        WHERE provider = #{provider}
+          AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </select>
+
 </mapper>

@@ -156,6 +156,14 @@ class VirtualAccountServiceTest {
             return store.get(key(userId, provider));
         }
 
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
+
         private static String key(Long userId, String provider) {
             return userId + ":" + provider;
         }
@@ -183,6 +191,11 @@ class VirtualAccountServiceTest {
         }
 
         @Override
+        public void upsertAll(List<Account> accounts) {
+            accounts.forEach(this::upsert);
+        }
+
+        @Override
         public void updateAccountDetails(Account account) {
         }
 
@@ -192,6 +205,14 @@ class VirtualAccountServiceTest {
                     .filter(a -> codefConnectionId.equals(a.getCodefConnectionId())
                             && accountNoHash.equals(a.getAccountNoHash()))
                     .findFirst().orElse(null);
+        }
+
+        @Override
+        public List<Account> findByConnectionIdAndAccountNoHashes(Long codefConnectionId, List<String> accountNoHashes) {
+            return accountNoHashes.stream()
+                    .map(hash -> findByConnectionIdAndAccountNoHash(codefConnectionId, hash))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
         }
 
         @Override
