@@ -9,7 +9,7 @@ import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 
-import com.ntropy.common.dto.diagnosis.CategoryExpenseSummary;
+import com.ntropy.diagnosis.api.dto.CategoryExpenseSummary;
 
 /**
  * 소비 카테고리별 금액과 비율을 계산하는 Service입니다.

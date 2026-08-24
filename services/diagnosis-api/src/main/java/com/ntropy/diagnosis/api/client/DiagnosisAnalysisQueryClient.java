@@ -1,8 +1,8 @@
-package com.ntropy.common.client;
+package com.ntropy.diagnosis.api.client;
 
 import java.time.YearMonth;
 
-import com.ntropy.common.dto.diagnosis.DiagnosisAnalysisSummary;
+import com.ntropy.diagnosis.api.dto.DiagnosisAnalysisSummary;
 
 /**
  * AI-service가 diagnosis-service에 회원·연월 단위 재무진단 상세를 조회하는 계약.

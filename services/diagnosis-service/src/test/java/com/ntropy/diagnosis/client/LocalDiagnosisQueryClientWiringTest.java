@@ -13,7 +13,7 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
-import com.ntropy.common.client.DiagnosisQueryClient;
+import com.ntropy.diagnosis.api.client.DiagnosisQueryClient;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
 import com.ntropy.diagnosis.service.DiagnosisResultService;

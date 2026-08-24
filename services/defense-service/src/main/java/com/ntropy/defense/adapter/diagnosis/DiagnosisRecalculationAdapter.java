@@ -4,8 +4,8 @@ import java.time.YearMonth;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.DiagnosisCommandClient;
 import com.ntropy.defense.port.diagnosis.DiagnosisRecalculationPort;
+import com.ntropy.diagnosis.api.client.DiagnosisCommandClient;
 
 import lombok.RequiredArgsConstructor;
 

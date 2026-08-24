@@ -1,4 +1,4 @@
-package com.ntropy.common.client;
+package com.ntropy.diagnosis.api.client;
 
 import java.time.YearMonth;
 

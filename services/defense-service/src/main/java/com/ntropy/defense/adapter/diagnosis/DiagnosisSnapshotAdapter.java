@@ -2,10 +2,10 @@ package com.ntropy.defense.adapter.diagnosis;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.DiagnosisQueryClient;
-import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
 import com.ntropy.defense.port.diagnosis.DefenseDiagnosisSnapshot;
 import com.ntropy.defense.port.diagnosis.DiagnosisSnapshotPort;
+import com.ntropy.diagnosis.api.client.DiagnosisQueryClient;
+import com.ntropy.diagnosis.api.dto.DiagnosisDefenseSnapshot;
 
 import lombok.RequiredArgsConstructor;
 

@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.diagnosis;
+package com.ntropy.diagnosis.api.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

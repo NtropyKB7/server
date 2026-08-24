@@ -11,7 +11,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.diagnosis.CategoryExpenseSummary;
+import com.ntropy.diagnosis.api.dto.CategoryExpenseSummary;
 
 /**
  * 카테고리별 소비 금액·비율 계산을 검증하는 테스트입니다.

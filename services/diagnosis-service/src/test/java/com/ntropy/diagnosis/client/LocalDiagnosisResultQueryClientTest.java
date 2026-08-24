@@ -14,8 +14,8 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.diagnosis.DiagnosisResultSummary;
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.diagnosis.api.dto.DiagnosisResultSummary;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;

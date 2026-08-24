@@ -11,8 +11,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.DiagnosisQueryClient;
-import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
+import com.ntropy.diagnosis.api.client.DiagnosisQueryClient;
+import com.ntropy.diagnosis.api.dto.DiagnosisDefenseSnapshot;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.service.DiagnosisResultService;
 

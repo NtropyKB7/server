@@ -5,12 +5,12 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.DiagnosisAnalysisQueryClient;
 import com.ntropy.common.client.MonthlyExpenseQueryClient;
 import com.ntropy.common.dto.account.MonthlyExpenseSummary;
-import com.ntropy.common.dto.diagnosis.CategoryExpenseSummary;
-import com.ntropy.common.dto.diagnosis.DiagnosisAnalysisSummary;
 import com.ntropy.common.exception.ServiceException;
+import com.ntropy.diagnosis.api.client.DiagnosisAnalysisQueryClient;
+import com.ntropy.diagnosis.api.dto.CategoryExpenseSummary;
+import com.ntropy.diagnosis.api.dto.DiagnosisAnalysisSummary;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.service.CategoryExpenseCalculator;

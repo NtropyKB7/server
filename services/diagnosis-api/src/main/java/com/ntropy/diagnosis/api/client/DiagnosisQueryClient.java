@@ -1,6 +1,6 @@
-package com.ntropy.common.client;
+package com.ntropy.diagnosis.api.client;
 
-import com.ntropy.common.dto.diagnosis.DiagnosisDefenseSnapshot;
+import com.ntropy.diagnosis.api.dto.DiagnosisDefenseSnapshot;
 
 /**
  * diagnosis-service가 구현해야 하는 방어모드용 재무진단 조회 계약.

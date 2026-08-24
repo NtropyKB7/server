@@ -18,10 +18,10 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
-import com.ntropy.common.client.DiagnosisAnalysisQueryClient;
 import com.ntropy.common.client.MonthlyExpenseQueryClient;
 import com.ntropy.common.dto.account.MonthlyExpenseSummary;
-import com.ntropy.common.dto.diagnosis.DiagnosisAnalysisSummary;
+import com.ntropy.diagnosis.api.client.DiagnosisAnalysisQueryClient;
+import com.ntropy.diagnosis.api.dto.DiagnosisAnalysisSummary;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
 import com.ntropy.diagnosis.service.CategoryExpenseCalculator;

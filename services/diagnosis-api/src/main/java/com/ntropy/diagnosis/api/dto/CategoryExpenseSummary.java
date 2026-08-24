@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.diagnosis;
+package com.ntropy.diagnosis.api.dto;
 
 import java.math.BigDecimal;
 

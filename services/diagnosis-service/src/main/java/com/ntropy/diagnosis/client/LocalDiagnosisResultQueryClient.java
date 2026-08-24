@@ -2,8 +2,8 @@ package com.ntropy.diagnosis.client;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.DiagnosisResultQueryClient;
-import com.ntropy.common.dto.diagnosis.DiagnosisResultSummary;
+import com.ntropy.diagnosis.api.client.DiagnosisResultQueryClient;
+import com.ntropy.diagnosis.api.dto.DiagnosisResultSummary;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.service.DiagnosisResultService;
 
