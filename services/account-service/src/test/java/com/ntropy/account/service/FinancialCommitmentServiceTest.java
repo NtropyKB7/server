@@ -256,7 +256,7 @@ class FinancialCommitmentServiceTest {
         assertEquals(1, result.size());
         FinancialCommitmentSummary summary = result.get(0);
         assertEquals("INSURANCE_PREMIUM", summary.getExpenseType());
-        assertEquals("삼성생명", summary.getProductName());
+        assertEquals("삼성생명보험", summary.getProductName());
         assertEquals(50000L, summary.getExpectedAmount());
         assertEquals(LocalDate.of(2026, 8, 5), summary.getNextPaymentDate());
         assertNull(summary.getAccountId());
@@ -265,25 +265,25 @@ class FinancialCommitmentServiceTest {
     }
 
     @Test
-    void insuranceSumsMultipleContractsAndWithdrawalAccountsForSameInsurerInLatestMonth() {
+    void insuranceSeparatesProductsFromSameInsurerWithoutSummingThem() {
         InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
-        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 3), "50000.00", "삼성생명보험", null, null, null));
-        mapper.insurance.add(insuranceRow(31L, LocalDate.of(2026, 7, 20), "30000.00", "삼성생명", null, null, null));
+        mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 3), "62000.00", null, "보험료", "삼성생명 실손보험", null));
+        mapper.insurance.add(insuranceRow(31L, LocalDate.of(2026, 7, 20), "43000.00", null, "보험료", "삼성생명 운전자보험", null));
         FinancialCommitmentService service = new FinancialCommitmentService(mapper, FIXED_CLOCK);
 
         List<FinancialCommitmentSummary> result = service.findFinancialCommitments(
                 1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
 
-        assertEquals(1, result.size());
-        FinancialCommitmentSummary summary = result.get(0);
-        assertEquals("삼성생명", summary.getProductName());
-        assertEquals(80000L, summary.getExpectedAmount());
-        assertEquals(LocalDate.of(2026, 8, 20), summary.getNextPaymentDate());
-        assertNull(summary.getAccountId());
+        assertEquals(2, result.size());
+        assertEquals(Set.of("삼성생명 실손보험", "삼성생명 운전자보험"),
+                result.stream().map(FinancialCommitmentSummary::getProductName).collect(Collectors.toSet()));
+        assertEquals(Set.of(62000L, 43000L),
+                result.stream().map(FinancialCommitmentSummary::getExpectedAmount).collect(Collectors.toSet()));
+        assertTrue(result.stream().allMatch(summary -> summary.getAccountId() == null));
     }
 
     @Test
-    void insuranceOnlySumsSameCalendarMonthAsLatestOccurrence() {
+    void insuranceUsesLatestOccurrenceAmountForSameProductWithoutSumming() {
         InMemoryFinancialCommitmentMapper mapper = new InMemoryFinancialCommitmentMapper();
         mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 6, 5), "999999.00", "삼성생명", null, null, null));
         mapper.insurance.add(insuranceRow(30L, LocalDate.of(2026, 7, 20), "50000.00", "삼성생명", null, null, null));
@@ -309,9 +309,9 @@ class FinancialCommitmentServiceTest {
 
         assertEquals(2, result.size());
         FinancialCommitmentSummary samsung = result.stream()
-                .filter(s -> "삼성생명".equals(s.getProductName())).findFirst().orElseThrow();
+                .filter(s -> "삼성생명보험".equals(s.getProductName())).findFirst().orElseThrow();
         FinancialCommitmentSummary db = result.stream()
-                .filter(s -> "DB손보".equals(s.getProductName())).findFirst().orElseThrow();
+                .filter(s -> "DB손해보험㈜".equals(s.getProductName())).findFirst().orElseThrow();
         assertEquals(50000L, samsung.getExpectedAmount());
         assertEquals(40000L, db.getExpectedAmount());
     }
@@ -328,7 +328,7 @@ class FinancialCommitmentServiceTest {
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(s -> "INSURANCE_PREMIUM".equals(s.getExpenseType())));
-        assertEquals(Set.of("국민건강보험", "국민연금"),
+        assertEquals(Set.of("국민건강보험공단", "국민연금"),
                 result.stream().map(FinancialCommitmentSummary::getProductName).collect(Collectors.toSet()));
     }
 
@@ -421,7 +421,7 @@ class FinancialCommitmentServiceTest {
 
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(s -> s.getAccountId() == null));
-        assertEquals(List.of("DB손보", "삼성생명"),
+        assertEquals(List.of("DB손해보험", "삼성생명보험"),
                 result.stream().map(FinancialCommitmentSummary::getProductName).toList());
     }
 

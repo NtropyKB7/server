@@ -81,7 +81,7 @@
 
     <!--
         수시입출 계좌(deposit_type_code=11)의 관측 기간 내 일반 출금 거래를 반환한다.
-        반복 보험료 그룹핑·판정은 은행별 desc 필드 정규화가 필요해 Service에서 수행한다.
+        보험사 판정과 실제 상품명별 분리는 은행별 desc 필드 정규화가 필요해 Service에서 수행한다.
     -->
     <select id="findInsuranceOutflowCandidates"
             resultType="com.ntropy.account.mapper.projection.InsuranceOutflowRow">
