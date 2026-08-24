@@ -4,6 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +69,8 @@ class DailyTransactionClassificationServiceTest {
                 new DailyTransactionClassificationService(
                         accountClient,
                         fastApiClient,
-                        new TransactionPreClassificationService()
+                        new TransactionPreClassificationService(),
+                        Runnable::run
                 );
 
         assertEquals(
@@ -122,12 +129,14 @@ class DailyTransactionClassificationServiceTest {
 
         FakeFastApiClient fastApiClient =
                 new FakeFastApiClient();
+        CountingExecutor executor = new CountingExecutor();
 
         DailyTransactionClassificationService service =
                 new DailyTransactionClassificationService(
                         accountClient,
                         fastApiClient,
-                        new TransactionPreClassificationService()
+                        new TransactionPreClassificationService(),
+                        executor
                 );
 
         assertEquals(
@@ -139,11 +148,37 @@ class DailyTransactionClassificationServiceTest {
                 List.of(100, 1),
                 fastApiClient.requestSizes
         );
+        assertEquals(2, executor.executions);
 
         assertEquals(
                 101,
                 accountClient.saved.size()
         );
+    }
+
+    @Test
+    void runsFastApiBatchesConcurrentlyOnTheConfiguredExecutor() {
+        List<DailyClassificationTargetTransaction> targets = new ArrayList<>();
+        for (long id = 1; id <= 101; id++) {
+            targets.add(target(id, "ORDINARY", "알 수 없는 상점 " + id));
+        }
+
+        ConcurrentFastApiClient fastApiClient = new ConcurrentFastApiClient();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            DailyTransactionClassificationService service =
+                    new DailyTransactionClassificationService(
+                            new FakeAccountClient(targets),
+                            fastApiClient,
+                            new TransactionPreClassificationService(),
+                            executor
+                    );
+
+            assertEquals(101, service.run());
+            assertEquals(2, fastApiClient.maxConcurrentRequests.get());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -179,7 +214,8 @@ class DailyTransactionClassificationServiceTest {
                 new DailyTransactionClassificationService(
                         accountClient,
                         fastApiClient,
-                        new TransactionPreClassificationService()
+                        new TransactionPreClassificationService(),
+                        Runnable::run
                 );
 
         service.run();
@@ -219,7 +255,8 @@ class DailyTransactionClassificationServiceTest {
                 new DailyTransactionClassificationService(
                         accountClient,
                         new FakeFastApiClient(),
-                        new TransactionPreClassificationService()
+                        new TransactionPreClassificationService(),
+                        Runnable::run
                 );
 
         assertEquals(
@@ -247,7 +284,7 @@ class DailyTransactionClassificationServiceTest {
                 List.of(target(1L, "ORDINARY", "스타벅스"))
         );
         DailyTransactionClassificationService service = new DailyTransactionClassificationService(
-                accountClient, new FakeFastApiClient(), new TransactionPreClassificationService()
+                accountClient, new FakeFastApiClient(), new TransactionPreClassificationService(), Runnable::run
         );
 
         assertEquals(1, service.classifyUnanalyzedTransactions(42L));
@@ -335,6 +372,45 @@ class DailyTransactionClassificationServiceTest {
                     "ok",
                     new TransactionClassificationData(results)
             );
+        }
+    }
+
+    private static class CountingExecutor implements Executor {
+        private int executions;
+
+        @Override
+        public void execute(Runnable command) {
+            executions++;
+            command.run();
+        }
+    }
+
+    private static class ConcurrentFastApiClient
+            extends FastApiTransactionClassificationClient {
+        private final CountDownLatch bothRequestsStarted = new CountDownLatch(2);
+        private final AtomicInteger activeRequests = new AtomicInteger();
+        private final AtomicInteger maxConcurrentRequests = new AtomicInteger();
+
+        @Override
+        public TransactionClassificationResponse classifyTransactions(
+                List<TransactionForClassification> transactions
+        ) {
+            int active = activeRequests.incrementAndGet();
+            maxConcurrentRequests.accumulateAndGet(active, Math::max);
+            bothRequestsStarted.countDown();
+            try {
+                if (!bothRequestsStarted.await(2, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("두 FastAPI 배치가 동시에 시작되지 않았습니다.");
+                }
+                return new TransactionClassificationResponse(
+                        true, 200, "ok", new TransactionClassificationData(List.of())
+                );
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(exception);
+            } finally {
+                activeRequests.decrementAndGet();
+            }
         }
     }
 
