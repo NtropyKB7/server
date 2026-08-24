@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,14 @@ class VirtualConnectionServiceTest {
         @Override
         public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
             return store.get(key(userId, provider));
+        }
+
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
         }
 
         private static String key(Long userId, String provider) {

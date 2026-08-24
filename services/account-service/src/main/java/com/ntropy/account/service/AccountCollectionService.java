@@ -3,8 +3,10 @@ package com.ntropy.account.service;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 
@@ -22,6 +24,7 @@ import com.ntropy.account.client.codef.parser.InstallmentSavingsResponseParser.P
 import com.ntropy.account.client.codef.parser.LoanTransactionResponseParser;
 import com.ntropy.account.client.codef.parser.LoanTransactionResponseParser.ParsedLoan;
 import com.ntropy.account.domain.AccountGroup;
+import com.ntropy.account.domain.Batching;
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.PersonalBank;
 import com.ntropy.account.domain.entity.Account;
@@ -113,7 +116,22 @@ public class AccountCollectionService {
                                                                LocalDate transactionStartDate,
                                                                LocalDate transactionEndDate,
                                                                BooleanSupplier heartbeat) {
-        CodefConnection connection = requireCodefConnection(userId);
+        return collectForDailySync(
+                userId, bank, requireCodefConnection(userId), birthDate, transactionStartDate, transactionEndDate,
+                heartbeat
+        );
+    }
+
+    /**
+     * {@link #collectForDailySync(Long, PersonalBank, String, LocalDate, LocalDate, BooleanSupplier)}와 같지만,
+     * 호출자가 이미 조회한 {@link CodefConnection}을 그대로 받아 동일 사용자의 기관별 반복 조회에서
+     * {@link #requireCodefConnection}을 다시 호출하지 않는다 (이슈 #233).
+     */
+    public List<AccountCollectionOutcome> collectForDailySync(Long userId, PersonalBank bank,
+                                                               CodefConnection connection, String birthDate,
+                                                               LocalDate transactionStartDate,
+                                                               LocalDate transactionEndDate,
+                                                               BooleanSupplier heartbeat) {
         String normalizedBirthDate = bank.normalizeBirthDate(birthDate);
         List<SavedAccountContext> savedContexts = fetchAndSaveAccounts(userId, bank, connection, heartbeat);
 
@@ -155,6 +173,9 @@ public class AccountCollectionService {
         return connection;
     }
 
+    /** MySQL packet 크기·MyBatis 파라미터 수를 고려한 계좌 bulk upsert/조회 batch 크기 (이슈 #233). */
+    private static final int ACCOUNT_UPSERT_BATCH_SIZE = 200;
+
     /** 실행마다 보유계좌를 재조회해 원문 계좌번호를 이 요청 흐름 안에서만 확보한다(저장하지 않음). */
     private List<SavedAccountContext> fetchAndSaveAccounts(Long userId, PersonalBank bank, CodefConnection connection,
                                                            BooleanSupplier heartbeat) {
@@ -170,13 +191,36 @@ public class AccountCollectionService {
         List<ParsedAccount> parsedAccounts = AccountResponseParser.parse(
                 accountListResponse.path("data"), connection.getId(), userId, bank.getOrganizationCode()
         );
+        if (parsedAccounts.isEmpty()) {
+            requireLease(heartbeat);
+            return List.of();
+        }
+
+        Map<String, Account> savedByHash = new LinkedHashMap<>();
+        for (List<ParsedAccount> chunk : Batching.chunk(parsedAccounts, ACCOUNT_UPSERT_BATCH_SIZE)) {
+            requireLease(heartbeat);
+            List<Account> accountsToUpsert = chunk.stream().map(ParsedAccount::account).toList();
+            accountMapper.upsertAll(accountsToUpsert);
+            List<String> accountNoHashes = accountsToUpsert.stream().map(Account::getAccountNoHash).toList();
+            List<Account> savedAccounts =
+                    accountMapper.findByConnectionIdAndAccountNoHashes(connection.getId(), accountNoHashes);
+            Map<String, Account> savedChunkByHash = new LinkedHashMap<>();
+            for (Account saved : savedAccounts) {
+                savedChunkByHash.put(saved.getAccountNoHash(), saved);
+                savedByHash.put(saved.getAccountNoHash(), saved);
+            }
+            if (!savedChunkByHash.keySet().containsAll(accountNoHashes)) {
+                throw new IllegalStateException("CODEF 계좌 bulk upsert 결과가 누락되었습니다.");
+            }
+            requireLease(heartbeat);
+        }
 
         List<SavedAccountContext> savedContexts = new ArrayList<>();
         for (ParsedAccount parsed : parsedAccounts) {
-            accountMapper.upsert(parsed.account());
-            Account saved = accountMapper.findByConnectionIdAndAccountNoHash(
-                    connection.getId(), parsed.account().getAccountNoHash()
-            );
+            Account saved = savedByHash.get(parsed.account().getAccountNoHash());
+            if (saved == null) {
+                throw new IllegalStateException("CODEF 계좌 bulk upsert 결과를 매핑할 수 없습니다.");
+            }
             savedContexts.add(new SavedAccountContext(saved, parsed.rawAccountNo()));
         }
         requireLease(heartbeat);

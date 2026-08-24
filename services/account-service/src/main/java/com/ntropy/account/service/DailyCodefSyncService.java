@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import com.ntropy.account.config.IncrementalSyncPolicy;
 import com.ntropy.account.domain.AccountSyncStatus;
+import com.ntropy.account.domain.Batching;
 import com.ntropy.account.domain.ConnectionProvider;
 import com.ntropy.account.domain.IncrementalSyncRangeCalculator;
 import com.ntropy.account.domain.InstitutionKeys;
@@ -46,6 +47,9 @@ public class DailyCodefSyncService {
 
     public static final String JOB_NAME = "daily-sync-codef";
 
+    /** 사용자 ID IN 절이 과도하게 커지지 않도록 나누는 chunk 크기 (이슈 #233). */
+    private static final int USER_ID_CHUNK_SIZE = 500;
+
     private final CodefConnectionMapper codefConnectionMapper;
     private final AccountSyncStateMapper accountSyncStateMapper;
     private final AccountTransactionMapper accountTransactionMapper;
@@ -62,9 +66,11 @@ public class DailyCodefSyncService {
         long processedTransactionCount = 0;
         boolean leaseLost = false;
 
+        Map<Long, CodefConnection> connectionsByUserId = fetchConnectionsByUserId(activeUserIds);
+
         userLoop:
         for (Long userId : activeUserIds) {
-            CodefConnection connection = codefConnectionMapper.findByUserIdAndProvider(userId, ConnectionProvider.CODEF.name());
+            CodefConnection connection = connectionsByUserId.get(userId);
             if (connection == null || connection.getConnectedId() == null || connection.getConnectedId().isBlank()) {
                 continue; // 이 provider의 동기화 대상이 아닌 사용자
             }
@@ -157,6 +163,17 @@ public class DailyCodefSyncService {
         );
     }
 
+    /** 활성 사용자의 CODEF 연결을 chunk 단위로 일괄 조회한다 (이슈 #233). */
+    private Map<Long, CodefConnection> fetchConnectionsByUserId(List<Long> userIds) {
+        Map<Long, CodefConnection> connectionsByUserId = new LinkedHashMap<>();
+        for (List<Long> chunk : Batching.chunk(userIds, USER_ID_CHUNK_SIZE)) {
+            for (CodefConnection connection : codefConnectionMapper.findByUserIdsAndProvider(chunk, ConnectionProvider.CODEF.name())) {
+                connectionsByUserId.put(connection.getUserId(), connection);
+            }
+        }
+        return connectionsByUserId;
+    }
+
     private InstitutionSyncOutcome synchronizeInstitution(Long userId, PersonalBank bank, CodefConnection connection,
                                                            LocalDate businessDate, LeaseHandle lease) {
         String organizationCode = bank.getOrganizationCode();
@@ -185,7 +202,7 @@ public class DailyCodefSyncService {
         List<AccountCollectionOutcome> outcomes;
         try {
             outcomes = accountCollectionService.collectForDailySync(
-                    userId, bank, birthDate, startDate, businessDate, () -> leaseService.heartbeat(lease)
+                    userId, bank, connection, birthDate, startDate, businessDate, () -> leaseService.heartbeat(lease)
             );
         } catch (LeaseLostException leaseLostSignal) {
             throw leaseLostSignal; // 상위 루프에서 전체 중단 처리

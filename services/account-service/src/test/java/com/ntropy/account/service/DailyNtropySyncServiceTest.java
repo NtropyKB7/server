@@ -196,6 +196,14 @@ class DailyNtropySyncServiceTest {
         public CodefConnection findByUserIdAndProvider(Long userId, String provider) {
             return byUserId.get(userId);
         }
+
+        @Override
+        public List<CodefConnection> findByUserIdsAndProvider(List<Long> userIds, String provider) {
+            return userIds.stream()
+                    .map(userId -> findByUserIdAndProvider(userId, provider))
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
     }
 
     private static class FakeAccountMapper implements AccountMapper {
@@ -211,12 +219,21 @@ class DailyNtropySyncServiceTest {
         }
 
         @Override
+        public void upsertAll(List<Account> accounts) {
+        }
+
+        @Override
         public void updateAccountDetails(Account account) {
         }
 
         @Override
         public Account findByConnectionIdAndAccountNoHash(Long codefConnectionId, String accountNoHash) {
             return null;
+        }
+
+        @Override
+        public List<Account> findByConnectionIdAndAccountNoHashes(Long codefConnectionId, List<String> accountNoHashes) {
+            return List.of();
         }
 
         @Override

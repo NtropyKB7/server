@@ -134,8 +134,10 @@ class LocalVirtualSettlementDepositCommandClientTest {
         private final List<Account> accounts = new ArrayList<>();
 
         @Override public void upsert(Account account) { }
+        @Override public void upsertAll(List<Account> accountsToUpsert) { }
         @Override public void updateAccountDetails(Account account) { }
         @Override public Account findByConnectionIdAndAccountNoHash(Long connectionId, String hash) { return null; }
+        @Override public List<Account> findByConnectionIdAndAccountNoHashes(Long connectionId, List<String> hashes) { return List.of(); }
         @Override public Account findByIdAndUserIdAndProvider(Long id, Long userId, String provider) { return null; }
         @Override public List<Account> findByUserIdAndProvider(Long userId, String provider) { return accounts; }
         @Override public boolean existsAnyByUserIdAndProvider(Long userId, String provider) { return !accounts.isEmpty(); }
