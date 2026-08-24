@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -107,10 +106,7 @@ public class FinancialCommitmentService {
         return result;
     }
 
-    /**
-     * 보험사 법인명·축약명 registry로 판정한 후보를 사용자별 표준 보험사명 하나로 묶는다.
-     * 출금계좌·계약·금액이 달라도 같은 보험사면 하나의 항목으로 합산하며, 반복 횟수나 동일 금액은 요구하지 않는다.
-     */
+    /** 보험사 registry로 판정한 출금 거래를 실제 상품명별로 분리하고, 상품별 최신 납입액을 반환한다. */
     private List<FinancialCommitmentSummary> buildInsuranceCommitments(Long userId, LocalDate fromDate, LocalDate toDate) {
         LocalDate today = LocalDate.now(clock);
         LocalDate observationEnd = toDate.isBefore(today) ? toDate : today;
@@ -119,42 +115,54 @@ public class FinancialCommitmentService {
         List<InsuranceOutflowRow> rows = financialCommitmentMapper.findInsuranceOutflowCandidates(
                 userId, observationStart, observationEnd);
 
-        Map<String, List<InsuranceOutflowRow>> occurrencesByInsurer = new LinkedHashMap<>();
+        Map<String, List<InsuranceOutflowRow>> occurrencesByProduct = new LinkedHashMap<>();
         for (InsuranceOutflowRow row : rows) {
             String combinedDescription = combineDescriptions(row);
             if (combinedDescription == null || row.getOutAmount() == null) {
                 continue;
             }
-            InsuranceCompany.matchStandardName(combinedDescription).ifPresent(standardName ->
-                    occurrencesByInsurer.computeIfAbsent(standardName, unused -> new ArrayList<>()).add(row));
+            InsuranceCompany.matchStandardName(combinedDescription).ifPresent(standardName -> {
+                String productName = findInsuranceProductName(row, standardName);
+                occurrencesByProduct.computeIfAbsent(productName, unused -> new ArrayList<>()).add(row);
+            });
         }
 
         List<FinancialCommitmentSummary> result = new ArrayList<>();
-        for (Map.Entry<String, List<InsuranceOutflowRow>> entry : occurrencesByInsurer.entrySet()) {
+        for (Map.Entry<String, List<InsuranceOutflowRow>> entry : occurrencesByProduct.entrySet()) {
             List<InsuranceOutflowRow> occurrences = entry.getValue();
 
-            LocalDate latestTranDate = occurrences.stream()
-                    .map(InsuranceOutflowRow::getTranDate)
-                    .max(Comparator.naturalOrder())
+            InsuranceOutflowRow latestOccurrence = occurrences.stream()
+                    .max(Comparator.comparing(InsuranceOutflowRow::getTranDate))
                     .orElseThrow();
+            LocalDate latestTranDate = latestOccurrence.getTranDate();
             LocalDate nextPaymentDate = latestTranDate.plusMonths(1);
             if (!withinRangeOrUnknown(nextPaymentDate, fromDate, toDate)) {
                 continue;
             }
 
-            YearMonth latestMonth = YearMonth.from(latestTranDate);
-            BigDecimal monthlyTotal = occurrences.stream()
-                    .filter(row -> YearMonth.from(row.getTranDate()).equals(latestMonth))
-                    .map(InsuranceOutflowRow::getOutAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            AmountResolution amount = resolveExpectedAmount(monthlyTotal);
+            AmountResolution amount = resolveExpectedAmount(latestOccurrence.getOutAmount());
             result.add(new FinancialCommitmentSummary(
                     null, null, EXPENSE_TYPE_INSURANCE, entry.getKey(),
                     null, amount.amount(), null, null, nextPaymentDate, amount.status(), STATUS_ESTIMATED
             ));
         }
         return result;
+    }
+
+    /** desc1~desc4 중 판정된 보험사가 포함된 원문 필드를 상품명으로 사용한다. */
+    private static String findInsuranceProductName(InsuranceOutflowRow row, String standardInsurerName) {
+        for (String value : new String[]{row.getDesc1(), row.getDesc2(), row.getDesc3(), row.getDesc4()}) {
+            if (value == null || value.trim().isEmpty()) {
+                continue;
+            }
+            String candidate = value.trim();
+            if (InsuranceCompany.matchStandardName(candidate)
+                    .filter(standardInsurerName::equals)
+                    .isPresent()) {
+                return candidate;
+            }
+        }
+        return standardInsurerName;
     }
 
     /** desc1→desc2→desc3→desc4 순서로 trim한 비어 있지 않은 값을 |로 결합한다. 전부 비어 있으면 null. */

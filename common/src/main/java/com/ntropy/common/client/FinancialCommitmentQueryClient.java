@@ -21,7 +21,7 @@ public interface FinancialCommitmentQueryClient {
     /**
      * 조회 기간에 납입 예정인 활성 금융상품을 반환한다.
      * 납입일을 알 수 없는 활성 대출·적금도 목록에서 제외하지 않는다.
-     * 보험은 반복 납입이 감지된 항목만 생성하므로 납입일 미상 상태 자체가 없다.
+     * 보험은 실제 거래 설명의 상품명별로 분리하고 최신 출금일과 금액으로 다음 납입을 추정한다.
      */
     List<FinancialCommitmentSummary> findFinancialCommitments(
             Long userId,
