@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.notification;
+package com.ntropy.notification.api.dto;
 
 /**
  * 다른 도메인 서비스(defense, payment, work 등)가 이벤트 발생 시 알림 생성을 요청할 때 사용하는 커맨드.

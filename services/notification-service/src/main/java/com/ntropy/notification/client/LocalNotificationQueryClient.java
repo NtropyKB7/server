@@ -4,9 +4,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.NotificationQueryClient;
+import com.ntropy.notification.api.client.NotificationQueryClient;
 import com.ntropy.common.dto.account.PageSummary;
-import com.ntropy.common.dto.notification.NotificationSummary;
+import com.ntropy.notification.api.dto.NotificationSummary;
 import com.ntropy.notification.domain.entity.Notification;
 import com.ntropy.notification.service.NotificationService;
 

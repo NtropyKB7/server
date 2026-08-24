@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.ntropy.common.dto.ai.AiReportDetailSummary;
+import com.ntropy.ai.api.dto.AiReportDetailSummary;
 
 class AiReportPdfServiceTest {
 

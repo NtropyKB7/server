@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.notification;
+package com.ntropy.notification.api.dto;
 
 import java.time.LocalDateTime;
 

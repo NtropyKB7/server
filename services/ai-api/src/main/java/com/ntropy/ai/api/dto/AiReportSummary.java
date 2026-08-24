@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.ai;
+package com.ntropy.ai.api.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 

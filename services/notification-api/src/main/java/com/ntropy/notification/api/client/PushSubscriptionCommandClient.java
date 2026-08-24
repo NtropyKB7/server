@@ -1,6 +1,6 @@
-package com.ntropy.common.client;
+package com.ntropy.notification.api.client;
 
-import com.ntropy.common.dto.notification.PushSubscribeCommand;
+import com.ntropy.notification.api.dto.PushSubscribeCommand;
 
 /**
  * 웹푸시 구독 등록/해제, VAPID 공개키 조회 계약. notification-service가 구현한다.

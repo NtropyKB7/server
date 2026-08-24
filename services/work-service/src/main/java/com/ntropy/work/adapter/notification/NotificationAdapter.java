@@ -2,8 +2,8 @@ package com.ntropy.work.adapter.notification;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.NotificationCommandClient;
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
+import com.ntropy.notification.api.client.NotificationCommandClient;
+import com.ntropy.notification.api.dto.NotificationCreateCommand;
 import com.ntropy.work.port.notification.NotificationPort;
 import com.ntropy.work.port.notification.NotificationRequest;
 

@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ntropy.ai.exception.AiReportErrorCode;
-import com.ntropy.common.dto.ai.AiReportDetailSummary;
+import com.ntropy.ai.api.dto.AiReportDetailSummary;
 import com.ntropy.common.exception.ServiceException;
 
 /** AI 리포트 상세 표시 모델을 한글 텍스트·표 중심 PDF로 생성한다. */

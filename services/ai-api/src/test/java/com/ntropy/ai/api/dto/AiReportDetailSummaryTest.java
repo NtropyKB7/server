@@ -1,4 +1,4 @@
-package com.ntropy.common.dto.ai;
+package com.ntropy.ai.api.dto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

@@ -3,8 +3,8 @@ package com.ntropy.ai.client;
 import org.springframework.stereotype.Component;
 
 import com.ntropy.ai.service.AiReportEmailDeliveryService;
-import com.ntropy.common.client.AiReportEmailDeliveryClient;
-import com.ntropy.common.dto.ai.AiReportEmailDeliverySummary;
+import com.ntropy.ai.api.client.AiReportEmailDeliveryClient;
+import com.ntropy.ai.api.dto.AiReportEmailDeliverySummary;
 
 import lombok.RequiredArgsConstructor;
 

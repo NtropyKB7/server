@@ -1,7 +1,7 @@
-package com.ntropy.common.client;
+package com.ntropy.notification.api.client;
 
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
-import com.ntropy.common.dto.notification.NotificationSummary;
+import com.ntropy.notification.api.dto.NotificationCreateCommand;
+import com.ntropy.notification.api.dto.NotificationSummary;
 
 /**
  * 알림 생성/읽음처리/삭제를 담당하는 notification-service 계약.

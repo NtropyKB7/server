@@ -11,8 +11,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ntropy.ai.domain.AiReport;
 import com.ntropy.ai.exception.AiReportErrorCode;
 import com.ntropy.ai.service.AiReportService;
-import com.ntropy.common.client.AiReportQueryClient;
-import com.ntropy.common.dto.ai.AiReportSummary;
+import com.ntropy.ai.api.client.AiReportQueryClient;
+import com.ntropy.ai.api.dto.AiReportSummary;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
-package com.ntropy.common.client;
+package com.ntropy.ai.api.client;
 
-import com.ntropy.common.dto.ai.AiReportSummary;
+import com.ntropy.ai.api.dto.AiReportSummary;
 import java.util.List;
 
 /**

@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import com.ntropy.common.dto.account.PageSummary;
-import com.ntropy.common.dto.notification.NotificationSummary;
+import com.ntropy.notification.api.dto.NotificationSummary;
 import com.ntropy.notification.service.NotificationServiceTestSupport;
 
 class LocalNotificationQueryClientTest {

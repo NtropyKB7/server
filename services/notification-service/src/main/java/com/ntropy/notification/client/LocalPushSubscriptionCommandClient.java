@@ -2,8 +2,8 @@ package com.ntropy.notification.client;
 
 import org.springframework.stereotype.Component;
 
-import com.ntropy.common.client.PushSubscriptionCommandClient;
-import com.ntropy.common.dto.notification.PushSubscribeCommand;
+import com.ntropy.notification.api.client.PushSubscriptionCommandClient;
+import com.ntropy.notification.api.dto.PushSubscribeCommand;
 import com.ntropy.notification.config.WebPushProperties;
 import com.ntropy.notification.service.PushSubscriptionService;
 

@@ -36,10 +36,10 @@ import com.ntropy.ai.exception.AiReportErrorCode;
 import com.ntropy.ai.port.payment.SubscriptionPort;
 import com.ntropy.ai.port.user.AiUser;
 import com.ntropy.ai.port.user.UserPort;
-import com.ntropy.common.client.AiReportQueryClient;
+import com.ntropy.ai.api.client.AiReportQueryClient;
 import com.ntropy.common.domain.Feature;
-import com.ntropy.common.dto.ai.AiReportEmailDeliverySummary;
-import com.ntropy.common.dto.ai.AiReportSummary;
+import com.ntropy.ai.api.dto.AiReportEmailDeliverySummary;
+import com.ntropy.ai.api.dto.AiReportSummary;
 import com.ntropy.common.exception.ServiceException;
 
 class AiReportEmailDeliveryServiceTest {

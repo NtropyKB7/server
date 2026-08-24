@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.common.dto.notification.NotificationCreateCommand;
-import com.ntropy.common.dto.notification.NotificationSummary;
+import com.ntropy.notification.api.dto.NotificationCreateCommand;
+import com.ntropy.notification.api.dto.NotificationSummary;
 import com.ntropy.notification.service.NotificationServiceTestSupport;
 
 class LocalNotificationCommandClientTest {
