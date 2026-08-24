@@ -1,9 +1,9 @@
 dependencies {
     implementation project(':common')
-    implementation project(':services:defense-api')
-    implementation project(':services:diagnosis-api')
-    implementation project(':services:account-api')
-    implementation project(':services:work-api')
+    implementation project(':services:defense:defense-api')
+    implementation project(':services:diagnosis:diagnosis-api')
+    implementation project(':services:account:account-api')
+    implementation project(':services:work:work-api')
     implementation "org.springframework:spring-webmvc:${springVersion}"
     implementation "org.springframework:spring-tx:${springVersion}"
     implementation 'org.mybatis:mybatis:3.5.16'
