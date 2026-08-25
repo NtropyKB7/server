@@ -33,15 +33,15 @@ import com.ntropy.account.mapper.FinancialPositionMapper;
 import com.ntropy.account.mapper.MonthlyExpenseMapper;
 import com.ntropy.account.service.FinancialPositionService;
 import com.ntropy.account.service.MonthlyExpenseService;
-import com.ntropy.work.api.client.IncomeAnalysisQueryClient;
 import com.ntropy.defense.api.dto.command.DefenseModeEnterCommand;
-import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.defense.adapter.diagnosis.DiagnosisSnapshotAdapter;
 import com.ntropy.defense.domain.DefenseCalculationStatus;
 import com.ntropy.defense.domain.DefenseMode;
 import com.ntropy.defense.domain.DefenseModeStatus;
 import com.ntropy.defense.mapper.DefenseModeMapper;
 import com.ntropy.defense.service.DefenseModeService;
+import com.ntropy.diagnosis.adapter.account.FinancialPositionAdapter;
+import com.ntropy.diagnosis.adapter.account.MonthlyExpenseAdapter;
 import com.ntropy.diagnosis.api.dto.DiagnosisAnalysisSummary;
 import com.ntropy.diagnosis.client.LocalDiagnosisAnalysisQueryClient;
 import com.ntropy.diagnosis.client.LocalDiagnosisCommandClient;
@@ -49,6 +49,8 @@ import com.ntropy.diagnosis.client.LocalDiagnosisQueryClient;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.dto.DiagnosisCalculationInput;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
+import com.ntropy.diagnosis.port.work.IncomeAnalysisPort;
+import com.ntropy.diagnosis.port.work.MonthlyIncomeAnalysis;
 import com.ntropy.diagnosis.service.CategoryExpenseCalculator;
 import com.ntropy.diagnosis.service.DiagnosisResultService;
 import com.zaxxer.hikari.HikariConfig;
@@ -98,7 +100,9 @@ class DiagnosisFinalizationManualVerificationTest {
                     context.getBean(FinancialPositionQueryClient.class);
 
             LocalDiagnosisCommandClient commandClient = new LocalDiagnosisCommandClient(
-                    diagnosisResultService, income, monthlyExpenseQueryClient, financialPositionQueryClient
+                    diagnosisResultService, income,
+                    new MonthlyExpenseAdapter(monthlyExpenseQueryClient),
+                    new FinancialPositionAdapter(financialPositionQueryClient)
             );
 
             commandClient.recalculate(USER_ID, targetMonth);
@@ -342,18 +346,13 @@ class DiagnosisFinalizationManualVerificationTest {
         }
     }
 
-    private static class StubIncomeAnalysisQueryClient implements IncomeAnalysisQueryClient {
+    private static class StubIncomeAnalysisQueryClient implements IncomeAnalysisPort {
         Long totalIncome;
         Long unmatchedIncome;
 
         @Override
-        public MonthlyIncomeAnalysisSummary getMonthlyIncomeAnalysis(Long userId, YearMonth yearMonth) {
-            return MonthlyIncomeAnalysisSummary.builder()
-                    .userId(userId)
-                    .yearMonth(yearMonth)
-                    .totalIncome(totalIncome)
-                    .unmatchedIncome(unmatchedIncome)
-                    .build();
+        public MonthlyIncomeAnalysis getMonthlyIncomeAnalysis(Long userId, YearMonth yearMonth) {
+            return new MonthlyIncomeAnalysis(totalIncome, unmatchedIncome);
         }
     }
 

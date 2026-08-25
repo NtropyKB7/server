@@ -25,7 +25,7 @@ import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
 import com.ntropy.account.api.dto.AccountRegistrationCommand;
-import com.ntropy.ai.api.client.TransactionClassificationCommandClient;
+import com.ntropy.account.port.ai.TransactionClassificationPort;
 import com.ntropy.common.exception.ServiceException;
 
 class LocalFinancialAccountCommandClientTest {
@@ -473,7 +473,7 @@ class LocalFinancialAccountCommandClientTest {
             AccountLifecycleMapper lifecycleMapper,
             AccountMapper accountMapper,
             CodefConnectionMapper connectionMapper,
-            TransactionClassificationCommandClient classificationClient
+            TransactionClassificationPort classificationClient
     ) {
         return new LocalFinancialAccountCommandClient(
                 personalBankAccountService, collectionService, regenerationService, virtualFinancialDataService,
@@ -482,7 +482,7 @@ class LocalFinancialAccountCommandClientTest {
     }
 
     private static class StubTransactionClassificationCommandClient
-            implements TransactionClassificationCommandClient {
+            implements TransactionClassificationPort {
         private final List<Long> userIds = new ArrayList<>();
         private RuntimeException failure;
 

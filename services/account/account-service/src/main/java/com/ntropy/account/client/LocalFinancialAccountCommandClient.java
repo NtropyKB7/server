@@ -24,7 +24,7 @@ import com.ntropy.account.service.PersonalBankAccountService;
 import com.ntropy.account.service.VirtualAccountRegenerationService;
 import com.ntropy.account.service.VirtualFinancialDataService;
 import com.ntropy.account.service.VirtualFinancialDataService.GenerationSummary;
-import com.ntropy.ai.api.client.TransactionClassificationCommandClient;
+import com.ntropy.account.port.ai.TransactionClassificationPort;
 import com.ntropy.common.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
     private final AccountLifecycleMapper accountLifecycleMapper;
     private final AccountMapper accountMapper;
     private final CodefConnectionMapper codefConnectionMapper;
-    private final TransactionClassificationCommandClient transactionClassificationCommandClient;
+    private final TransactionClassificationPort transactionClassificationPort;
 
     @Override
     public List<BankSummary> findSupportedBanks() {
@@ -103,7 +103,7 @@ public class LocalFinancialAccountCommandClient implements FinancialAccountComma
 
     private void classifyTransactionsSafely(Long userId) {
         try {
-            int processed = transactionClassificationCommandClient.classifyUnanalyzedTransactions(userId);
+            int processed = transactionClassificationPort.classifyUnanalyzedTransactions(userId);
             log.info("계좌 연동 후 소비 분류 완료: userId={}, processed={}", userId, processed);
         } catch (RuntimeException e) {
             log.warn("계좌 연동 후 소비 분류 실패: userId={}", userId, e);

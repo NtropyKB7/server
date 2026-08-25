@@ -22,16 +22,16 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
-import com.ntropy.account.api.client.FinancialPositionQueryClient;
-import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
-import com.ntropy.account.api.dto.FinancialPositionSummary;
-import com.ntropy.account.api.dto.MonthlyExpenseSummary;
-import com.ntropy.work.api.client.IncomeAnalysisQueryClient;
-import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.common.exception.ServiceException;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.exception.DiagnosisErrorCode;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
+import com.ntropy.diagnosis.port.account.FinancialPosition;
+import com.ntropy.diagnosis.port.account.FinancialPositionPort;
+import com.ntropy.diagnosis.port.account.MonthlyExpense;
+import com.ntropy.diagnosis.port.account.MonthlyExpensePort;
+import com.ntropy.diagnosis.port.work.MonthlyIncomeAnalysis;
+import com.ntropy.diagnosis.port.work.IncomeAnalysisPort;
 import com.ntropy.diagnosis.service.DiagnosisResultService;
 
 class LocalDiagnosisCommandClientTest {
@@ -284,7 +284,7 @@ class LocalDiagnosisCommandClientTest {
         StubFinancialPositionQueryClient financialPosition = new StubFinancialPositionQueryClient();
     }
 
-    private static class StubIncomeAnalysisQueryClient implements IncomeAnalysisQueryClient {
+    private static class StubIncomeAnalysisQueryClient implements IncomeAnalysisPort {
         boolean called;
         boolean returnNull;
         RuntimeException toThrow;
@@ -292,7 +292,7 @@ class LocalDiagnosisCommandClientTest {
         Long unmatchedIncome = 0L;
 
         @Override
-        public MonthlyIncomeAnalysisSummary getMonthlyIncomeAnalysis(Long userId, YearMonth yearMonth) {
+        public MonthlyIncomeAnalysis getMonthlyIncomeAnalysis(Long userId, YearMonth yearMonth) {
             called = true;
             if (toThrow != null) {
                 throw toThrow;
@@ -300,16 +300,11 @@ class LocalDiagnosisCommandClientTest {
             if (returnNull) {
                 return null;
             }
-            return MonthlyIncomeAnalysisSummary.builder()
-                    .userId(userId)
-                    .yearMonth(yearMonth)
-                    .totalIncome(totalIncome)
-                    .unmatchedIncome(unmatchedIncome)
-                    .build();
+            return new MonthlyIncomeAnalysis(totalIncome, unmatchedIncome);
         }
     }
 
-    private static class StubMonthlyExpenseQueryClient implements MonthlyExpenseQueryClient {
+    private static class StubMonthlyExpenseQueryClient implements MonthlyExpensePort {
         boolean called;
         boolean returnNull;
         RuntimeException toThrow;
@@ -317,7 +312,7 @@ class LocalDiagnosisCommandClientTest {
         Long fixedExpense = 0L;
 
         @Override
-        public MonthlyExpenseSummary findMonthlyExpense(Long userId, String yearMonth) {
+        public MonthlyExpense findMonthlyExpense(Long userId, String yearMonth) {
             called = true;
             if (toThrow != null) {
                 throw toThrow;
@@ -325,19 +320,19 @@ class LocalDiagnosisCommandClientTest {
             if (returnNull) {
                 return null;
             }
-            return new MonthlyExpenseSummary(userId, yearMonth, totalExpense, fixedExpense, Map.of());
+            return new MonthlyExpense(totalExpense, fixedExpense);
         }
     }
 
-    private static class StubFinancialPositionQueryClient implements FinancialPositionQueryClient {
+    private static class StubFinancialPositionQueryClient implements FinancialPositionPort {
         boolean currentCalled;
         boolean asOfCalled;
         LocalDate lastAsOf;
         RuntimeException toThrow;
-        FinancialPositionSummary summary = new FinancialPositionSummary(0L, 0L, 0L, 0L, 0L);
+        FinancialPosition summary = new FinancialPosition(0L, 0L, 0L);
 
         @Override
-        public FinancialPositionSummary findFinancialPosition(Long userId) {
+        public FinancialPosition findFinancialPosition(Long userId) {
             currentCalled = true;
             if (toThrow != null) {
                 throw toThrow;
@@ -346,7 +341,7 @@ class LocalDiagnosisCommandClientTest {
         }
 
         @Override
-        public FinancialPositionSummary findFinancialPosition(Long userId, LocalDate asOf) {
+        public FinancialPosition findFinancialPosition(Long userId, LocalDate asOf) {
             asOfCalled = true;
             lastAsOf = asOf;
             if (toThrow != null) {

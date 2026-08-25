@@ -15,15 +15,15 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
-import com.ntropy.account.api.client.FinancialPositionQueryClient;
-import com.ntropy.account.api.client.MonthlyExpenseQueryClient;
-import com.ntropy.account.api.dto.FinancialPositionSummary;
-import com.ntropy.account.api.dto.MonthlyExpenseSummary;
-import com.ntropy.work.api.client.IncomeAnalysisQueryClient;
-import com.ntropy.work.api.dto.summary.MonthlyIncomeAnalysisSummary;
 import com.ntropy.diagnosis.api.client.DiagnosisCommandClient;
 import com.ntropy.diagnosis.domain.entity.DiagnosisResult;
 import com.ntropy.diagnosis.mapper.DiagnosisResultMapper;
+import com.ntropy.diagnosis.port.account.FinancialPosition;
+import com.ntropy.diagnosis.port.account.FinancialPositionPort;
+import com.ntropy.diagnosis.port.account.MonthlyExpense;
+import com.ntropy.diagnosis.port.account.MonthlyExpensePort;
+import com.ntropy.diagnosis.port.work.MonthlyIncomeAnalysis;
+import com.ntropy.diagnosis.port.work.IncomeAnalysisPort;
 import com.ntropy.diagnosis.service.DiagnosisResultService;
 
 /**
@@ -65,31 +65,26 @@ class LocalDiagnosisCommandClientWiringTest {
         }
 
         @Bean
-        IncomeAnalysisQueryClient incomeAnalysisQueryClient() {
-            return (userId, yearMonth) -> MonthlyIncomeAnalysisSummary.builder()
-                    .userId(userId)
-                    .yearMonth(yearMonth)
-                    .totalIncome(0L)
-                    .unmatchedIncome(0L)
-                    .build();
+        IncomeAnalysisPort incomeAnalysisPort() {
+            return (userId, yearMonth) -> new MonthlyIncomeAnalysis(0L, 0L);
         }
 
         @Bean
-        MonthlyExpenseQueryClient monthlyExpenseQueryClient() {
-            return (userId, yearMonth) -> new MonthlyExpenseSummary(userId, yearMonth, 0L, 0L, java.util.Map.of());
+        MonthlyExpensePort monthlyExpensePort() {
+            return (userId, yearMonth) -> new MonthlyExpense(0L, 0L);
         }
 
         @Bean
-        FinancialPositionQueryClient financialPositionQueryClient() {
-            return new FinancialPositionQueryClient() {
+        FinancialPositionPort financialPositionPort() {
+            return new FinancialPositionPort() {
                 @Override
-                public FinancialPositionSummary findFinancialPosition(Long userId) {
-                    return new FinancialPositionSummary(0L, 0L, 0L, 0L, 0L);
+                public FinancialPosition findFinancialPosition(Long userId) {
+                    return new FinancialPosition(0L, 0L, 0L);
                 }
 
                 @Override
-                public FinancialPositionSummary findFinancialPosition(Long userId, LocalDate asOf) {
-                    return new FinancialPositionSummary(0L, 0L, 0L, 0L, 0L);
+                public FinancialPosition findFinancialPosition(Long userId, LocalDate asOf) {
+                    return new FinancialPosition(0L, 0L, 0L);
                 }
             };
         }
