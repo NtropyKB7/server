@@ -1,17 +1,20 @@
-<div align="center">
+<p align="center">
   <img src="readme-assets/images/img_6.png" width="180" alt="Ntropy 로고">
-  <h1>N트로피</h1>
-  <h3>N잡러의 지속 가능한 자산 관리를 위한 금융 매니저</h3>
-  <p>
-    흩어진 근무와 금융 데이터를 한곳에 모아<br>
-    오늘의 수입부터 내일의 재무 계획까지 체계적으로 관리합니다.
-  </p>
-  <p>
-    <a href="https://kbntropy.vercel.app"><strong>🌐 서비스 바로가기</strong></a>
-    &nbsp;&nbsp;|&nbsp;&nbsp;
-    <a href="https://www.youtube.com/watch?v=qjZMiiO7CHE"><strong>🎬 시연 영상 보기</strong></a>
-  </p>
-</div>
+</p>
+
+<h1 align="center">N트로피</h1>
+<h3 align="center">N잡러의 지속 가능한 자산 관리를 위한 금융 매니저</h3>
+
+<p align="center">
+  흩어진 근무와 금융 데이터를 한곳에 모아<br>
+  오늘의 수입부터 내일의 재무 계획까지 체계적으로 관리합니다.
+</p>
+
+<p align="center">
+  <a href="https://kbntropy.vercel.app"><strong>🌐 서비스 바로가기</strong></a>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="https://www.youtube.com/watch?v=qjZMiiO7CHE"><strong>🎬 시연 영상 보기</strong></a>
+</p>
 
 <br>
 
