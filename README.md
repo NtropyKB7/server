@@ -32,6 +32,8 @@
 - **진행 과정**: KB IT's Your Life 7기 종합 실무 프로젝트
 - **개발 기간**: 2026.07.09 ~ 2026.08.24 (8주)
 
+<br>
+
 ## 💡 핵심 기능
 
 ![Ntropy 핵심 기능](readme-assets/images/img_2.png)
@@ -45,6 +47,8 @@
 - **소셜 로그인** — Google·Kakao OAuth와 JWT를 기반으로 간편하고 안전한 인증을 지원합니다.
 - **구독·결제** — PortOne을 통해 결제수단 등록, 정기 구독, 해지 및 결제 내역을 관리합니다.
 - **알림** — 근무와 정산 등 주요 일정을 Web Push로 안내합니다.
+
+<br>
 
 ## 📈 시장 배경 및 문제 정의
 
@@ -61,6 +65,7 @@
 
 Ntropy는 근무·정산·계좌·소비 데이터를 하나로 연결해 소득을 통합 관리하고, 목표에 맞는 근무 계획과 재무 대응 방안을 제시합니다.
 
+<br>
 
 ## 🛠️ 기술 스택
 
@@ -112,6 +117,7 @@ Ntropy는 근무·정산·계좌·소비 데이터를 하나로 연결해 소득
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 ![GitHub Container Registry](https://img.shields.io/badge/GHCR-181717?style=flat-square&logo=github&logoColor=white)
 
+<br>
 
 ## 🏛️ 시스템 아키텍처
 
@@ -132,6 +138,8 @@ Ntropy 백엔드는 기능별 책임을 분리한 멀티 모듈 모놀리스 구
 | `notification-service` | 서비스 알림과 Web Push |
 | `ai-service` | 거래 분류, AI 리포트, 금융상품 추천, PDF·이메일 생성 |
 | `common` | 모듈 간 공통 DTO, 인터페이스, 예외 및 유틸리티 |
+
+<br>
 
 ## 🗃️ ERD
 
